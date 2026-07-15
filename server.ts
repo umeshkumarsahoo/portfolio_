@@ -656,9 +656,9 @@ Guidelines for responding:
       parts: [{ text: trimmedMessage }]
     });
 
-    console.log(`[BACKEND] Querying Gemini 3.5 Flash for user request...`);
+    console.log(`[BACKEND] Querying Gemini Flash for user request...`);
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-1.5-flash",
       contents,
       config: {
         systemInstruction,
