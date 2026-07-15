@@ -598,15 +598,20 @@ URL: ${story.url || `https://news.ycombinator.com/item?id=${story.id}`}`;
     // Always fetch latest or cached repos & readmes
     const repos = await fetchGithubData();
 
-    // Construct highly detailed portfolio knowledge base context
+    // Construct highly detailed portfolio knowledge base context (TRUNCATED for speed)
     const reposContextText = repos.map((r, i) => {
+      // Truncate readme to save massive amount of tokens and make AI extremely fast
+      const truncatedReadme = r.readme && r.readme.length > 800 
+        ? r.readme.substring(0, 800) + "... [TRUNCATED]" 
+        : (r.readme || "No README provided.");
+
       return `--- REPO #${i + 1}: ${r.name} ---
 URL: ${r.html_url}
 Language: ${r.language || "Not Specified"}
 Stars: ${r.stargazers_count} | Forks: ${r.forks_count}
 Description: ${r.description || "No description provided."}
-README.md Content:
-${r.readme}
+README Snippet:
+${truncatedReadme}
 `;
     }).join("\n\n");
 
