@@ -269,18 +269,6 @@ ACHIEVEMENTS & CERTIFICATIONS
 - Google Generative AI (Intro) · IBM Introduction to AI · Job Ready Data Science · Active LeetCode problem-solver (DSA & Design Thinking, username: phribbi39)
 `;
 
-function getRequestedNewsCount(message: string) {
-  const lowerMessage = message.toLowerCase();
-  const hasNewsIntent = /\b(news|headlines?|hacker\s*news|hn)\b/.test(lowerMessage);
-  const asksForBriefing = /\b(brief|summari[sz]e|top|latest|current|today|headlines?)\b/.test(lowerMessage);
-  if (!hasNewsIntent || !asksForBriefing) return null;
-
-  const countMatch = lowerMessage.match(/\b(?:top|brief|summari[sz]e|show|get|give)?\s*(10|[1-9])\s*(?:tech\s*)?(?:news|headlines?|hacker\s*news|hn)\b/)
-    || lowerMessage.match(/\b(?:news|headlines?|hacker\s*news|hn)\b.{0,24}\b(10|[1-9])\b/);
-  const requestedCount = countMatch ? Number(countMatch[1]) : 7;
-  return Math.min(10, Math.max(1, requestedCount));
-}
-
 async function fetchHackerNewsStories(limit = 7) {
   const storyLimit = Math.min(10, Math.max(1, limit));
   const now = Date.now();
@@ -596,20 +584,15 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       return;
     }
 
-    const requestedNewsCount = getRequestedNewsCount(trimmedMessage);
     let liveNewsContextText = "";
-    if (requestedNewsCount) {
-      try {
-        const newsStories = await fetchHackerNewsStories(requestedNewsCount);
-        liveNewsContextText = newsStories.map((story, index) => {
-          return `${index + 1}. ${story.title}
+    if (cachedNewsStories.length > 0) {
+      liveNewsContextText = cachedNewsStories.slice(0, 10).map((story, index) => {
+        return `${index + 1}. ${story.title}
 Author: ${story.by || "unknown"} | Score: ${story.score || 0}
 URL: ${story.url || `https://news.ycombinator.com/item?id=${story.id}`}`;
-        }).join("\n\n");
-      } catch (newsError) {
-        console.error("[BACKEND] Hacker News fetch failed:", newsError);
-        liveNewsContextText = "Live Hacker News context could not be fetched right now. Give a concise fallback warning instead of inventing headlines.";
-      }
+      }).join("\n\n");
+    } else {
+      liveNewsContextText = "Live Hacker News context could not be fetched right now. Give a concise fallback warning instead of inventing headlines.";
     }
 
     // Always fetch latest or cached repos & readmes
