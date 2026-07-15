@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
+import { Eye } from "lucide-react";
 import HeaderBar from "./components/HeaderBar";
 import LeftSidebar from "./components/LeftSidebar";
 import TerminalLogs from "./components/TerminalLogs";
@@ -304,10 +305,15 @@ export default function App() {
                     </div>
 
                     {/* Role Badge */}
-                    <div id="hero-role-badge">
+                    <div id="hero-role-badge" className="flex items-center gap-3">
                       <span className="border border-white/60 text-white font-mono text-[10px] sm:text-xs tracking-[0.2em] px-3.5 py-1.5 bg-white/5 inline-block font-semibold">
                         AI/ML PORTFOLIO ENGINEER
                       </span>
+                      {/* Profile Views */}
+                      <div title="Profile Views" className="border border-white/30 px-3 py-1.5 bg-black inline-flex items-center gap-2">
+                        <Eye className="w-3.5 h-3.5 text-gray-400" /> 
+                        <img src="https://komarev.com/ghpvc/?username=umeshkumarsahoo-portfolio&label=%20&color=dc2626&style=flat-square" alt="Visitor Count" className="h-3.5" />
+                      </div>
                     </div>
 
                     {/* Professional Description */}

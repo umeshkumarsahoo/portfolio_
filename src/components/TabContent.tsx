@@ -373,15 +373,6 @@ export default function TabContent({
               <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
               <span className="sm:col-span-8 text-white select-all">+91-7735203945</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1 items-center border-t border-white/10 pt-2">
-              <span className="sm:col-span-3 text-gray-400 font-bold flex items-center gap-2">
-                <Eye className="w-3.5 h-3.5" /> PROFILE VIEWS
-              </span>
-              <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
-              <span className="sm:col-span-8 text-white">
-                <img src="https://komarev.com/ghpvc/?username=umeshkumarsahoo-portfolio&label=%20&color=black&style=flat-square" alt="Visitor Count" className="h-4 opacity-80 mix-blend-screen" />
-              </span>
-            </div>
           </div>
         </div>
 
