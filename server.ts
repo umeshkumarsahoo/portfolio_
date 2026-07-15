@@ -418,12 +418,12 @@ app.get("/api/csrf", (req, res) => {
   res.json({ csrfToken });
 });
 
-app.use("/api", verifyCsrf);
-
-// Health Check
+// Health Check (MUST be before CSRF middleware so Render can reach it)
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+app.use("/api", verifyCsrf);
 
 // Get public repositories
 app.get("/api/github/repos", async (req, res) => {
