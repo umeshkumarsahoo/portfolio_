@@ -14,6 +14,7 @@ dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1); // Fixes ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on Render
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 const HMR_PORT = Number(process.env.VITE_HMR_PORT) || PORT + 1;
