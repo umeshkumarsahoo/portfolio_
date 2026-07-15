@@ -332,7 +332,7 @@ export default function TabContent({
           <p className="text-white font-bold text-xs flex items-center gap-1.5 uppercase">
             [ ABOUT ME ]
           </p>
-          <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">
+          <p className="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed">
             I'm Umesh Kumar Sahoo, an AI/ML enthusiast and Computer Science undergraduate who loves building intelligent systems that solve real-world problems. I enjoy turning ideas into products using data, code and a deep curiosity to learn more every day.
           </p>
 
@@ -480,10 +480,10 @@ export default function TabContent({
                   <span className="text-[10px] bg-white text-black px-1 font-bold inline-block select-none mb-1">
                     {exp.year}
                   </span>
-                  <h4 className="text-white font-bold text-xs sm:text-sm tracking-wide">
+                  <h4 className="text-white font-bold text-xs sm:text-sm md:text-base tracking-wide">
                     {exp.role}
                   </h4>
-                  <ul className="text-xs text-gray-300 space-y-1 pl-1 mt-1.5">
+                  <ul className="text-xs sm:text-sm md:text-base text-gray-300 space-y-1 pl-1 mt-1.5">
                     {exp.details.map((detail, dIdx) => (
                       <li key={dIdx} className="leading-relaxed">
                         &gt; {detail}
@@ -501,52 +501,75 @@ export default function TabContent({
 
   // 3. PROJECTS TAB (Matches Screenshot 2 perfectly)
   if (activeTab === "projects") {
-    const projectItems = [
-      {
-        title: "RAG-Based Video Teaching Assistant",
-        tags: "Python | RAG | LLM | Streamlit",
-        icon: <Brain className="w-5 h-5 text-white" />,
-        githubUrl: "https://github.com/umeshkumarsahoo/rag-video-assistant",
-        lines: [
-          "Built a Retrieval-Augmented Generation system for educational videos.",
-          "Pipeline: Whisper transcription -> chunking -> embeddings -> cosine similarity -> LLM answer with timestamp context.",
-          "Implemented confidence-threshold filtering to reduce hallucinations and improve response reliability."
-        ]
-      },
-      {
-        title: "FreshGuard - Shelf-Life Prediction System",
-        tags: "Python | ML | Flask | CI/CD",
-        icon: <Leaf className="w-5 h-5 text-white" />,
-        githubUrl: "https://github.com/umeshkumarsahoo/FreshGuard",
-        lines: [
-          "End-to-end ML pipeline on 3,552 real-world produce records.",
-          "Achieved R² = 0.89 with Gradient Boosting (31% better than baseline).",
-          "Deployed as Flask REST API with GitHub Actions CI/CD for automated testing and deployment."
-        ]
-      },
-      {
-        title: "Nifty-50 Stock Price Forecasting",
-        tags: "Python | LSTM | ARIMAX | TF",
-        icon: <TrendingUp className="w-5 h-5 text-white" />,
-        githubUrl: "https://github.com/umeshkumarsahoo/Nifty-50-Stock-Price-Forecasting",
-        lines: [
-          "Forecasted VWAP on 20+ years ICICI Bank / Nifty-50 data.",
-          "Engineered 32 lag features using 3d/7d/30d rolling windows.",
-          "Benchmarked ARIMA, ARIMAX, LSTM, RNN - LSTM performed best with ~3-4% lower MAE than RNN."
-        ]
-      },
-      {
-        title: "Flight Delay Prediction Classifier",
-        tags: "Python | XGBoost | Scikit-learn",
-        icon: <Plane className="w-5 h-5 text-white" />,
-        githubUrl: "https://github.com/umeshkumarsahoo/Flight-Delay-Prediction-Classifier",
-        lines: [
-          "Built multiclass classifier to predict flight delay categories.",
-          "Achieved Accuracy 87%, Precision 0.84, Recall 0.80, AUC 0.91.",
-          "Engineered temporal, seasonal and airport-level features."
-        ]
+    // Dynamically calculate value and rank projects based on impact
+    const getImpactScore = (repo: GithubRepo) => {
+      let score = (repo.stargazers_count * 100) + (repo.forks_count * 50);
+      
+      const name = repo.name.toLowerCase();
+      const desc = (repo.description || "").toLowerCase();
+      const combined = name + " " + desc;
+
+      // Heavy penalty for obvious junk/assignments
+      if (
+        name.includes("assingment") || 
+        name.includes("assignment") || 
+        name === "small-projects" || 
+        name === "python" ||
+        name.includes("leet-code") || 
+        name.includes("mern-stack") ||
+        name.includes("bday") || 
+        name.includes("hlo-resh") ||
+        name.includes("git1") ||
+        name.includes("first-web") ||
+        name.includes("calculator") ||
+        name.includes("awesome-github") ||
+        name.includes("docs") ||
+        name.includes("portfolio") ||
+        name === "tata" ||
+        name === "aws" ||
+        name === "water-borne"
+      ) {
+        return -9999;
       }
-    ];
+
+      // Massive bonus for recognized flagship projects so they stay featured 
+      // unless organically surpassed by a new repo with many stars (e.g., > 5 stars)
+      if (name.includes("rag") || name.includes("teaching")) score += 500;
+      if (name.includes("fresh_guard") || name.includes("freshguard")) score += 500;
+      if (name.includes("time_series") || name.includes("nifty")) score += 500;
+      if (name.includes("ml-projects") || name.includes("classifier")) score += 400;
+      if (name.includes("spec2model")) score += 300;
+
+      // Organic bonuses for good descriptions and ML keywords
+      if (combined.includes("prediction") || combined.includes("system") || combined.includes("classifier") || combined.includes("forecasting") || combined.includes("pipeline") || combined.includes("model")) {
+        score += 50;
+      }
+
+      if (desc.length > 20) score += 20;
+
+      return score;
+    };
+
+    const rankedRepos = [...repos]
+      .filter(repo => getImpactScore(repo) > -100) // Drop penalized repos
+      .sort((a, b) => getImpactScore(b) - getImpactScore(a));
+
+    const topRepos = rankedRepos.slice(0, 4);
+
+    const getDynamicIcon = (repo: GithubRepo) => {
+      const name = repo.name.toLowerCase();
+      const lang = repo.language?.toLowerCase() || "";
+      const desc = repo.description?.toLowerCase() || "";
+
+      if (name.includes("ml") || name.includes("ai") || name.includes("rag") || desc.includes("learning") || desc.includes("prediction") || desc.includes("model")) return <Brain className="w-5 h-5 text-white" />;
+      if (name.includes("flight") || name.includes("plane")) return <Plane className="w-5 h-5 text-white" />;
+      if (name.includes("guard") || name.includes("eco") || name.includes("leaf")) return <Leaf className="w-5 h-5 text-white" />;
+      if (name.includes("stock") || name.includes("trade") || name.includes("finance") || name.includes("forecast")) return <TrendingUp className="w-5 h-5 text-white" />;
+      if (lang === "python") return <Code className="w-5 h-5 text-white" />;
+      if (lang === "javascript" || lang === "typescript" || lang === "html") return <Globe className="w-5 h-5 text-white" />;
+      
+      return <Terminal className="w-5 h-5 text-white" />;
+    };
 
     return (
       <motion.div
@@ -572,48 +595,52 @@ export default function TabContent({
           </p>
 
           <div className="space-y-4">
-            {projectItems.map((proj, idx) => (
-              <div key={idx} className="border-b border-dashed border-white/10 pb-4 last:border-b-0 last:pb-0 flex flex-col sm:flex-row gap-3.5 items-start">
-                
-                {/* Left Side square icon */}
-                <div className="border border-white/30 p-2.5 bg-black rounded-sm flex items-center justify-center shrink-0">
-                  {proj.icon}
-                </div>
-
-                {/* Right Side Content details */}
-                <div className="flex-1 space-y-1.5 w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <h4 className="text-white font-bold text-xs sm:text-sm tracking-wide">
-                      {proj.title}
-                    </h4>
-                    <span className="text-[10px] text-gray-400 font-mono">
-                      [ {proj.tags} ]
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-300 space-y-1 pl-1">
-                    {proj.lines.map((line, lIdx) => (
-                      <p key={lIdx} className="leading-relaxed">
-                        &gt; {line}
-                      </p>
-                    ))}
-                  </div>
+            {topRepos.length > 0 ? (
+              topRepos.map((repo, idx) => (
+                <div key={idx} className="border-b border-dashed border-white/10 pb-4 last:border-b-0 last:pb-0 flex flex-col sm:flex-row gap-3.5 items-start">
                   
-                  {/* Active GitHub Link Button for each project */}
-                  <div className="pt-1.5 pl-1">
-                    <a
-                      href={proj.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[10px] text-white hover:text-black hover:bg-white border border-white/30 hover:border-white px-2.5 py-1 font-bold transition-all"
-                    >
-                      <Globe className="w-3 h-3" />
-                      &gt; VIEW REPO ON GITHUB
-                    </a>
+                  {/* Left Side square icon */}
+                  <div className="border border-white/30 p-2.5 bg-black rounded-sm flex items-center justify-center shrink-0">
+                    {getDynamicIcon(repo)}
                   </div>
-                </div>
 
+                  {/* Right Side Content details */}
+                  <div className="flex-1 space-y-1.5 w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                      <h4 className="text-white font-bold text-xs sm:text-sm md:text-base tracking-wide">
+                        {repo.name}
+                      </h4>
+                      <span className="text-[10px] sm:text-xs md:text-sm text-gray-400 font-mono">
+                        [ {repo.language || "Mixed"} | ⭐ {repo.stargazers_count} | ⑂ {repo.forks_count} ]
+                      </span>
+                    </div>
+                    <div className="text-xs sm:text-sm md:text-base text-gray-300 space-y-1 pl-1">
+                      <p className="leading-relaxed whitespace-pre-wrap">
+                        &gt; {repo.description || "No description provided for this repository."}
+                      </p>
+                    </div>
+                    
+                    {/* Active GitHub Link Button for each project */}
+                    <div className="pt-1.5 pl-1">
+                      <a
+                        href={repo.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-white hover:text-black hover:bg-white border border-white/30 hover:border-white px-2.5 py-1 font-bold transition-all"
+                      >
+                        <Globe className="w-3 h-3" />
+                        &gt; VIEW REPO ON GITHUB
+                      </a>
+                    </div>
+                  </div>
+
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-gray-400 font-mono p-4 animate-pulse">
+                &gt; NO REPOSITORIES FOUND. FETCHING FROM UPSTREAM...
               </div>
-            ))}
+            )}
           </div>
 
           {/* Bottom link element matching Screenshot 2 */}
@@ -676,10 +703,10 @@ export default function TabContent({
                   {/* Skills description & bars */}
                   <div className="flex-1 w-full min-w-0 grid grid-cols-1 xl:grid-cols-12 gap-2 xl:items-center">
                     <div className="xl:col-span-7 space-y-1 min-w-0">
-                      <h4 className="text-white font-bold text-xs sm:text-sm tracking-wide">
+                      <h4 className="text-white font-bold text-xs sm:text-sm md:text-base tracking-wide">
                         {skill.title}
                       </h4>
-                      <p className="text-[10px] text-gray-400 leading-normal">
+                      <p className="text-[10px] sm:text-xs md:text-sm text-gray-400 leading-normal">
                         {skill.items}
                       </p>
                     </div>

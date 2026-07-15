@@ -42,15 +42,18 @@ body,
 /* Custom styles for terminal scanning lines and scan effect */
 @keyframes scanline {
   0% {
-    transform: translateY(-100%);
+    top: 0%;
+  }
+  50% {
+    top: 100%;
   }
   100% {
-    transform: translateY(100%);
+    top: 0%;
   }
 }
 
 .animate-scanline {
-  animation: scanline 6s linear infinite;
+  animation: scanline 4s ease-in-out infinite;
 }
 
 @keyframes blink {
