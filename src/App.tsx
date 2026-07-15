@@ -207,16 +207,11 @@ export default function App() {
     ]);
   };
 
-  const handleBriefNews = (stories: HackerNewsStory[]) => {
-    const storyLines = stories.slice(0, 7).map((story, index) => {
-      const title = story.title.length > 76 ? `${story.title.slice(0, 73)}...` : story.title;
-      return `${index + 1}. ${title} (${story.score || 0} pts by ${story.by || "unknown"})`;
-    }).join("\n");
-
+  const handleBriefNews = () => {
     updateLogsForTab("agent");
-    setInitialAgentQuery(
-      `Brief these top 7 live tech news items in one short line each. Keep it concise and terminal-style.\n${storyLines}`
-    );
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("ask-news-brief"));
+    }, 100);
   };
 
   const centerPanelGridClass =

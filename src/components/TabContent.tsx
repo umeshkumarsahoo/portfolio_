@@ -84,8 +84,19 @@ export default function TabContent({
     const handleRefresh = () => {
       loadRepos();
     };
+    const handleNewsBriefPrompt = () => {
+      setMessages(prev => [...prev, {
+        role: "agent",
+        content: "I have the top daily tech news loaded in my cache! Which specific news item or topic would you like me to brief you on?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      }]);
+    };
     window.addEventListener("github-data-refreshed", handleRefresh);
-    return () => window.removeEventListener("github-data-refreshed", handleRefresh);
+    window.addEventListener("ask-news-brief", handleNewsBriefPrompt);
+    return () => {
+      window.removeEventListener("github-data-refreshed", handleRefresh);
+      window.removeEventListener("ask-news-brief", handleNewsBriefPrompt);
+    };
   }, []);
 
   useEffect(() => {
