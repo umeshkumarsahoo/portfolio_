@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Fira+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "Share Tech Mono", "Fira Mono", "Courier New", monospace;
+  --font-pixel: "VT323", "Share Tech Mono", monospace;
+}
+
+:root {
+  --terminal-accent: #ef4444;
+  --terminal-accent-soft: rgba(239, 68, 68, 0.16);
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000000;
+}
+
+.terminal-red-shell {
+  background:
+    linear-gradient(180deg, rgba(239, 68, 68, 0.055), transparent 22%),
+    radial-gradient(circle at 10% 0%, rgba(239, 68, 68, 0.12), transparent 28%),
+    #000000;
+}
+
+.terminal-red-frame {
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.18),
+    0 0 28px rgba(239, 68, 68, 0.08),
+    0 0 20px rgba(255, 255, 255, 0.05);
+}
+
+.terminal-red-rule {
+  box-shadow: inset 0 -1px 0 rgba(239, 68, 68, 0.35);
+}
+
+/* Custom styles for terminal scanning lines and scan effect */
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.animate-scanline {
+  animation: scanline 6s linear infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Custom scrollbar to keep terminal aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid #000000;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
