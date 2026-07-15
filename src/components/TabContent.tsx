@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { 
   Send, Terminal, Cpu, Bot, Star, ExternalLink, RefreshCw, Sparkles, BookOpen, 
   Calendar, User, MapPin, Mail, Phone, GraduationCap, TrendingUp, Cloud, Trophy, 
-  Brain, Leaf, Plane, Award, Code, Globe, Play 
+  Brain, Leaf, Plane, Award, Code, Globe, Play, Github, Linkedin 
 } from "lucide-react";
 import { secureFetch } from "../lib/api";
 
@@ -882,6 +882,62 @@ export default function TabContent({
             </button>
           </div>
         </form>
+
+        {/* Social Links Panel */}
+        <div className="border border-white/20 p-4 bg-white/5 space-y-3">
+          <p className="text-white font-bold text-xs uppercase mb-2">
+            [ CONNECT_PROTOCOLS ]
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* GitHub */}
+            <a
+              href="https://github.com/umeshkumarsahoo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 border border-white/20 bg-black p-3 hover:border-white hover:bg-white/5 transition-all group cursor-pointer"
+            >
+              <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0">
+                <Github className="w-5 h-5 text-white group-hover:text-red-400 transition-colors" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-white font-bold text-xs block tracking-wide">GITHUB</span>
+                <span className="text-[9px] text-gray-400 font-mono truncate block">umeshkumarsahoo</span>
+              </div>
+            </a>
+
+            {/* LinkedIn */}
+            <a
+              href="https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 border border-white/20 bg-black p-3 hover:border-white hover:bg-white/5 transition-all group cursor-pointer"
+            >
+              <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0">
+                <Linkedin className="w-5 h-5 text-white group-hover:text-red-400 transition-colors" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-white font-bold text-xs block tracking-wide">LINKEDIN</span>
+                <span className="text-[9px] text-gray-400 font-mono truncate block">umesh-kumar-sahoo</span>
+              </div>
+            </a>
+
+            {/* LeetCode */}
+            <a
+              href="https://leetcode.com/u/phribbi39"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 border border-white/20 bg-black p-3 hover:border-white hover:bg-white/5 transition-all group cursor-pointer"
+            >
+              <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0">
+                <Code className="w-5 h-5 text-white group-hover:text-red-400 transition-colors" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-white font-bold text-xs block tracking-wide">LEETCODE</span>
+                <span className="text-[9px] text-gray-400 font-mono truncate block">phribbi39</span>
+              </div>
+            </a>
+          </div>
+        </div>
       </motion.div>
     );
   }
