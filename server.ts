@@ -424,6 +424,55 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// --- VISITOR COUNTER ---
+const VISITOR_STATS_FILE = path.join(process.cwd(), "visitor_stats.json");
+let visitorTotalCount = 0;
+const visitorSeenIPs = new Set<string>();
+
+// Load persisted visitor stats on startup
+try {
+  if (fs.existsSync(VISITOR_STATS_FILE)) {
+    const raw = fs.readFileSync(VISITOR_STATS_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.totalCount === "number") visitorTotalCount = parsed.totalCount;
+    if (Array.isArray(parsed.seenHashes)) {
+      for (const h of parsed.seenHashes) visitorSeenIPs.add(h);
+    }
+    console.log(`[BACKEND] Loaded visitor stats: ${visitorTotalCount} total views, ${visitorSeenIPs.size} unique visitors.`);
+  }
+} catch (err) {
+  console.error("[BACKEND] Error reading visitor stats file:", err);
+}
+
+function persistVisitorStats() {
+  try {
+    fs.writeFileSync(
+      VISITOR_STATS_FILE,
+      JSON.stringify({ totalCount: visitorTotalCount, seenHashes: Array.from(visitorSeenIPs) }, null, 2),
+      "utf-8"
+    );
+  } catch (err) {
+    console.error("[BACKEND] Error writing visitor stats file:", err);
+  }
+}
+
+// Visitor count endpoint — GET so it bypasses CSRF, tracks on each page load
+app.get("/api/visitors", (req, res) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  const rawIp = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress || "unknown";
+  const ipHash = crypto.createHash("sha256").update(rawIp + "portfolio-salt-2026").digest("hex");
+
+  visitorTotalCount++;
+  const isNew = !visitorSeenIPs.has(ipHash);
+  if (isNew) visitorSeenIPs.add(ipHash);
+
+  // Persist asynchronously (non-blocking)
+  persistVisitorStats();
+
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ totalViews: visitorTotalCount, uniqueVisitors: visitorSeenIPs.size });
+});
+
 app.use("/api", verifyCsrf);
 
 // Get public repositories

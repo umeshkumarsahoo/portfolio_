@@ -21,6 +21,19 @@ export default function App() {
     "Let's build the future with data and intelligence."
   ]);
   const [initialAgentQuery, setInitialAgentQuery] = useState("");
+  const [visitorCount, setVisitorCount] = useState<number | null>(null);
+
+  // Fetch real visitor count from server on mount
+  useEffect(() => {
+    fetch("/api/visitors", { credentials: "same-origin", cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data && typeof data.totalViews === "number") {
+          setVisitorCount(data.totalViews);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Event listener to append system logs from sub-components
   useEffect(() => {
@@ -311,8 +324,10 @@ export default function App() {
                       </span>
                       {/* Profile Views */}
                       <div title="Profile Views" className="border border-white/30 px-3 py-1.5 bg-black inline-flex items-center gap-2">
-                        <Eye className="w-3.5 h-3.5 text-gray-400" /> 
-                        <img src="https://komarev.com/ghpvc/?username=umeshkumarsahoo-portfolio&label=%20&color=dc2626&style=flat-square" alt="Visitor Count" className="h-3.5" />
+                        <Eye className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="font-mono text-[11px] text-red-400 tracking-wider">
+                          {visitorCount !== null ? visitorCount.toLocaleString() : "···"}
+                        </span>
                       </div>
                     </div>
 
