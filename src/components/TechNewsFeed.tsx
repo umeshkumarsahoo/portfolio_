@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ExternalLink, Sparkles, RefreshCw, Radio } from "lucide-react";
 
 export interface HackerNewsStory {
   id: number;
@@ -10,172 +11,157 @@ export interface HackerNewsStory {
 
 interface TechNewsFeedProps {
   onBriefNews?: (stories: HackerNewsStory[]) => void;
+  className?: string;
 }
 
 const TOP_STORIES_URL = "https://hacker-news.firebaseio.com/v0/topstories.json";
 const ITEM_URL = "https://hacker-news.firebaseio.com/v0/item";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const STORY_COUNT = 7;
+const STORY_COUNT = 6;
 
-export default function TechNewsFeed({ onBriefNews }: TechNewsFeedProps) {
+export default function TechNewsFeed({ onBriefNews, className = "" }: TechNewsFeedProps) {
   const [stories, setStories] = useState<HackerNewsStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const loadStories = async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
+    setError("");
 
-    const loadStories = async (showLoading = false) => {
-      if (showLoading) {
-        setIsLoading(true);
-      }
-      setError("");
+    try {
+      const topStoriesResponse = await fetch(TOP_STORIES_URL);
+      if (!topStoriesResponse.ok) throw new Error("Unable to reach Hacker News");
 
-      try {
-        const topStoriesResponse = await fetch(TOP_STORIES_URL, {
-          signal: controller.signal
-        });
+      const storyIds = (await topStoriesResponse.json()) as number[];
+      const topStoryIds = storyIds.slice(0, STORY_COUNT);
 
-        if (!topStoriesResponse.ok) {
-          throw new Error("topstories endpoint rejected the stream");
-        }
+      const storyResults = await Promise.all(
+        topStoryIds.map(async (id) => {
+          const res = await fetch(`${ITEM_URL}/${id}.json`);
+          if (!res.ok) return null;
+          return (await res.json()) as HackerNewsStory | null;
+        })
+      );
 
-        const storyIds = (await topStoriesResponse.json()) as number[];
-        const topStoryIds = storyIds.slice(0, STORY_COUNT);
-
-        const storyResults = await Promise.all(
-          topStoryIds.map(async (id) => {
-            const storyResponse = await fetch(`${ITEM_URL}/${id}.json`, {
-              signal: controller.signal
-            });
-
-            if (!storyResponse.ok) {
-              throw new Error(`item ${id} endpoint rejected the stream`);
-            }
-
-            return (await storyResponse.json()) as HackerNewsStory | null;
-          })
-        );
-
-        const normalizedStories = storyResults
-          .filter((story): story is HackerNewsStory => Boolean(story?.id && story?.title))
-          .map((story) => ({
-            ...story,
-            url: story.url || `https://news.ycombinator.com/item?id=${story.id}`
-          }));
-
-        setStories(normalizedStories);
-        setLastUpdated(new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
+      const normalizedStories = storyResults
+        .filter((story): story is HackerNewsStory => Boolean(story?.id && story?.title))
+        .map((story) => ({
+          ...story,
+          url: story.url || `https://news.ycombinator.com/item?id=${story.id}`,
         }));
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          setError("SYS_WARN: Hacker News stream temporarily unavailable.");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
+      setStories(normalizedStories);
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    } catch (err: any) {
+      setError("Hacker News live stream temporarily unreachable.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadStories(true);
-    const refreshTimer = window.setInterval(() => loadStories(false), REFRESH_INTERVAL_MS);
-
-    return () => {
-      controller.abort();
-      window.clearInterval(refreshTimer);
-    };
+    const timer = setInterval(() => loadStories(false), REFRESH_INTERVAL_MS);
+    return () => clearInterval(timer);
   }, []);
 
   return (
-    <aside
+    <div
       id="tech-news-feed"
-      className="flex lg:col-span-12 xl:col-span-5 h-[380px] sm:h-[420px] xl:h-full min-h-0 flex-col border-t xl:border-t-0 xl:border-l border-white bg-black overflow-hidden font-mono text-xs"
+      className={`rounded-2xl border border-[var(--color-border)] bg-[var(--bg-primary)] p-6 md:p-8 flex flex-col justify-between space-y-6 ${className}`}
     >
-      <div className="shrink-0 border-b border-[#333] bg-black px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping bg-red-500 opacity-60"></span>
-              <span className="relative inline-flex h-2.5 w-2.5 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]"></span>
-            </span>
-            <p className="truncate text-[11px] font-bold tracking-[0.18em] text-white">
-              NEWS
-            </p>
-          </div>
-          <span className="shrink-0 border border-red-500/30 bg-red-950/20 px-2 py-1 text-[9px] tracking-widest text-red-300">
-            TOP_{STORY_COUNT}
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-orange)] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent-orange)]"></span>
           </span>
+          <h3 className="text-xs font-mono tracking-widest uppercase font-semibold text-[var(--text-primary)]">
+            Live Tech Pulse · Hacker News
+          </h3>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-2 text-[9px] tracking-widest text-gray-500">
-          <span>HN_FIREBASE_V0</span>
-          <span className="tabular-nums">{lastUpdated ? `SYNC ${lastUpdated}` : "SYNC --:--"}</span>
+
+        <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-faint)]">
+          <span>{lastUpdated ? `Synced ${lastUpdated}` : "Syncing..."}</span>
+          <button
+            onClick={() => loadStories(true)}
+            className="p-1 hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            title="Refresh news"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto border border-[#333] border-l-0 border-r-0 bg-black p-4 scrollbar-thin scrollbar-thumb-red-500/20 scrollbar-track-black">
-        {isLoading && (
-          <div className="space-y-2 text-[11px] leading-relaxed text-gray-300">
-            <p className="text-red-300">&gt; curl https://hacker-news.firebaseio.com/v0/topstories.json</p>
-            <p>&gt; slicing_top_story_ids --limit={STORY_COUNT}</p>
-            <p>&gt; Promise.all item payload requests [PENDING]</p>
-            <p className="animate-pulse text-white">&gt; FETCHING_HEADLINES_STREAMING [LOADING]...</p>
+      {/* Stories List */}
+      <div className="space-y-3.5 min-h-[220px]">
+        {isLoading && stories.length === 0 ? (
+          <div className="py-12 text-center text-sm text-[var(--text-faint)] font-mono flex items-center justify-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-[var(--accent-blue)]" />
+            Streaming latest headlines from Hacker News...
           </div>
-        )}
-
-        {!isLoading && error && (
-          <div className="border border-red-500/40 bg-red-950/20 p-3 text-[11px] leading-relaxed text-red-300">
-            <p>&gt; {error}</p>
-            <p className="mt-2 text-gray-400">&gt; fallback_thread_url prepared for next sync cycle.</p>
+        ) : error && stories.length === 0 ? (
+          <div className="p-4 rounded-xl border border-[var(--color-border)] text-xs text-[var(--text-muted)] font-mono">
+            {error} (Cached fallback active in UMU AI)
           </div>
-        )}
-
-        {!isLoading && !error && (
-          <div className="space-y-3">
-            {stories.map((story, index) => (
-              <article
-                key={story.id}
-                className="border border-[#333] bg-white/[0.03] p-3 transition-colors hover:border-red-500/60 hover:bg-red-950/10"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2 text-[9px] tracking-widest text-gray-500">
-                  <span className="text-red-300">STREAM_PACKET_{String(index + 1).padStart(2, "0")}</span>
-                  <span className="tabular-nums">{story.score || 0} PTS</span>
-                </div>
+        ) : (
+          stories.map((story, idx) => (
+            <article
+              key={story.id}
+              className="group p-3 rounded-xl border border-transparent hover:border-[var(--color-border)] hover:bg-[var(--bg-secondary)] transition-all flex items-start justify-between gap-3"
+            >
+              <div className="space-y-1 flex-1 min-w-0">
                 <a
                   href={story.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-[12px] font-bold leading-relaxed text-white transition-colors hover:text-red-300"
+                  className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors line-clamp-1 block"
                 >
-                  &gt; {story.title}
+                  <span className="font-mono text-xs text-[var(--accent-blue)] mr-2 font-semibold">
+                    0{idx + 1}.
+                  </span>
+                  {story.title}
                 </a>
-                <div className="mt-2 flex items-center justify-between gap-2 text-[9px] tracking-widest text-gray-500">
-                  <span className="truncate">BY: {story.by || "unknown"}</span>
-                  <span>ID:{story.id}</span>
+                <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-faint)]">
+                  <span>{story.score || 0} pts</span>
+                  <span>·</span>
+                  <span className="truncate">by {story.by || "hn"}</span>
                 </div>
-              </article>
-            ))}
-          </div>
+              </div>
+
+              <a
+                href={story.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors shrink-0 p-1"
+                title="Open story in new tab"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </article>
+          ))
         )}
       </div>
 
-      <div className="shrink-0 border-t border-[#333] bg-black px-4 py-3 text-[10px] tracking-widest text-gray-500">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center justify-between gap-3 sm:flex-1">
-            <span>REFRESH_INTERVAL: 300s</span>
-            <span className="text-red-300">OPEN_LINKS_NEW_TAB</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onBriefNews?.(stories)}
-            disabled={isLoading || Boolean(error) || stories.length === 0}
-            className="border border-red-500/40 bg-red-950/20 px-3 py-2 text-[10px] font-bold tracking-widest text-red-300 transition-all hover:bg-red-500 hover:text-black disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/5 disabled:text-gray-600"
-          >
-            &gt; GET UMU BRIEF
-          </button>
-        </div>
+      {/* Footer & AI Brief Trigger */}
+      <div className="pt-4 border-t border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <span className="text-[11px] font-mono text-[var(--text-faint)] flex items-center gap-1.5">
+          <Radio className="w-3 h-3 text-[var(--accent-orange)]" />
+          Auto-updates every 5 mins from official Firebase stream
+        </span>
+
+        <button
+          type="button"
+          onClick={() => onBriefNews?.(stories)}
+          disabled={isLoading || stories.length === 0}
+          className="text-xs font-semibold px-4 py-2 rounded-lg bg-[var(--text-primary)] text-[var(--bg-primary)] hover:bg-[var(--accent-blue)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-[var(--accent-orange)]" />
+          Ask UMU AI to Brief Me →
+        </button>
       </div>
-    </aside>
+    </div>
   );
 }

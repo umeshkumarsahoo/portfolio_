@@ -1,25 +1,48 @@
 import { lazy, Suspense, useState, useEffect } from "react";
-import { Eye } from "lucide-react";
-import HeaderBar from "./components/HeaderBar";
-import LeftSidebar from "./components/LeftSidebar";
-import TerminalLogs from "./components/TerminalLogs";
-import ScannerFrame from "./components/ScannerFrame";
-import StatsPanel from "./components/StatsPanel";
-import TechNewsFeed from "./components/TechNewsFeed";
-import type { HackerNewsStory } from "./components/TechNewsFeed";
-import BottomStatusBar from "./components/BottomStatusBar";
+import { Eye, Download, Menu, X, GraduationCap, Briefcase, Brain, Code2, Sparkles, ArrowRight } from "lucide-react";
 import resumePdf from "./assets/Umesh_Kumar_Sahoo_Resume.pdf?url";
 import { secureFetch } from "./lib/api";
+import {
+  HomeIllustration,
+  AboutIllustration,
+  ExperienceIllustration,
+  ProjectsIllustration,
+  SkillsIllustration,
+  AchievementsIllustration,
+  ContactIllustration,
+  UmuAiIllustration,
+} from "./components/SectionIllustrations";
+
+import TechNewsFeed from "./components/TechNewsFeed";
 
 const TabContent = lazy(() => import("./components/TabContent"));
+
+const navItems = [
+  { id: "home", label: "Home", num: "01" },
+  { id: "about", label: "About", num: "02" },
+  { id: "experience", label: "Experience", num: "03" },
+  { id: "projects", label: "Projects", num: "04" },
+  { id: "skills", label: "Skills", num: "05" },
+  { id: "achievements", label: "Achievements", num: "06" },
+  { id: "contact", label: "Contact", num: "07" },
+  { id: "agent", label: "UMU AI", num: "08" },
+];
+
+const sectionCards = [
+  { id: "home", num: "01", label: "HOME", desc: "Overview & summary", component: HomeIllustration },
+  { id: "about", num: "02", label: "ABOUT", desc: "Background & education", component: AboutIllustration },
+  { id: "experience", num: "03", label: "EXPERIENCE", desc: "Internships & milestones", component: ExperienceIllustration },
+  { id: "projects", num: "04", label: "PROJECTS", desc: "Featured AI & systems", component: ProjectsIllustration },
+  { id: "skills", num: "05", label: "SKILLS", desc: "Capabilities matrix", component: SkillsIllustration },
+  { id: "achievements", num: "06", label: "ACHIEVEMENTS", desc: "Academic honors & ranks", component: AchievementsIllustration },
+  { id: "contact", num: "07", label: "CONTACT", desc: "Direct inquiry & message", component: ContactIllustration },
+  { id: "agent", num: "08", label: "UMU AI", desc: "Interactive cognitive agent", component: UmuAiIllustration },
+];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [systemLogs, setSystemLogs] = useState<string[]>([
-    "Welcome! Explore my work, projects and skills.",
-    "Let's build the future with data and intelligence."
-  ]);
+  const [systemLogs, setSystemLogs] = useState<string[]>([]);
   const [initialAgentQuery, setInitialAgentQuery] = useState("");
   const [visitorCount, setVisitorCount] = useState<number | null>(null);
 
@@ -47,10 +70,10 @@ export default function App() {
     return () => window.removeEventListener("add-system-log", handleAddSystemLog);
   }, []);
 
-  // Log updater utility
+  // Tab switcher utility - preserves all original log behavior
   const updateLogsForTab = (tabId: string) => {
     setActiveTab(tabId);
-    setSidebarOpen(false); // Close sidebar on mobile after clicking
+    setSidebarOpen(false);
 
     switch (tabId) {
       case "home":
@@ -131,7 +154,6 @@ export default function App() {
     const cmd = rawCommand.trim();
     if (!cmd) return;
 
-    // Echo user's typed command in the system console
     setSystemLogs((prev) => [...prev, `visitor@umeshkumar:~$ ${cmd}`]);
 
     const args = cmd.split(" ");
@@ -228,196 +250,536 @@ export default function App() {
     }, 100);
   };
 
-  const centerPanelGridClass =
-    activeTab === "about"
-      ? "lg:col-span-7 lg:border-r"
-      : activeTab === "home"
-        ? "lg:col-span-12 xl:col-span-7 xl:border-r"
-        : "lg:col-span-12";
+  const getNavIllustration = (id: string) => {
+    const cls = "w-6 h-6 opacity-40 group-hover:opacity-70 transition-opacity";
+    switch (id) {
+      case "home": return <HomeIllustration className={cls} />;
+      case "about": return <AboutIllustration className={cls} />;
+      case "experience": return <ExperienceIllustration className={cls} />;
+      case "projects": return <ProjectsIllustration className={cls} />;
+      case "skills": return <SkillsIllustration className={cls} />;
+      case "achievements": return <AchievementsIllustration className={cls} />;
+      case "contact": return <ContactIllustration className={cls} />;
+      case "agent": return <UmuAiIllustration className={cls} />;
+      default: return null;
+    }
+  };
 
   return (
-    <div id="terminal-root" className="terminal-red-shell w-screen h-screen p-0 select-none font-mono overflow-hidden">
-      {/* Outer Retro Framing Box */}
-      <div id="terminal-frame" className="terminal-red-frame w-full h-full border-2 border-white bg-black flex flex-col overflow-hidden relative">
-        
-        {/* Top Header Information & Menu Bar */}
-        <HeaderBar />
-
-        {/* Mobile Header Bar & Toggle (Only visible on small devices) */}
-        <div id="mobile-navigation-header" className="md:hidden flex justify-between items-center px-4 py-2 bg-black border-b border-white text-xs text-white">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 bg-red-500 animate-ping"></span>
-            <span className="tracking-widest">TAB: {activeTab.toUpperCase()}</span>
-          </div>
-          <button
-            id="mobile-menu-toggle-btn"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="border border-white/80 hover:border-red-400 hover:bg-red-500 hover:text-black px-2 py-1 transition-all uppercase cursor-pointer text-[10px]"
-          >
-            {sidebarOpen ? "[ CLOSE MENU ]" : "[ ||| MENU ]"}
-          </button>
-        </div>
-
-        {/* Core Layout Panel */}
-        <div id="terminal-workspace-body" className="flex flex-col md:flex-row flex-1 relative overflow-hidden min-h-0">
-          
-          {/* Left Sidebar (Desktop fixed, Mobile collapsible) */}
-          <div
-            id="sidebar-wrapper"
-            className={`${
-              sidebarOpen ? "block absolute inset-y-0 left-0 z-40 w-full" : "hidden"
-            } md:block md:relative md:w-64`}
-          >
-            <LeftSidebar
-              activeTab={activeTab}
-              setActiveTab={updateLogsForTab}
-              onDownloadResume={handleDownloadResume}
-            />
+    <div id="portfolio-root" className="w-full min-h-[100dvh] h-[100dvh] bg-[var(--bg-primary)] flex flex-col overflow-hidden select-none">
+      
+      {/* ── Top Navigation Bar ── */}
+      <header id="portfolio-header" className="w-full shrink-0 border-b border-[var(--color-border)] bg-[var(--bg-primary)]/90 backdrop-blur-md z-30">
+        <div className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-3 sm:py-4">
+          {/* Logo / Name */}
+          <div id="header-brand" className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full border border-[var(--color-border-strong)] bg-white/70 flex items-center justify-center shadow-xs">
+              <span className="text-sm font-bold text-[var(--text-primary)]">U</span>
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold tracking-wide text-[var(--text-primary)] leading-tight">
+                Umesh Kumar Sahoo
+              </h1>
+              <p className="text-[10px] font-mono text-[var(--text-faint)] tracking-wider">
+                AI/ML Engineer · Silicon University
+              </p>
+            </div>
           </div>
 
-          {/* Right Main workspace panel */}
-          <div
-            id="main-content-workspace"
-            className={`flex-1 flex flex-col bg-black min-h-0 ${
-              activeTab === "home" ? "overflow-y-auto xl:overflow-hidden" : "overflow-hidden"
-            }`}
-          >
-            
-            {/* Top Workspace Section (Hero content on Left, Scanner Portrait on Right) */}
-            <div
-              id="workspace-top-split"
-              className={`grid grid-cols-1 lg:grid-cols-12 border-b border-white min-h-0 ${
-                activeTab === "home" ? "flex-none xl:flex-1 overflow-visible xl:overflow-hidden" : "flex-1 overflow-hidden"
-              }`}
+          {/* Desktop Navigation */}
+          <nav id="desktop-nav" className="hidden lg:flex items-center gap-1">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  id={`nav-${item.id}`}
+                  onClick={() => updateLogsForTab(item.id)}
+                  className={`relative px-3 py-1.5 text-[13px] transition-all duration-200 cursor-pointer rounded-md group ${
+                    isActive
+                      ? "text-[var(--text-primary)] font-medium"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {item.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-3 right-3 h-px bg-[var(--text-primary)]" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Right side actions */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Visitor count */}
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-[var(--text-faint)]">
+              <Eye className="w-3.5 h-3.5" />
+              <span className="font-mono tabular-nums">
+                {visitorCount !== null ? visitorCount.toLocaleString() : "···"}
+              </span>
+            </div>
+
+            {/* Resume download button */}
+            <button
+              id="cta-download-resume"
+              onClick={handleDownloadResume}
+              className="hidden sm:flex items-center gap-1.5 text-xs text-[var(--text-primary)] border border-[var(--color-border-strong)] bg-white/60 px-3 py-1.5 rounded-md hover:bg-[var(--text-primary)] hover:text-[var(--bg-primary)] transition-all duration-200 cursor-pointer font-medium shadow-xs"
             >
+              <Download className="w-3.5 h-3.5" />
+              Resume
+            </button>
+
+            {/* Mobile menu toggle */}
+            <button
+              id="mobile-menu-toggle-btn"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 text-[var(--text-primary)] cursor-pointer rounded-md hover:bg-black/5"
+            >
+              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Mobile Navigation Overlay ── */}
+      {sidebarOpen && (
+        <div
+          id="mobile-nav-overlay"
+          className="lg:hidden fixed inset-0 z-50 bg-[var(--bg-primary)] flex flex-col p-6 animate-fade-in"
+        >
+          <div className="flex items-center justify-between pb-4 border-b border-[var(--color-border)]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full border border-[var(--color-border-strong)] flex items-center justify-center font-bold text-sm">
+                U
+              </div>
+              <span className="text-sm font-semibold text-[var(--text-primary)]">Umesh Kumar Sahoo</span>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 text-[var(--text-primary)] cursor-pointer rounded-lg hover:bg-black/5"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <nav className="flex-1 overflow-y-auto py-6 flex flex-col gap-2 stagger-children">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => updateLogsForTab(item.id)}
+                  className={`flex items-center gap-4 px-4 py-3 rounded-xl text-base transition-all cursor-pointer group ${
+                    isActive
+                      ? "bg-white/80 text-[var(--text-primary)] font-semibold shadow-xs"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5"
+                  }`}
+                >
+                  <span className="font-mono text-xs font-bold text-[var(--accent-blue)]">{item.num}</span>
+                  {getNavIllustration(item.id)}
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <span className="text-xs text-[var(--text-faint)] font-mono">→</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="pt-4 border-t border-[var(--color-border)] flex items-center justify-between">
+            <button
+              onClick={handleDownloadResume}
+              className="flex-1 flex items-center justify-center gap-2 text-sm bg-[var(--text-primary)] text-[var(--bg-primary)] py-3 rounded-xl font-medium cursor-pointer shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download Resume (PDF)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Content Area ── */}
+      <main
+        id="main-content-workspace"
+        className="flex-1 overflow-hidden"
+      >
+        {activeTab === "home" ? (
+          /* ── HOME SECTION ── */
+          <div
+            id="home-section"
+            className="h-full overflow-y-auto overscroll-y-contain"
+          >
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-10 py-8 sm:py-12 md:py-16 space-y-12 sm:space-y-16">
               
-              {/* Left Column: Variable Content / Hero Information */}
-              <div 
-                id="center-left-hero" 
-                className={`${
-                  centerPanelGridClass
-                } p-4 sm:p-6 flex flex-col justify-start gap-4 ${
-                  activeTab === "home" ? "border-b xl:border-b-0" : "border-b lg:border-b-0"
-                } border-white ${
-                  activeTab === "home"
-                    ? "overflow-visible xl:overflow-y-auto h-auto xl:h-full min-h-fit xl:min-h-0"
-                    : "overflow-y-auto h-full min-h-0"
-                } scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent`}
-              >
-                
-                {activeTab === "home" ? (
-                  <div className="space-y-4 w-full max-w-3xl py-2 xl:my-auto xl:py-0">
-                    {/* Terminal booting visual logs */}
-                    <TerminalLogs />
+              {/* ── Hero Spotlight Area ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+                {/* Left: Text Content (7 cols on lg) */}
+                <div className="lg:col-span-7 space-y-6 animate-fade-in-up">
+                  {/* Status Pill */}
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--color-border)] bg-white/70 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse" />
+                    <span className="text-[11px] font-mono text-[var(--text-secondary)] font-medium">
+                      Open to AI/ML & Software Roles · 2026/2027
+                    </span>
+                  </div>
 
-                    {/* Developer Name */}
-                    <div id="hero-name-block" className="space-y-1">
-                      <h2 className="font-pixel text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-extrabold tracking-wider text-white leading-none">
-                        UMESH KUMAR SAHOO
-                      </h2>
-                    </div>
-
-                    {/* Role Badge */}
-                    <div id="hero-role-badge" className="flex items-center gap-3">
-                      <span className="border border-white/60 text-white font-mono text-[10px] sm:text-xs tracking-[0.2em] px-3.5 py-1.5 bg-white/5 inline-block font-semibold">
-                        AI/ML PORTFOLIO ENGINEER
+                  {/* Main Headline */}
+                  <div id="hero-name-block" className="space-y-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="section-number">01</span>
+                      <span className="editorial-divider w-8" />
+                      <span className="text-xs font-mono text-[var(--text-faint)] uppercase tracking-widest">
+                        Portfolio Introduction
                       </span>
-                      {/* Profile Views */}
-                      <div title="Profile Views" className="border border-white/30 px-3 py-1.5 bg-black inline-flex items-center gap-2">
-                        <Eye className="w-3.5 h-3.5 text-gray-400" />
-                        <span className="font-mono text-[11px] text-red-400 tracking-wider">
-                          {visitorCount !== null ? visitorCount.toLocaleString() : "···"}
-                        </span>
+                    </div>
+                    <h2 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[var(--text-primary)] leading-[1.08]">
+                      Umesh Kumar
+                      <br />
+                      <span className="text-[var(--text-muted)] font-bold">Sahoo</span>
+                    </h2>
+                  </div>
+
+                  {/* Role subtitle */}
+                  <div id="hero-role-badge" className="flex items-center gap-2 text-xs sm:text-sm font-mono text-[var(--accent-blue)] font-semibold">
+                    <Sparkles className="w-4 h-4 text-[var(--accent-orange)]" />
+                    <span>AI/ML & Software Engineer · Silicon University (9.60 CGPA)</span>
+                  </div>
+
+                  {/* Punchy Bio */}
+                  <p id="hero-description" className="text-sm sm:text-base md:text-lg text-[var(--text-secondary)] leading-relaxed max-w-xl">
+                    Computer Science undergraduate with hands-on experience building web applications, ML APIs, and RAG-based AI systems. Skilled in Python, SQL, REST APIs, embeddings, vector search, and automated cloud workflows.
+                  </p>
+
+                  {/* Call-to-action buttons */}
+                  <div id="hero-cta-buttons" className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
+                    <button
+                      id="cta-view-projects"
+                      onClick={() => updateLogsForTab("projects")}
+                      className="text-xs sm:text-sm font-medium bg-[var(--text-primary)] text-[var(--bg-primary)] px-5 py-2.5 rounded-lg hover:bg-[var(--accent-blue)] transition-all cursor-pointer shadow-xs"
+                    >
+                      View Projects
+                    </button>
+                    <button
+                      id="cta-get-in-touch"
+                      onClick={() => updateLogsForTab("contact")}
+                      className="text-xs sm:text-sm font-medium border border-[var(--color-border-strong)] bg-white/60 text-[var(--text-primary)] px-5 py-2.5 rounded-lg hover:bg-[var(--text-primary)] hover:text-[var(--bg-primary)] transition-all cursor-pointer"
+                    >
+                      Get in Touch
+                    </button>
+                    <button
+                      onClick={handleDownloadResume}
+                      className="text-xs sm:text-sm font-medium border border-[var(--color-border-strong)] bg-white/60 text-[var(--text-primary)] px-4 py-2.5 rounded-lg hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)] transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => updateLogsForTab("agent")}
+                      className="text-xs sm:text-sm font-medium text-[var(--accent-blue)] px-3 py-2.5 cursor-pointer btn-underline flex items-center gap-1 group"
+                    >
+                      Talk to UMU AI <span className="transition-transform group-hover:translate-x-1">→</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right: Editorial Profile Showcase Card (5 cols on lg) */}
+                <div className="lg:col-span-5 animate-fade-in" style={{ animationDelay: "0.2s" }}>
+                  <div className="rounded-3xl border border-[var(--color-border)] bg-white/80 p-6 sm:p-8 shadow-xs flex flex-col items-center gap-5 sm:gap-6">
+                    <div className="relative">
+                      <HomeIllustration className="w-36 h-36 sm:w-48 sm:h-48 animate-float" />
+                      <div className="absolute -bottom-2 -right-2 px-3 py-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--color-border)] text-[10px] font-mono text-[var(--text-secondary)] font-medium shadow-xs">
+                        ✦ AI/ML Explorer
                       </div>
                     </div>
 
-                    {/* Professional Description */}
-                    <p id="hero-description" className="text-gray-300 font-mono text-xs sm:text-sm tracking-wide leading-relaxed max-w-xl italic">
-                      "Building intelligent systems that learn, adapt and create real-world impact using data, code and curiosity."
-                    </p>
-
-                    {/* Interactive CTAs */}
-                    <div id="hero-cta-buttons" className="flex flex-wrap gap-4 pt-1">
-                      <button
-                        id="cta-view-projects"
-                        onClick={() => updateLogsForTab("projects")}
-                        className="font-mono text-xs tracking-wider border border-white hover:border-red-400 hover:bg-red-500 hover:text-black px-5 py-2.5 transition-all duration-200 cursor-pointer text-white font-medium flex items-center gap-1.5 active:scale-[0.98]"
-                      >
-                        &gt; VIEW PROJECTS
-                      </button>
-                      <button
-                        id="cta-get-in-touch"
-                        onClick={() => updateLogsForTab("contact")}
-                        className="font-mono text-xs tracking-wider border border-white/40 hover:border-red-400 px-5 py-2.5 transition-all duration-200 cursor-pointer text-gray-300 hover:text-red-100 font-medium flex items-center gap-1.5 active:scale-[0.98]"
-                      >
-                        &gt; GET IN TOUCH
-                      </button>
-                      <button
-                        id="cta-download-resume"
-                        onClick={handleDownloadResume}
-                        className="font-mono text-xs tracking-wider border border-white/40 hover:border-red-400 px-5 py-2.5 transition-all duration-200 cursor-pointer text-gray-300 hover:text-red-100 font-medium flex items-center gap-1.5 active:scale-[0.98]"
-                      >
-                        &gt; DOWNLOAD RESUME
-                      </button>
+                    {/* Quick Stats Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full pt-4 border-t border-[var(--color-border)]">
+                      {[
+                        { val: "9.60", label: "CGPA", sub: "Silicon Univ" },
+                        { val: "2", label: "Internships", sub: "DevOps & MERN" },
+                        { val: "3", label: "Core Projects", sub: "AI Systems" },
+                        { val: "4", label: "Awards", sub: "Honors" },
+                      ].map((s, i) => (
+                        <div key={i} className="text-center p-2.5 rounded-xl bg-[var(--bg-secondary)]/50 border border-[var(--color-border)]/40">
+                          <p className="text-base sm:text-lg font-bold text-[var(--text-primary)]">{s.val}</p>
+                          <p className="text-[10px] font-mono font-semibold uppercase text-[var(--accent-blue)]">{s.label}</p>
+                          <p className="text-[9px] text-[var(--text-faint)] truncate">{s.sub}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  // Variable dynamic Tab content (About, Experience, Projects, etc.)
-                  <div id="tab-wrapper-section" className="flex flex-col gap-3 h-full">
-                    <div className="flex items-center gap-2 border-b border-white/20 pb-2.5 shrink-0">
-                      <span className="text-white font-bold tracking-widest uppercase text-xs">
-                        // {activeTab === "agent" ? "umu AI" : activeTab}
-                      </span>
-                      <span className="text-[9px] text-gray-500 font-mono">
-                        DIRECTORY_INDEX
-                      </span>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                      <Suspense
-                        fallback={
-                          <div className="border border-white/20 bg-white/5 p-4 font-mono text-xs text-gray-300 animate-pulse">
-                            [ SYS_LOAD ] Mounting directory module...
-                          </div>
-                        }
-                      >
-                        <TabContent
-                          activeTab={activeTab}
-                          onActionClick={updateLogsForTab}
-                          initialAgentQuery={initialAgentQuery}
-                          clearInitialAgentQuery={() => setInitialAgentQuery("")}
-                        />
-                      </Suspense>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
 
-              {activeTab === "home" && <TechNewsFeed onBriefNews={handleBriefNews} />}
-
-              {/* Right Column: Character Portrait Radar Scanner */}
-              {activeTab === "about" && (
-                <div id="center-right-scanner" className="lg:col-span-5 bg-black h-full overflow-y-auto overflow-x-hidden scrollbar-none">
-                  <ScannerFrame />
+              {/* ── 4 Dimensions of Umesh's Engineering Profile ── */}
+              <div className="pt-4">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <span className="section-number">HIGHLIGHTS</span>
+                    <span className="editorial-divider w-8" />
+                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                      Engineering Foundations
+                    </h3>
+                  </div>
+                  <span className="text-xs font-mono text-[var(--text-faint)] hidden sm:inline">
+                    Verified Profile Registry
+                  </span>
                 </div>
-              )}
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {/* Card 1: Education */}
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-white/70 p-5 sm:p-6 hover:border-[var(--accent-blue)] hover:shadow-md transition-all flex flex-col justify-between group">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[var(--accent-blue)] group-hover:scale-110 transition-transform">
+                          <GraduationCap className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-mono tracking-wider text-[var(--accent-blue)] font-semibold uppercase">
+                          9.60 CGPA
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                          01 · Education
+                        </span>
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">
+                          Silicon University
+                        </h4>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          B.Tech CSE (2023–2027)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-[var(--color-border)] space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[var(--text-secondary)]">Undergraduate</span>
+                        <span className="font-mono font-semibold text-[var(--accent-blue)]">9.60 / 10</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                        <span>JNV Panikoili</span>
+                        <span className="font-mono">91.2% / 95.8%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Experience */}
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-white/70 p-5 sm:p-6 hover:border-[var(--accent-orange)] hover:shadow-md transition-all flex flex-col justify-between group">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[var(--accent-orange)] group-hover:scale-110 transition-transform">
+                          <Briefcase className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-mono tracking-wider text-[var(--accent-orange)] font-semibold uppercase">
+                          2 Internships
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                          02 · Industry
+                        </span>
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">
+                          DevOps & MERN
+                        </h4>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Production deployments
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-[var(--color-border)] space-y-1.5">
+                      <div className="text-xs">
+                        <span className="font-medium text-[var(--text-primary)]">Ingenious Tech</span>
+                        <span className="text-[var(--text-faint)]"> · DevOps & Actions</span>
+                      </div>
+                      <div className="text-xs">
+                        <span className="font-medium text-[var(--text-primary)]">Syllogistick</span>
+                        <span className="text-[var(--text-faint)]"> · Full-stack MERN</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Focus Areas */}
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-white/70 p-5 sm:p-6 hover:border-emerald-600 hover:shadow-md transition-all flex flex-col justify-between group">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                          <Brain className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-mono tracking-wider text-emerald-600 font-semibold uppercase">
+                          AI Core
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                          03 · Focus
+                        </span>
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">
+                          RAG & ML Systems
+                        </h4>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Vector search & Embeddings
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-[var(--color-border)] flex flex-wrap gap-1.5">
+                      {["RAG Pipelines", "LLM APIs", "Embeddings", "Scikit-Learn"].map((tag, tIdx) => (
+                        <span key={tIdx} className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card 4: Tech Stack */}
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-white/70 p-5 sm:p-6 hover:border-indigo-600 hover:shadow-md transition-all flex flex-col justify-between group">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                          <Code2 className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-mono tracking-wider text-indigo-600 font-semibold uppercase">
+                          Tooling
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                          04 · Stack
+                        </span>
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-0.5">
+                          Full-Stack & Cloud
+                        </h4>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Modern automated stack
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 mt-4 border-t border-[var(--color-border)] flex flex-wrap gap-1.5">
+                      {["Python", "FastAPI", "React", "SQL", "Terraform", "Actions"].map((tag, tIdx) => (
+                        <span key={tIdx} className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Section Directory Grid (Matching Image 2 Reference) ── */}
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <span className="section-number">INDEX</span>
+                    <span className="editorial-divider w-8" />
+                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                      Explore Portfolio
+                    </h3>
+                  </div>
+                  <span className="text-xs font-mono text-[var(--text-faint)]">
+                    8 Interactive Sections
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {sectionCards.map((card) => {
+                    const CardIcon = card.component;
+                    return (
+                      <div
+                        key={card.id}
+                        onClick={() => updateLogsForTab(card.id)}
+                        className="group p-5 rounded-2xl border border-[var(--color-border)] bg-white/80 hover:border-[var(--accent-blue)] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-[var(--accent-blue)]">
+                            {card.num}
+                          </span>
+                          <span className="font-mono text-[11px] tracking-wider text-[var(--text-faint)] group-hover:text-[var(--text-primary)] transition-colors uppercase font-medium">
+                            {card.label}
+                          </span>
+                        </div>
+
+                        <div className="py-4 sm:py-6 flex items-center justify-center group-hover:scale-105 transition-transform">
+                          <CardIcon className="w-16 h-16 sm:w-20 sm:h-20 opacity-80 group-hover:opacity-100 transition-opacity" />
+                        </div>
+
+                        <div className="pt-3 border-t border-[var(--color-border)] flex items-center justify-between text-xs">
+                          <span className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors truncate">
+                            {card.desc}
+                          </span>
+                          <span className="text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors pl-2 font-mono group-hover:translate-x-0.5 transform">
+                            →
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── Live Tech News Stream (Hacker News API) ── */}
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <span className="section-number">PULSE</span>
+                    <span className="editorial-divider w-8" />
+                    <h3 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                      Live Tech Intelligence Feed
+                    </h3>
+                  </div>
+                  <span className="text-xs font-mono text-[var(--text-faint)] hidden sm:inline">
+                    Real-time Hacker News Stream
+                  </span>
+                </div>
+
+                <TechNewsFeed onBriefNews={handleBriefNews} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ── ALL OTHER SECTIONS ── */
+          <div className="h-full flex flex-col overflow-hidden">
+            {/* Section header with illustration */}
+            <div className="shrink-0 px-6 md:px-10 pt-6 pb-4 border-b border-[var(--color-border)]">
+              <div className="max-w-5xl mx-auto flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="section-number">
+                    {navItems.find(n => n.id === activeTab)?.num}
+                  </span>
+                  <span className="editorial-divider w-6" />
+                </div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] tracking-tight">
+                  {activeTab === "agent" ? "UMU AI" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </h2>
+                {/* Small section illustration */}
+                <div className="ml-auto opacity-30 hidden sm:block">
+                  {activeTab === "about" && <AboutIllustration className="w-12 h-12" />}
+                  {activeTab === "experience" && <ExperienceIllustration className="w-12 h-12" />}
+                  {activeTab === "projects" && <ProjectsIllustration className="w-12 h-12" />}
+                  {activeTab === "skills" && <SkillsIllustration className="w-12 h-12" />}
+                  {activeTab === "achievements" && <AchievementsIllustration className="w-12 h-12" />}
+                  {activeTab === "contact" && <ContactIllustration className="w-12 h-12" />}
+                  {activeTab === "agent" && <UmuAiIllustration className="w-12 h-12" />}
+                </div>
+              </div>
             </div>
 
-            {/* Bottom Workspace Section (Structured Stats Columns) */}
-            {activeTab === "home" && <StatsPanel />}
-
+            {/* Section content */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className={`max-w-5xl mx-auto px-6 md:px-10 py-6 ${activeTab === "agent" ? "h-full" : ""}`}>
+                <Suspense
+                  fallback={
+                    <div className="py-12 text-center text-sm text-[var(--text-faint)]">
+                      Loading...
+                    </div>
+                  }
+                >
+                  <TabContent
+                    activeTab={activeTab}
+                    onActionClick={updateLogsForTab}
+                    initialAgentQuery={initialAgentQuery}
+                    clearInitialAgentQuery={() => setInitialAgentQuery("")}
+                  />
+                </Suspense>
+              </div>
+            </div>
           </div>
-
-        </div>
-
-        {/* Terminal status message area and uptime info */}
-        <BottomStatusBar
-          logs={systemLogs}
-          activeTab={activeTab}
-          onExecuteCommand={handleExecuteCommand}
-        />
-
-      </div>
+        )}
+      </main>
     </div>
   );
 }

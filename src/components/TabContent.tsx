@@ -2,10 +2,19 @@ import { lazy, Suspense, useState, useEffect, FormEvent, useRef } from "react";
 import { motion } from "motion/react";
 import { 
   Send, Terminal, Cpu, Bot, Star, ExternalLink, RefreshCw, Sparkles, BookOpen, 
-  Calendar, User, MapPin, Mail, Phone, GraduationCap, TrendingUp, Cloud, Trophy, 
+  Calendar, User, MapPin, Mail, GraduationCap, TrendingUp, Cloud, Trophy, 
   Brain, Leaf, Plane, Award, Code, Globe, Play, Github, Linkedin, Eye 
 } from "lucide-react";
 import { secureFetch } from "../lib/api";
+import UmuDoodle, { DoodleGang } from "./UmuDoodle";
+import type { DoodleState } from "./UmuDoodle";
+import {
+  AboutIllustration,
+  ExperienceIllustration,
+  SkillsIllustration,
+  AchievementsIllustration,
+} from "./SectionIllustrations";
+import portraitImg from "../assets/images/umesh_portrait_1784052523060.png";
 
 const GitHubStats = lazy(() => import("./GitHubStats"));
 
@@ -47,14 +56,15 @@ export default function TabContent({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
-      content: "SYSTEM ENCRYPTED AGENT ONLINE. Welcome, I am 'umu' — Umesh's personalized AI assistant. I have indexed Umesh's complete resume, project details, and public GitHub repositories. Ask me any question, and I will keep responses highly concise unless you ask me to describe or explain in detail!",
+      content: "Hi! I'm umu — Umesh's AI assistant. I know about his resume, projects, and GitHub repos. Ask me anything!",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }
   ]);
   const [repos, setRepos] = useState<GithubRepo[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
-  const [queryStatus, setQueryStatus] = useState("SCANNING DIRECTORIES & RESUME CONTEXT...");
+  const [queryStatus, setQueryStatus] = useState("Thinking...");
+  const [doodleState, setDoodleState] = useState<DoodleState>("idle");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -126,7 +136,8 @@ export default function TabContent({
     setMessages(prev => [...prev, newMsg]);
     if (!customQuery) setQuery("");
     setIsQuerying(true);
-    setQueryStatus("SCANNING DIRECTORIES & RESUME CONTEXT...");
+    setDoodleState("thinking");
+    setQueryStatus("Thinking...");
 
     let statusTimer1: NodeJS.Timeout | undefined;
     let statusTimer2: NodeJS.Timeout | undefined;
@@ -134,15 +145,17 @@ export default function TabContent({
 
     try {
       statusTimer1 = setTimeout(() => {
-        setQueryStatus("SEARCHING REPOSITORY INDEX...");
+        setQueryStatus("Searching repositories...");
+        setDoodleState("searching");
       }, 700);
 
       statusTimer2 = setTimeout(() => {
-        setQueryStatus("SYNTHESIZING RESPONSE...");
+        setQueryStatus("Composing response...");
+        setDoodleState("processing");
       }, 1600);
 
       statusTimer3 = setTimeout(() => {
-        setQueryStatus("ENCRYPTING DOWNLINK PACKETS...");
+        setQueryStatus("Almost there...");
       }, 2500);
 
       const chatHistory = messages.map(m => ({
@@ -160,26 +173,33 @@ export default function TabContent({
 
       if (response.ok) {
         const data = await response.json();
+        setDoodleState("speaking");
         setMessages(prev => [...prev, {
           role: "agent",
           content: data.reply,
           timestamp: responseTimestamp
         }]);
+        setTimeout(() => setDoodleState("success"), 500);
+        setTimeout(() => setDoodleState("idle"), 2000);
       } else {
         const errData = await response.json();
+        setDoodleState("error");
         setMessages(prev => [...prev, {
           role: "agent",
-          content: `ERROR: Failed to establish secure connection. [REASON: ${errData.error || "Unknown server error."}]`,
+          content: `Sorry, something went wrong: ${errData.error || "Unknown server error."}`,
           timestamp: responseTimestamp
         }]);
+        setTimeout(() => setDoodleState("idle"), 3000);
       }
     } catch (err: any) {
       const responseTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setDoodleState("error");
       setMessages(prev => [...prev, {
         role: "agent",
-        content: `SYS_ERR: Packet transmission aborted. Please verify server integrity.`,
+        content: `Connection error. Please try again.`,
         timestamp: responseTimestamp
       }]);
+      setTimeout(() => setDoodleState("idle"), 3000);
     } finally {
       if (statusTimer1) clearTimeout(statusTimer1);
       if (statusTimer2) clearTimeout(statusTimer2);
@@ -192,10 +212,10 @@ export default function TabContent({
   const handleContactSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formState.name || !formState.email || !formState.msg) {
-      setFormStatus("ERROR: All fields must be populated.");
+      setFormStatus("Please fill in all fields.");
       return;
     }
-    setFormStatus("ESTABLISHING SECURE CONNECTION & TRANSMITTING PAYLOAD...");
+    setFormStatus("Sending your message...");
     try {
       const res = await secureFetch("/api/contact", {
         method: "POST",
@@ -203,20 +223,19 @@ export default function TabContent({
         body: JSON.stringify(formState)
       });
       if (res.ok) {
-        setFormStatus("SUCCESS: Direct message securely delivered!");
+        setFormStatus("Message sent successfully! I'll get back to you soon.");
         setFormState({ name: "", email: "", msg: "" });
       } else {
         const data = await res.json();
-        setFormStatus(`ERROR: Transmission failed [${data.error || "Server rejection"}]`);
+        setFormStatus(`Failed to send: ${data.error || "Server error"}`);
       }
     } catch (err: any) {
-      setFormStatus("SYS_ERR: Packet drop. Direct connection failed.");
+      setFormStatus("Connection error. Please try again.");
     }
   };
 
   // Dynamically calibrate skill ratings based on GitHub Repos counts
   const getCalibratedSkills = () => {
-    // Humble honest baselines reflecting actual starting/internship level
     let languages = 60;
     let aiMl = 50;
     let dataEng = 50;
@@ -225,7 +244,6 @@ export default function TabContent({
     let toolsPlatforms = 55;
 
     if (repos && repos.length > 0) {
-      // Dynamic adjustments based on repository technologies & metadata
       const pythonRepos = repos.filter(r => 
         r.language?.toLowerCase() === "python" || 
         r.name.toLowerCase().includes("python") || 
@@ -267,48 +285,10 @@ export default function TabContent({
     }
 
     return [
-      {
-        id: "languages",
-        title: "Languages",
-        items: "Python, Java, JavaScript (ES6+), SQL, C",
-        rating: languages,
-        icon: <Code className="w-4 h-4 text-white" />
-      },
-      {
-        id: "aiml",
-        title: "AI / ML / Gen AI",
-        items: "Machine Learning, NLP, RAG, LLM Integration, Vector Embeddings, Whisper, Scikit-learn, XGBoost, Gradient Boosting, LSTM, RNN, ARIMA",
-        rating: aiMl,
-        icon: <Brain className="w-4 h-4 text-white" />
-      },
-      {
-        id: "dataeng",
-        title: "Data Engineering",
-        items: "Pandas, NumPy, Feature Engineering, Data Preprocessing, Regression, Classification, Clustering, Statistical Modeling",
-        rating: dataEng,
-        icon: <BookOpen className="w-4 h-4 text-white" />
-      },
-      {
-        id: "cloud",
-        title: "Cloud & DevOps",
-        items: "GitHub Actions (CI/CD), Terraform, Infrastructure as Code (IaC), Linux",
-        rating: cloudDevops,
-        icon: <Cloud className="w-4 h-4 text-white" />
-      },
-      {
-        id: "web",
-        title: "Web & Backend",
-        items: "React.js, Node.js, Express.js, MongoDB, Flask, REST APIs",
-        rating: webBackend,
-        icon: <Globe className="w-4 h-4 text-white" />
-      },
-      {
-        id: "tools",
-        title: "Tools & Platforms",
-        items: "TensorFlow, Keras, Jupyter Notebook, Postman, Matplotlib, Seaborn, Plotly, Git, GitHub",
-        rating: toolsPlatforms,
-        icon: <Terminal className="w-4 h-4 text-white" />
-      }
+      { id: "programming", title: "Programming", items: "Python, C, SQL", rating: languages },
+      { id: "aiml", title: "Machine Learning / AI", items: "Scikit-learn, XGBoost, Gradient Boosting, Random Forest, Keras, RAG Pipelines, LLM Integration, Embeddings, Vector Similarity Search, Feature Engineering, Model Evaluation", rating: aiMl },
+      { id: "frameworks", title: "Frameworks / Libraries", items: "FastAPI, Flask, React.js, Node.js, Pandas, NumPy, Matplotlib, Seaborn", rating: webBackend },
+      { id: "tools", title: "Tools / DevOps", items: "Git, GitHub, GitHub Actions, Terraform, Linux, Postman, Jupyter Notebook, VS Code", rating: cloudDevops },
     ];
   };
 
@@ -317,7 +297,7 @@ export default function TabContent({
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
   };
 
-  // 1. ABOUT TAB (Matches Screenshot 1 perfectly)
+  // ── ABOUT TAB ──
   if (activeTab === "about") {
     return (
       <motion.div
@@ -325,131 +305,137 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="about-tab-content"
-        className="h-full min-h-0 flex flex-col gap-4 font-mono select-none overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+        className="space-y-8"
       >
-        {/* Main Bio Card */}
-        <div className="border border-white/20 p-4 bg-white/5 space-y-3">
-          <p className="text-white font-bold text-xs flex items-center gap-1.5 uppercase">
-            [ ABOUT ME ]
-          </p>
-          <p className="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed">
-            I'm Umesh Kumar Sahoo, an AI/ML enthusiast and Computer Science undergraduate who loves building intelligent systems that solve real-world problems. I enjoy turning ideas into products using data, code and a deep curiosity to learn more every day.
-          </p>
+        {/* Bio section with portrait */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div className="lg:col-span-2 space-y-5">
+            <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed">
+              Computer Science undergraduate with hands-on experience building web applications, ML APIs, and RAG-based AI systems. Skilled in Python, Basic JavaScript, SQL, REST APIs, machine learning, embeddings, vector search, and LLM integration, with a strong interest in software development and AI engineering.
+            </p>
 
-          {/* Profile Meta Table Grid */}
-          <div className="border border-white/30 bg-black mt-3 p-3 text-xs space-y-2.5 font-mono">
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1 items-center">
-              <span className="sm:col-span-3 text-gray-400 font-bold flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5" /> NAME
-              </span>
-              <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
-              <span className="sm:col-span-8 text-white font-semibold">Umesh Kumar Sahoo</span>
+            {/* Profile Info */}
+            <div className="space-y-3 pt-2">
+              {[
+                { icon: <User className="w-4 h-4" />, label: "Name", value: "Umesh Kumar Sahoo" },
+                { icon: <MapPin className="w-4 h-4" />, label: "Location", value: "Bhubaneswar, Odisha, India" },
+                { icon: <Mail className="w-4 h-4" />, label: "Email", value: "sahooumesh2003@gmail.com" },
+                { icon: <GraduationCap className="w-4 h-4" />, label: "Degree", value: "B.Tech in Computer Science & Engineering (CGPA: 9.60 / 10.0)" },
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-start gap-3 group">
+                  <span className="text-[var(--text-faint)] mt-0.5 group-hover:text-[var(--accent-blue)] transition-colors">{item.icon}</span>
+                  <div className="flex-1">
+                    <span className="text-[11px] font-mono text-[var(--text-faint)] uppercase tracking-wider">{item.label}</span>
+                    <p className="text-sm text-[var(--text-primary)] select-all">{item.value}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1 items-center border-t border-white/10 pt-2">
-              <span className="sm:col-span-3 text-gray-400 font-bold flex items-center gap-2">
-                <User className="w-3.5 h-3.5" /> ROLE
-              </span>
-              <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
-              <span className="sm:col-span-8 text-white">AI/ML Portfolio Engineer</span>
+          </div>
+
+          {/* Portrait + Illustration */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden border border-[var(--color-border)]">
+              <img
+                src={portraitImg}
+                alt="Umesh Kumar Sahoo"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover portrait-editorial"
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1 items-center border-t border-white/10 pt-2">
-              <span className="sm:col-span-3 text-gray-400 font-bold flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5" /> LOCATION
-              </span>
-              <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
-              <span className="sm:col-span-8 text-white">Bhubaneswar, Odisha, India</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1 items-center border-t border-white/10 pt-2">
-              <span className="sm:col-span-3 text-gray-400 font-bold flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5" /> EMAIL
-              </span>
-              <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
-              <span className="sm:col-span-8 text-white select-all">sahooumesh2003@gmail.com</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-1 items-center border-t border-white/10 pt-2">
-              <span className="sm:col-span-3 text-gray-400 font-bold flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5" /> PHONE
-              </span>
-              <span className="sm:col-span-1 text-gray-400 max-sm:hidden">:</span>
-              <span className="sm:col-span-8 text-white select-all">+91-7735203945</span>
-            </div>
+            <AboutIllustration className="w-24 h-24 opacity-30" />
           </div>
         </div>
 
-        {/* At a Glance Bento Boxes Row */}
-        <div className="space-y-2">
-          <p className="text-white font-bold text-xs uppercase">[ AT A GLANCE ]</p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            
-            {/* Box 1 */}
-            <div className="border border-white/20 bg-white/5 p-3 flex flex-col justify-center items-start gap-1">
-              <div className="flex items-center gap-1.5 font-bold text-white text-sm">
-                <span className="text-white/60 font-mono text-[10px]">&lt;/&gt;</span>
-                <span>15+</span>
+        {/* Education Timeline */}
+        <div className="pt-6 border-t border-[var(--color-border)]">
+          <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase mb-5">
+            Education
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                degree: "B.Tech in Computer Science & Engineering",
+                institution: "Silicon University, Bhubaneswar",
+                period: "2023 – 2027",
+                grade: "CGPA: 9.60 / 10.0",
+                badge: "Current · 9.60 CGPA",
+              },
+              {
+                degree: "Senior Secondary (Class XII)",
+                institution: "JNV Panikoili",
+                period: "2021",
+                grade: "Percentage: 91.2%",
+                badge: "91.2%",
+              },
+              {
+                degree: "Secondary (Class X)",
+                institution: "JNV Panikoili",
+                period: "2019",
+                grade: "Percentage: 95.8%",
+                badge: "95.8%",
+              },
+            ].map((edu, idx) => (
+              <div key={idx} className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--bg-primary)] space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-[var(--accent-blue)]">{edu.period}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--color-border)] text-[var(--text-primary)] font-medium">
+                    {edu.badge}
+                  </span>
+                </div>
+                <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-snug">
+                  {edu.degree}
+                </h4>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {edu.institution}
+                </p>
+                <p className="text-xs font-mono text-[var(--text-secondary)] font-medium pt-1">
+                  {edu.grade}
+                </p>
               </div>
-              <p className="text-[8px] text-gray-400 font-bold tracking-wider leading-tight uppercase">PROJECTS BUILT</p>
-            </div>
-
-            {/* Box 2 */}
-            <div className="border border-white/20 bg-white/5 p-3 flex flex-col justify-center items-start gap-1">
-              <div className="flex items-center gap-1.5 font-bold text-white text-sm">
-                <GraduationCap className="w-4 h-4 text-white/70" />
-                <span>4th</span>
-              </div>
-              <p className="text-[8px] text-gray-400 font-bold tracking-wider leading-tight uppercase">YEAR B.TECH CSE</p>
-            </div>
-
-            {/* Box 3 */}
-            <div className="border border-white/20 bg-white/5 p-3 flex flex-col justify-center items-start gap-1">
-              <div className="flex items-center gap-1.5 font-bold text-white text-sm">
-                <TrendingUp className="w-4 h-4 text-white/70" />
-                <span>6+</span>
-              </div>
-              <p className="text-[8px] text-gray-400 font-bold tracking-wider leading-tight uppercase">ML MODELS TRAINED</p>
-            </div>
-
-            {/* Box 4 */}
-            <div className="border border-white/20 bg-white/5 p-3 flex flex-col justify-center items-start gap-1">
-              <div className="flex items-center gap-1.5 font-bold text-white text-sm">
-                <Cloud className="w-4 h-4 text-white/70" />
-                <span>2</span>
-              </div>
-              <p className="text-[8px] text-gray-400 font-bold tracking-wider leading-tight uppercase">INTERNSHIPS</p>
-            </div>
-
-            {/* Box 5 */}
-            <div className="border border-white/20 bg-white/5 p-3 flex flex-col justify-center items-start gap-1 max-md:col-span-2">
-              <div className="flex items-center gap-1.5 font-bold text-white text-sm">
-                <Trophy className="w-4 h-4 text-white/70" />
-                <span>3+</span>
-              </div>
-              <p className="text-[8px] text-gray-400 font-bold tracking-wider leading-tight uppercase">AWARDS & CERTS</p>
-            </div>
-
+            ))}
           </div>
         </div>
 
+        {/* At a Glance */}
+        <div className="pt-4 border-t border-[var(--color-border)]">
+          <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase mb-4">At a Glance</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            {[
+              { val: "9.60", label: "CGPA" },
+              { val: "2", label: "Internships" },
+              { val: "3", label: "Core Projects" },
+              { val: "4", label: "Awards & Honors" },
+              { val: "3", label: "Certifications" },
+            ].map((stat, idx) => (
+              <div key={idx} className="text-center py-3 rounded-lg bg-[var(--color-border)] bg-opacity-30">
+                <p className="text-xl font-bold text-[var(--text-primary)]">{stat.val}</p>
+                <p className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider mt-1">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </motion.div>
     );
   }
 
-  // 2. EXPERIENCE TAB (Matches Screenshot 4 perfectly)
+  // ── EXPERIENCE TAB ──
   if (activeTab === "experience") {
     const experiences = [
       {
-        year: "Jun 2025 – Jul 2025",
-        role: "DevOps Engineer Intern · Ingenious Tech World",
+        year: "June 2025 – July 2025",
+        role: "DevOps Engineer Intern",
+        company: "Ingenious Tech World",
         details: [
-          "Engineered CI/CD pipelines via GitHub Actions — automated build, test & deploy workflows, cutting manual deployment effort by 40%.",
-          "Provisioned scalable cloud infrastructure using Terraform (IaC), ensuring environment consistency across dev and staging; applied distributed-systems principles for multi-region reliability."
+          "Worked with GitHub Actions and Terraform on CI/CD and Infrastructure-as-Code workflows."
         ]
       },
       {
-        year: "Jun 2024 – Jul 2024",
-        role: "MERN Stack Developer Intern · Syllogistick",
+        year: "June 2024 – July 2024",
+        role: "MERN Stack Developer Intern",
+        company: "Syllogistick",
         details: [
-          "Built production e-commerce platform: MongoDB + Express.js + React.js + Node.js with JWT auth and 10+ REST API endpoints.",
-          "Improved frontend responsiveness via React code-splitting; optimized MongoDB schema design to reduce query latency."
+          "Worked on a MERN-based application involving React, REST APIs, authentication, and MongoDB."
         ]
       }
     ];
@@ -460,33 +446,29 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="experience-tab-content"
-        className="h-full min-h-0 flex flex-col gap-4 font-mono overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent select-none"
+        className="space-y-8"
       >
-        <div className="border border-white/20 p-4 bg-white/5 space-y-4">
-          <p className="text-white font-bold text-xs uppercase mb-1">
-            [ EXPERIENCE ]
-          </p>
-
-          <div className="relative pl-5 border-l border-dashed border-white/30 space-y-6">
+        <div className="flex items-start gap-8">
+          <div className="flex-1 space-y-8">
             {experiences.map((exp, idx) => (
-              <div key={idx} className="relative group">
-                {/* Node Square Dot */}
-                <span className="absolute -left-[25px] top-1 w-2.5 h-2.5 border border-white bg-black flex items-center justify-center font-bold text-[10px]">
-                  <span className="w-1 h-1 bg-white"></span>
-                </span>
+              <div key={idx} className="relative pl-6 border-l-2 border-[var(--color-border)] group">
+                {/* Timeline dot */}
+                <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-[var(--accent-blue)] bg-[var(--bg-primary)]" />
                 
-                {/* Content block */}
-                <div className="space-y-1">
-                  <span className="text-[10px] bg-white text-black px-1 font-bold inline-block select-none mb-1">
+                <div className="space-y-2">
+                  <span className="text-[11px] font-mono text-[var(--accent-blue)] tracking-wider">
                     {exp.year}
                   </span>
-                  <h4 className="text-white font-bold text-xs sm:text-sm md:text-base tracking-wide">
+                  <h4 className="text-lg font-semibold text-[var(--text-primary)]">
                     {exp.role}
                   </h4>
-                  <ul className="text-xs sm:text-sm md:text-base text-gray-300 space-y-1 pl-1 mt-1.5">
+                  <p className="text-sm text-[var(--text-muted)] font-medium">
+                    {exp.company}
+                  </p>
+                  <ul className="space-y-2 pt-2">
                     {exp.details.map((detail, dIdx) => (
-                      <li key={dIdx} className="leading-relaxed">
-                        &gt; {detail}
+                      <li key={dIdx} className="text-sm text-[var(--text-secondary)] leading-relaxed pl-4 relative before:content-[''] before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:rounded-full before:bg-[var(--color-border-strong)]">
+                        {detail}
                       </li>
                     ))}
                   </ul>
@@ -494,14 +476,15 @@ export default function TabContent({
               </div>
             ))}
           </div>
+          
+          <ExperienceIllustration className="hidden lg:block w-32 h-32 opacity-20 shrink-0" />
         </div>
       </motion.div>
     );
   }
 
-  // 3. PROJECTS TAB (Matches Screenshot 2 perfectly)
+  // ── PROJECTS TAB ──
   if (activeTab === "projects") {
-    // Dynamically calculate value and rank projects based on impact
     const getImpactScore = (repo: GithubRepo) => {
       let score = (repo.stargazers_count * 100) + (repo.forks_count * 50);
       
@@ -509,7 +492,6 @@ export default function TabContent({
       const desc = (repo.description || "").toLowerCase();
       const combined = name + " " + desc;
 
-      // Heavy penalty for obvious junk/assignments
       if (
         name.includes("assingment") || 
         name.includes("assignment") || 
@@ -532,15 +514,12 @@ export default function TabContent({
         return -9999;
       }
 
-      // Massive bonus for recognized flagship projects so they stay featured 
-      // unless organically surpassed by a new repo with many stars (e.g., > 5 stars)
       if (name.includes("rag") || name.includes("teaching")) score += 500;
       if (name.includes("fresh_guard") || name.includes("freshguard")) score += 500;
       if (name.includes("time_series") || name.includes("nifty")) score += 500;
       if (name.includes("ml-projects") || name.includes("classifier")) score += 400;
       if (name.includes("spec2model")) score += 300;
 
-      // Organic bonuses for good descriptions and ML keywords
       if (combined.includes("prediction") || combined.includes("system") || combined.includes("classifier") || combined.includes("forecasting") || combined.includes("pipeline") || combined.includes("model")) {
         score += 50;
       }
@@ -551,25 +530,56 @@ export default function TabContent({
     };
 
     const rankedRepos = [...repos]
-      .filter(repo => getImpactScore(repo) > -100) // Drop penalized repos
+      .filter(repo => getImpactScore(repo) > -100)
       .sort((a, b) => getImpactScore(b) - getImpactScore(a));
 
     const topRepos = rankedRepos.slice(0, 4);
 
-    const getDynamicIcon = (repo: GithubRepo) => {
-      const name = repo.name.toLowerCase();
-      const lang = repo.language?.toLowerCase() || "";
-      const desc = repo.description?.toLowerCase() || "";
-
-      if (name.includes("ml") || name.includes("ai") || name.includes("rag") || desc.includes("learning") || desc.includes("prediction") || desc.includes("model")) return <Brain className="w-5 h-5 text-white" />;
-      if (name.includes("flight") || name.includes("plane")) return <Plane className="w-5 h-5 text-white" />;
-      if (name.includes("guard") || name.includes("eco") || name.includes("leaf")) return <Leaf className="w-5 h-5 text-white" />;
-      if (name.includes("stock") || name.includes("trade") || name.includes("finance") || name.includes("forecast")) return <TrendingUp className="w-5 h-5 text-white" />;
-      if (lang === "python") return <Code className="w-5 h-5 text-white" />;
-      if (lang === "javascript" || lang === "typescript" || lang === "html") return <Globe className="w-5 h-5 text-white" />;
-      
-      return <Terminal className="w-5 h-5 text-white" />;
+    const getLanguageColor = (lang: string | null) => {
+      const colors: Record<string, string> = {
+        python: "#3572A5",
+        javascript: "#F1E05A",
+        typescript: "#3178C6",
+        html: "#E34C26",
+        java: "#B07219",
+      };
+      return colors[(lang || "").toLowerCase()] || "#6B6B6B";
     };
+
+    const resumeProjects = [
+      {
+        title: "AI-Powered Terminal Portfolio",
+        tags: ["React", "FastAPI", "Gemini", "REST APIs", "Security"],
+        highlights: [
+          "Built a React + FastAPI terminal-style portfolio with a backend, integrating GitHub and Hacker News APIs with server-side caching for dynamic content.",
+          "Developed a Gemini-powered assistant using resume and public repository context to answer questions about projects, skills, and experience.",
+          "Implemented API security controls including Helmet security headers, rate limiting, CSRF protection, input validation, and server-side secret management."
+        ],
+        github: "https://github.com/umeshkumarsahoo/portfolio_",
+        live: "https://umesh-portfolio-4r6o.onrender.com/",
+      },
+      {
+        title: "RAG-Based Teaching Assistant System",
+        tags: ["Python", "RAG", "Embeddings", "Vector Search", "LLM Integration"],
+        highlights: [
+          "Built an end-to-end RAG pipeline covering document ingestion, chunking, embedding generation, vector similarity search, retrieval, and LLM-based response generation.",
+          "Used semantic retrieval to provide relevant source context to the language model for context-aware question answering over educational content."
+        ],
+        github: "https://github.com/umeshkumarsahoo/RAG-Based-Teaching-Assistant-System",
+        live: null,
+      },
+      {
+        title: "Emotion Detection API",
+        tags: ["Python", "Keras", "BiGRU", "FastAPI", "NLP"],
+        highlights: [
+          "Built a Keras Bidirectional GRU model for text emotion classification and exposed inference through a FastAPI REST service.",
+          "Implemented inference preprocessing, tokenizer-based sequence conversion, padding, and prediction with emotion probabilities and confidence scores.",
+          "Added health and prediction endpoints with validation and error handling for unavailable model or tokenizer artifacts."
+        ],
+        github: "https://github.com/umeshkumarsahoo/Emotion_detection_api",
+        live: null,
+      }
+    ];
 
     return (
       <motion.div
@@ -577,84 +587,152 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="projects-tab-content"
-        className="h-full min-h-0 flex flex-col gap-4 overflow-y-auto font-mono pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent select-none"
+        className="space-y-10"
       >
-        <Suspense
-          fallback={
-            <div className="border border-white/20 p-4 bg-white/5 font-mono text-xs text-gray-400 animate-pulse">
-              CALIBRATING REAL-TIME REGISTRY DATASETS...
-            </div>
-          }
-        >
-          <GitHubStats repos={repos} isLoading={isLoadingRepos} />
-        </Suspense>
+        {/* Core Resume Featured Projects */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
+              Featured Resume Projects
+            </h3>
+            <span className="text-xs font-mono text-[var(--accent-blue)]">
+              Production & Research
+            </span>
+          </div>
 
-        <div className="border border-white/20 p-4 bg-white/5 space-y-4">
-          <p className="text-white font-bold text-xs uppercase">
-            [ FEATURED PROJECTS ]
-          </p>
-
-          <div className="space-y-4">
-            {topRepos.length > 0 ? (
-              topRepos.map((repo, idx) => (
-                <div key={idx} className="border-b border-dashed border-white/10 pb-4 last:border-b-0 last:pb-0 flex flex-col sm:flex-row gap-3.5 items-start">
-                  
-                  {/* Left Side square icon */}
-                  <div className="border border-white/30 p-2.5 bg-black rounded-sm flex items-center justify-center shrink-0">
-                    {getDynamicIcon(repo)}
-                  </div>
-
-                  {/* Right Side Content details */}
-                  <div className="flex-1 space-y-1.5 w-full">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                      <h4 className="text-white font-bold text-xs sm:text-sm md:text-base tracking-wide">
-                        {repo.name}
-                      </h4>
-                      <span className="text-[10px] sm:text-xs md:text-sm text-gray-400 font-mono">
-                        [ {repo.language || "Mixed"} | ⭐ {repo.stargazers_count} | ⑂ {repo.forks_count} ]
-                      </span>
-                    </div>
-                    <div className="text-xs sm:text-sm md:text-base text-gray-300 space-y-1 pl-1">
-                      <p className="leading-relaxed whitespace-pre-wrap">
-                        &gt; {repo.description || "No description provided for this repository."}
-                      </p>
-                    </div>
-                    
-                    {/* Active GitHub Link Button for each project */}
-                    <div className="pt-1.5 pl-1">
+          <div className="space-y-5">
+            {resumeProjects.map((project, idx) => (
+              <div
+                key={idx}
+                className="p-6 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] bg-[var(--bg-primary)] transition-all duration-200 space-y-4"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-base md:text-lg font-semibold text-[var(--text-primary)]">
+                    {project.title}
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    {project.github && (
                       <a
-                        href={repo.html_url}
+                        href={project.github}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[10px] text-white hover:text-black hover:bg-white border border-white/30 hover:border-white px-2.5 py-1 font-bold transition-all"
+                        className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--accent-blue)] flex items-center gap-1 transition-colors"
                       >
-                        <Globe className="w-3 h-3" />
-                        &gt; VIEW REPO ON GITHUB
+                        <Github className="w-3.5 h-3.5" />
+                        Code
                       </a>
-                    </div>
+                    )}
+                    {project.live && (
+                      <a
+                        href={project.live}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-[var(--accent-blue)] hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Live Demo
+                      </a>
+                    )}
                   </div>
-
                 </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {project.tags.map((tag, tidx) => (
+                    <span
+                      key={tidx}
+                      className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[var(--color-border)] text-[var(--text-primary)] font-medium"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <ul className="space-y-2 pt-1">
+                  {project.highlights.map((bullet, bidx) => (
+                    <li
+                      key={bidx}
+                      className="text-sm text-[var(--text-secondary)] leading-relaxed pl-4 relative before:content-[''] before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:rounded-full before:bg-[var(--accent-blue)]"
+                    >
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* GitHub Stats & Repositories */}
+        <div className="space-y-6 pt-6 border-t border-[var(--color-border)]">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
+              Live GitHub Repositories
+            </h3>
+            <span className="text-xs font-mono text-[var(--text-faint)]">
+              Real-time Sync
+            </span>
+          </div>
+
+          <Suspense
+            fallback={
+              <div className="py-8 text-center text-sm text-[var(--text-faint)]">
+                Loading GitHub data...
+              </div>
+            }
+          >
+            <GitHubStats repos={repos} isLoading={isLoadingRepos} />
+          </Suspense>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            {topRepos.length > 0 ? (
+              topRepos.map((repo, idx) => (
+                <a
+                  key={idx}
+                  href={repo.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block p-4 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] bg-[var(--bg-primary)] hover:shadow-sm transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h5 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors">
+                      {repo.name}
+                    </h5>
+                    <ExternalLink className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] shrink-0 transition-colors" />
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-3 line-clamp-2">
+                    {repo.description || "No description provided."}
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-[var(--text-faint)]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full" style={{ background: getLanguageColor(repo.language) }} />
+                      {repo.language || "Mixed"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Star className="w-3 h-3" />
+                      {repo.stargazers_count}
+                    </span>
+                  </div>
+                </a>
               ))
             ) : (
-              <div className="text-xs text-gray-400 font-mono p-4 animate-pulse">
-                &gt; NO REPOSITORIES FOUND. FETCHING FROM UPSTREAM...
+              <div className="col-span-2 text-center py-6 text-sm text-[var(--text-faint)]">
+                Loading synced repositories...
               </div>
             )}
           </div>
 
-          {/* Bottom link element matching Screenshot 2 */}
-          <div className="flex flex-col sm:flex-row justify-between items-center border border-white/30 p-2.5 bg-black gap-2 mt-2">
+          <div className="flex items-center justify-between pt-2">
             <a 
               href="https://github.com/umeshkumarsahoo" 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-white hover:bg-white hover:text-black border border-white/40 px-3 py-1.5 text-[10px] sm:text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+              className="text-xs text-[var(--accent-blue)] font-medium hover:underline flex items-center gap-1.5"
             >
-              &gt; VIEW ALL PROJECTS ON GITHUB
+              <Github className="w-3.5 h-3.5" />
+              View all {repos.length || 15}+ repositories on GitHub →
             </a>
-            <span className="text-gray-400 font-mono text-[10px] tracking-wider uppercase select-all">
-              [ github.com/umeshkumarsahoo ]
+            <span className="text-[11px] font-mono text-[var(--text-faint)]">
+              github.com/umeshkumarsahoo
             </span>
           </div>
         </div>
@@ -662,7 +740,7 @@ export default function TabContent({
     );
   }
 
-  // 4. SKILLS TAB (Matches Screenshot 3 perfectly)
+  // ── SKILLS TAB ──
   if (activeTab === "skills") {
     const skillsList = getCalibratedSkills();
 
@@ -672,105 +750,101 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="skills-tab-content"
-        className="h-full min-h-0 flex flex-col gap-4 font-mono overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent select-none"
+        className="space-y-8"
       >
-        <div className="border border-white/20 p-4 bg-white/5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-1 min-w-0">
-            <p className="text-white font-bold text-xs uppercase">
-              [ TECHNICAL SKILLS ]
-            </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
             {repos.length > 0 && (
-              <span className="text-[9px] text-red-300 border border-red-500/40 bg-red-950/20 px-1.5 py-0.5 rounded-sm animate-pulse tracking-wide font-semibold sm:text-right leading-relaxed max-w-full break-words">
-                AUTOCALIBRATION ACTIVE: {repos.length} REPOS SYNCED
-              </span>
+              <p className="text-xs text-[var(--accent-blue)] font-mono mb-6">
+                Auto-calibrated from {repos.length} synced repositories
+              </p>
             )}
-          </div>
 
-          <div className="space-y-4">
-            {skillsList.map((skill) => {
-              // Calculate blocks (20 total blocks)
-              const totalBlocks = 20;
-              const filledCount = Math.round((skill.rating / 100) * totalBlocks);
-              const emptyCount = totalBlocks - filledCount;
-
-              return (
-                <div key={skill.id} className="flex flex-col sm:flex-row gap-3 items-start border-b border-dashed border-white/10 pb-3 last:border-b-0 last:pb-0 min-w-0">
-                  {/* Icon Frame */}
-                  <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0 flex items-center justify-center">
-                    {skill.icon}
+            <div className="space-y-6">
+              {skillsList.map((skill) => (
+                <div key={skill.id} className="space-y-2 group">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-[var(--text-primary)]">
+                      {skill.title}
+                    </h4>
+                    <span className="text-xs font-mono text-[var(--accent-blue)] tabular-nums font-medium">
+                      {skill.rating}%
+                    </span>
                   </div>
-
-                  {/* Skills description & bars */}
-                  <div className="flex-1 w-full min-w-0 grid grid-cols-1 xl:grid-cols-12 gap-2 xl:items-center">
-                    <div className="xl:col-span-7 space-y-1 min-w-0">
-                      <h4 className="text-white font-bold text-xs sm:text-sm md:text-base tracking-wide">
-                        {skill.title}
-                      </h4>
-                      <p className="text-[10px] sm:text-xs md:text-sm text-gray-400 leading-normal">
-                        {skill.items}
-                      </p>
-                    </div>
-
-                    {/* Progress Bar & Percentage */}
-                    <div className="xl:col-span-5 flex items-center justify-between gap-3 w-full min-w-0">
-                      {/* Responsive Grid block loader */}
-                      <div className="grid grid-cols-[repeat(20,minmax(0,1fr))] gap-0.5 select-none font-mono flex-1 min-w-0 max-w-[220px] xl:max-w-none">
-                        {Array.from({ length: filledCount }).map((_, i) => (
-                          <div key={`f-${i}`} className="h-3.5 bg-white border border-white/30 min-w-0"></div>
-                        ))}
-                        {Array.from({ length: emptyCount }).map((_, i) => (
-                          <div key={`e-${i}`} className="h-3.5 border border-white/20 bg-white/5 opacity-40 min-w-0"></div>
-                        ))}
-                      </div>
-                      
-                      <span className="text-xs font-bold text-white tracking-wider tabular-nums min-w-[32px] text-right">
-                        {skill.rating}%
-                      </span>
-                    </div>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    {skill.items}
+                  </p>
+                  {/* Progress bar */}
+                  <div className="h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--accent-blue)] skill-bar-fill"
+                      style={{ width: `${skill.rating}%` }}
+                    />
                   </div>
-
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
+          <SkillsIllustration className="hidden lg:block w-32 h-32 opacity-20 shrink-0 mt-8" />
+        </div>
 
-          {/* Bottom Banner */}
-          <div className="border border-white/25 bg-black p-2.5 text-center">
-            <span className="text-white text-[10px] font-bold tracking-[0.2em] uppercase">
-              &gt; ALWAYS LEARNING. ALWAYS BUILDING.
-            </span>
-          </div>
+        <div className="text-center pt-4 border-t border-[var(--color-border)]">
+          <p className="text-sm text-[var(--text-muted)] italic">
+            Always learning. Always building.
+          </p>
         </div>
       </motion.div>
     );
   }
 
-  // 5. ACHIEVEMENTS TAB (Matches Screenshot 5 perfectly)
+  // ── ACHIEVEMENTS TAB ──
   if (activeTab === "achievements") {
-    const certs = [
+    const achievements = [
       {
-        title: "Runner-Up",
-        desc: "SPEC2MODEL ML Challenge (Food Delivery Delay Prediction). Engineered top performing regression model with high accuracy under strict time constraint.",
+        title: "Runner-Up – SPEC2MODEL ML Challenge",
+        desc: "Secured 2nd place in the Food Delivery Delay Prediction competition. Developed predictive regression models with feature engineering under strict competition criteria.",
         year: "2024",
-        icon: <Trophy className="w-5 h-5 text-white" />
+        category: "ML Competition",
+        color: "var(--accent-orange)",
       },
       {
-        title: "2nd Place",
-        desc: "Algo Arena 2.0, Silicon University. Excelled in competitive programming, algorithms design, and rapid prototyping hackathon.",
+        title: "Algo Arena 2.0 – 2nd Place",
+        desc: "Secured 2nd Place at Silicon University. Demonstrated algorithmic problem-solving and rapid data structure implementation in competitive programming.",
         year: "2024",
-        icon: <Award className="w-5 h-5 text-white" />
+        category: "Silicon University",
+        color: "var(--accent-blue)",
       },
       {
         title: "PwC Launchpad Program",
-        desc: "Selected for the prestigious ongoing program. Gaining power skills, direct professional exposure, and strategic consulting simulations.",
+        desc: "Selected for the PwC Launchpad program. Engaging in intensive corporate learning, power skills workshops, and consulting case simulations.",
         year: "Ongoing",
-        icon: <Sparkles className="w-5 h-5 text-white" />
+        category: "Program",
+        color: "var(--accent-blue)",
       },
       {
-        title: "Active LeetCode Solver",
-        desc: "Solved 150+ complex algorithms on LeetCode focusing on DSA & design thinking logic. (leetcode.com/u/phribbi39)",
-        year: "Active",
-        icon: <Code className="w-5 h-5 text-white" />
+        title: "Kaggle Agents Intensive Capstone",
+        desc: "Participated in the Google x Kaggle Agents Intensive program and built an agent-based AI application using Google ADK and Gemini.",
+        year: "2025",
+        category: "Google x Kaggle",
+        color: "var(--accent-orange)",
+      }
+    ];
+
+    const certifications = [
+      {
+        title: "Generative AI Introduction",
+        issuer: "Google",
+        desc: "Foundational concepts of large language models, prompt engineering, generative architectures, and AI ethics.",
+      },
+      {
+        title: "Introduction to Artificial Intelligence",
+        issuer: "IBM",
+        desc: "Comprehensive foundation in AI concepts, machine learning workflows, and practical applications.",
+      },
+      {
+        title: "Job Ready Data Science",
+        issuer: "CodeWithHarry",
+        desc: "Extensive hands-on data science training covering Python, data analysis, feature engineering, and predictive modeling.",
       }
     ];
 
@@ -780,50 +854,78 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="achievements-tab-content"
-        className="h-full min-h-0 flex flex-col gap-4 font-mono overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent select-none"
+        className="space-y-10"
       >
-        <div className="border border-white/20 p-4 bg-white/5 space-y-4">
-          <p className="text-white font-bold text-xs uppercase">
-            [ ACHIEVEMENTS & CERTIFICATIONS ]
-          </p>
+        <div className="flex items-start gap-8">
+          <div className="flex-1 space-y-10">
+            {/* Honors & Achievements */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
+                Honors & Achievements
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {achievements.map((item, idx) => (
+                  <div 
+                    key={idx} 
+                    className="p-5 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] bg-[var(--bg-primary)] transition-all group space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ background: item.color }}
+                        />
+                        <span className="font-mono text-[var(--text-faint)]">{item.category}</span>
+                      </div>
+                      <span className="font-mono text-[var(--accent-blue)] font-medium">{item.year}</span>
+                    </div>
+                    <h4 className="text-sm md:text-base font-semibold text-[var(--text-primary)]">
+                      {item.title}
+                    </h4>
+                    <p className="text-xs md:text-sm text-[var(--text-muted)] leading-relaxed">
+                      {item.desc}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {certs.map((cert, idx) => (
-              <div key={idx} className="border border-white/20 p-3 bg-black flex gap-3 items-start flex-col sm:flex-row min-h-[110px] hover:border-white/50 transition-all">
-                
-                {/* Left Side Icon */}
-                <div className="border border-white/30 p-2.5 bg-black rounded-sm shrink-0 flex items-center justify-center">
-                  {cert.icon}
-                </div>
-
-                {/* Right Side Content text */}
-                <div className="flex-1 flex flex-col justify-between h-full space-y-1.5">
-                  <div className="space-y-1">
-                    <span className="text-white font-bold text-xs block uppercase tracking-wide leading-tight">
+            {/* Certifications */}
+            <div className="space-y-4 pt-6 border-t border-[var(--color-border)]">
+              <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
+                Certifications
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {certifications.map((cert, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--bg-primary)] space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--color-border)] text-[var(--text-primary)] font-medium">
+                        {cert.issuer}
+                      </span>
+                      <Award className="w-3.5 h-3.5 text-[var(--accent-blue)]" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                       {cert.title}
-                    </span>
-                    <p className="text-gray-300 text-[10px] sm:text-[11px] leading-relaxed">
+                    </h4>
+                    <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                       {cert.desc}
                     </p>
                   </div>
-                  <span className="text-[9px] text-gray-400 font-bold block border border-white/10 px-1 py-0.5 rounded-sm bg-white/5 w-fit mt-1">
-                    [ {cert.year} ]
-                  </span>
-                </div>
-
+                ))}
               </div>
-            ))}
+            </div>
           </div>
 
-          <p className="text-white/60 font-mono text-[10px] tracking-widest uppercase pl-1 pt-1.5">
-            &gt; More achievements coming soon...
-          </p>
+          <AchievementsIllustration className="hidden lg:block w-28 h-28 opacity-20 shrink-0" />
         </div>
       </motion.div>
     );
   }
 
-  // 6. CONTACT TAB (Contact form)
+  // ── CONTACT TAB ──
   if (activeTab === "contact") {
     return (
       <motion.div
@@ -831,118 +933,113 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="contact-tab-content"
-        className="h-full min-h-0 flex flex-col gap-3 font-mono overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+        className="space-y-8"
       >
-        <form onSubmit={handleContactSubmit} className="flex flex-col gap-2.5 border border-white/20 p-4 bg-white/5">
-          <p className="text-white font-bold text-xs uppercase mb-1">
-            [ SECURE CONTACT TERMINAL ]
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-gray-400 block mb-1">USER_NAME.EXE</label>
-              <input
-                type="text"
-                placeholder="Name"
-                value={formState.name}
-                onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                className="w-full bg-black border border-white/30 focus:border-white px-2 py-2 text-xs text-white focus:outline-none"
-              />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Contact Form */}
+          <form onSubmit={handleContactSubmit} className="space-y-5">
+            <p className="text-base text-[var(--text-secondary)] leading-relaxed">
+              Have a project idea, question, or just want to say hello? I'd love to hear from you.
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-mono text-[var(--text-faint)] block mb-1.5 tracking-wider uppercase">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={formState.name}
+                  onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                  className="w-full bg-transparent border border-[var(--color-border-strong)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-faint)] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-mono text-[var(--text-faint)] block mb-1.5 tracking-wider uppercase">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formState.email}
+                  onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                  className="w-full bg-transparent border border-[var(--color-border-strong)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-faint)] transition-colors"
+                />
+              </div>
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 block mb-1">USER_EMAIL.CFG</label>
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={formState.email}
-                onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                className="w-full bg-black border border-white/30 focus:border-white px-2 py-2 text-xs text-white focus:outline-none"
+              <label className="text-xs font-mono text-[var(--text-faint)] block mb-1.5 tracking-wider uppercase">
+                Message
+              </label>
+              <textarea
+                placeholder="Tell me about your project or idea..."
+                rows={4}
+                value={formState.msg}
+                onChange={(e) => setFormState({ ...formState, msg: e.target.value })}
+                className="w-full bg-transparent border border-[var(--color-border-strong)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-faint)] resize-none transition-colors"
               />
             </div>
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-400 block mb-1">MESSAGE_PAYLOAD.TXT</label>
-            <textarea
-              placeholder="Provide message details..."
-              rows={3}
-              value={formState.msg}
-              onChange={(e) => setFormState({ ...formState, msg: e.target.value })}
-              className="w-full bg-black border border-white/30 focus:border-white px-2 py-2 text-xs text-white focus:outline-none resize-none"
-            ></textarea>
-          </div>
-          
-          <div className="flex justify-between items-center mt-1 flex-wrap gap-2">
-            <span className="text-[10px] text-yellow-400 tracking-wider">
-              {formStatus}
-            </span>
-            <button
-              type="submit"
-              className="border border-white hover:bg-white hover:text-black px-4 py-2 text-xs text-white cursor-pointer transition-colors active:scale-[0.98]"
-            >
-              TRANSMIT_DATA &gt;
-            </button>
-          </div>
-        </form>
+            
+            <div className="flex items-center justify-between gap-4">
+              {formStatus && (
+                <p className={`text-xs ${formStatus.includes("success") ? "text-[var(--color-success)]" : formStatus.includes("Failed") || formStatus.includes("error") ? "text-[var(--color-error)]" : "text-[var(--accent-blue)]"}`}>
+                  {formStatus}
+                </p>
+              )}
+              <button
+                type="submit"
+                className="ml-auto text-sm font-medium bg-[var(--text-primary)] text-[var(--bg-primary)] px-6 py-2.5 rounded-lg hover:bg-[var(--accent-blue)] transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                Send Message
+              </button>
+            </div>
+          </form>
 
-        {/* Social Links Panel */}
-        <div className="border border-white/20 p-4 bg-white/5 space-y-3">
-          <p className="text-white font-bold text-xs uppercase mb-2">
-            [ CONNECT_PROTOCOLS ]
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* GitHub */}
-            <a
-              href="https://github.com/umeshkumarsahoo"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 border border-white/20 bg-black p-3 hover:border-white hover:bg-white/5 transition-all group cursor-pointer"
-            >
-              <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0">
-                <Github className="w-5 h-5 text-white group-hover:text-red-400 transition-colors" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-white font-bold text-xs block tracking-wide">GITHUB</span>
-                <span className="text-[9px] text-gray-400 font-mono truncate block">umeshkumarsahoo</span>
-              </div>
-            </a>
+          {/* Social Links */}
+          <div className="space-y-5">
+            <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
+              Connect
+            </h3>
+            <div className="space-y-3">
+              {[
+                { href: "https://github.com/umeshkumarsahoo", icon: <Github className="w-5 h-5" />, name: "GitHub", handle: "umeshkumarsahoo" },
+                { href: "https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a", icon: <Linkedin className="w-5 h-5" />, name: "LinkedIn", handle: "umesh-kumar-sahoo" },
+                { href: "https://leetcode.com/u/phribbi39", icon: <Code className="w-5 h-5" />, name: "LeetCode", handle: "phribbi39" },
+              ].map((social, idx) => (
+                <a
+                  key={idx}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-4 p-4 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] transition-all group"
+                >
+                  <span className="text-[var(--text-muted)] group-hover:text-[var(--accent-blue)] transition-colors">
+                    {social.icon}
+                  </span>
+                  <div>
+                    <span className="text-sm font-medium text-[var(--text-primary)] block">{social.name}</span>
+                    <span className="text-xs text-[var(--text-faint)] font-mono">{social.handle}</span>
+                  </div>
+                  <ExternalLink className="w-4 h-4 ml-auto text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors" />
+                </a>
+              ))}
+            </div>
 
-            {/* LinkedIn */}
-            <a
-              href="https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 border border-white/20 bg-black p-3 hover:border-white hover:bg-white/5 transition-all group cursor-pointer"
-            >
-              <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0">
-                <Linkedin className="w-5 h-5 text-white group-hover:text-red-400 transition-colors" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-white font-bold text-xs block tracking-wide">LINKEDIN</span>
-                <span className="text-[9px] text-gray-400 font-mono truncate block">umesh-kumar-sahoo</span>
-              </div>
-            </a>
-
-            {/* LeetCode */}
-            <a
-              href="https://leetcode.com/u/phribbi39"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 border border-white/20 bg-black p-3 hover:border-white hover:bg-white/5 transition-all group cursor-pointer"
-            >
-              <div className="border border-white/30 p-2 bg-black rounded-sm shrink-0">
-                <Code className="w-5 h-5 text-white group-hover:text-red-400 transition-colors" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-white font-bold text-xs block tracking-wide">LEETCODE</span>
-                <span className="text-[9px] text-gray-400 font-mono truncate block">phribbi39</span>
-              </div>
-            </a>
+            <div className="pt-4 border-t border-[var(--color-border)]">
+              <p className="text-sm text-[var(--text-muted)]">
+                <Mail className="w-4 h-4 inline mr-2" />
+                sahooumesh2003@gmail.com
+              </p>
+            </div>
           </div>
         </div>
       </motion.div>
     );
   }
 
-  // 7. AI AGENT TAB (Named 'umu', full width, clean, concise chat)
+  // ── AI AGENT TAB ──
   if (activeTab === "agent") {
     return (
       <motion.div
@@ -950,22 +1047,36 @@ export default function TabContent({
         initial="hidden"
         animate="visible"
         id="agent-tab-content"
-        className="h-full min-h-0 font-mono text-xs overflow-hidden"
+        className="h-full flex flex-col overflow-hidden"
       >
-        {/* Full Width: Dynamic Chat Console (takes up full 100% space) */}
-        <div className="w-full flex flex-col border border-white/20 bg-black/60 h-full overflow-hidden">
-          {/* Chat Header */}
-          <div className="bg-white/5 border-b border-white/20 px-3 py-2 flex justify-between items-center shrink-0 select-none">
-            <span className="text-white font-bold flex items-center gap-2">
-              <Bot className="w-4 h-4 text-white" /> umu.EXE
-            </span>
-            <span className="text-[10px] text-gray-500 flex items-center gap-1 font-semibold">
-              <span className="w-1.5 h-1.5 bg-red-500 inline-block animate-pulse"></span> SECURE_DOWNLINK
-            </span>
+        <div className="flex-1 flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--bg-primary)] overflow-hidden">
+          {/* Chat Header with Doodle */}
+          <div className="shrink-0 px-4 py-3 border-b border-[var(--color-border)] flex items-center gap-3">
+            <UmuDoodle state={doodleState} className="" />
+            <div>
+              <span className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                umu
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)] inline-block" />
+              </span>
+              <span className="text-[10px] text-[var(--text-faint)] font-mono">
+                {isQuerying ? queryStatus : "Online · Ready to help"}
+              </span>
+            </div>
           </div>
 
-          {/* Messages readout area */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3.5 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+            {messages.length <= 1 && (
+              <div className="py-6 px-4 my-2 rounded-2xl border border-[var(--color-border)] bg-[var(--bg-secondary)]/50 text-center space-y-3">
+                <DoodleGang className="w-full max-w-sm h-28 mx-auto" />
+                <h4 className="text-xs font-mono uppercase tracking-widest text-[var(--accent-blue)] font-bold">
+                  Meet umu · Umesh's AI Assistant
+                </h4>
+                <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
+                  Ask me about Umesh's projects, B.Tech coursework, DevOps pipelines, GitHub code, or live tech news.
+                </p>
+              </div>
+            )}
             {messages.map((m, idx) => (
               <div
                 key={idx}
@@ -973,16 +1084,16 @@ export default function TabContent({
                   m.role === "user" ? "items-end" : "items-start"
                 }`}
               >
-                <div className="flex items-center gap-1.5 mb-1 text-[9px] text-gray-500 font-bold tracking-wider select-none">
-                  <span>{m.role === "user" ? "USER_PROMPT" : "umu_RESP"}</span>
-                  <span>•</span>
-                  <span>{m.timestamp}</span>
+                <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[var(--text-faint)]">
+                  <span>{m.role === "user" ? "You" : "umu"}</span>
+                  <span>·</span>
+                  <span className="font-mono">{m.timestamp}</span>
                 </div>
                 <div
-                  className={`p-2.5 max-w-[90%] leading-relaxed whitespace-pre-wrap select-text selection:bg-white selection:text-black ${
+                  className={`px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap select-text ${
                     m.role === "user"
-                      ? "bg-white text-black font-semibold"
-                      : "bg-white/5 border border-white/10 text-gray-300"
+                      ? "chat-bubble-user"
+                      : "chat-bubble-agent"
                   }`}
                 >
                   {m.content}
@@ -991,13 +1102,14 @@ export default function TabContent({
             ))}
             
             {isQuerying && (
-              <div className="flex flex-col items-start select-none">
-                <div className="flex items-center gap-1.5 mb-1 text-[9px] text-gray-500 font-bold">
-                  <span>umu_THINKING</span>
-                  <span className="animate-pulse">...</span>
+              <div className="flex flex-col items-start">
+                <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[var(--text-faint)]">
+                  <span>umu</span>
+                  <span>·</span>
+                  <span className="font-mono">thinking</span>
                 </div>
-                <div className="p-2.5 bg-white/5 border border-white/10 text-yellow-400 italic flex items-center gap-2">
-                  <span className="inline-block animate-spin border-t border-r border-yellow-400 rounded-full w-3.5 h-3.5 shrink-0"></span>
+                <div className="chat-bubble-agent px-4 py-3 flex items-center gap-2 text-sm text-[var(--accent-blue)]">
+                  <span className="inline-block animate-spin border-t-2 border-r-2 border-[var(--accent-blue)] rounded-full w-3.5 h-3.5 shrink-0" />
                   {queryStatus}
                 </div>
               </div>
@@ -1005,53 +1117,43 @@ export default function TabContent({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Clickable Quick Prompts (Tags) */}
-          <div className="px-3 py-1.5 bg-white/5 border-t border-white/10 overflow-x-auto whitespace-nowrap flex gap-2 shrink-0 select-none scrollbar-none">
-            <button
-              onClick={(e) => handleQuerySubmit(e, "Explain your RAG-Based Assistant")}
-              className="border border-white/20 hover:border-white text-[9px] text-gray-300 hover:text-white px-2 py-0.5 rounded bg-black cursor-pointer transition-colors"
-            >
-              # RAG-Assistant
-            </button>
-            <button
-              onClick={(e) => handleQuerySubmit(e, "Detail your DevOps and Terraform experience")}
-              className="border border-white/20 hover:border-white text-[9px] text-gray-300 hover:text-white px-2 py-0.5 rounded bg-black cursor-pointer transition-colors"
-            >
-              # Terraform-DevOps
-            </button>
-            <button
-              onClick={(e) => handleQuerySubmit(e, "Explain the FreshGuard ML project")}
-              className="border border-white/20 hover:border-white text-[9px] text-gray-300 hover:text-white px-2 py-0.5 rounded bg-black cursor-pointer transition-colors"
-            >
-              # FreshGuard-ML
-            </button>
-            <button
-              onClick={(e) => handleQuerySubmit(e, "How did you optimize e-commerce queries?")}
-              className="border border-white/20 hover:border-white text-[9px] text-gray-300 hover:text-white px-2 py-0.5 rounded bg-black cursor-pointer transition-colors"
-            >
-              # MongoDB-Optimization
-            </button>
+          {/* Quick Prompts */}
+          <div className="px-4 py-2 border-t border-[var(--color-border)] overflow-x-auto flex gap-2 shrink-0">
+            {[
+              { label: "RAG Assistant", prompt: "Explain your RAG-Based Assistant" },
+              { label: "DevOps", prompt: "Detail your DevOps and Terraform experience" },
+              { label: "FreshGuard", prompt: "Explain the FreshGuard ML project" },
+              { label: "MongoDB", prompt: "How did you optimize e-commerce queries?" },
+            ].map((item, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => handleQuerySubmit(e, item.prompt)}
+                className="shrink-0 text-xs text-[var(--text-muted)] hover:text-[var(--accent-blue)] border border-[var(--color-border)] hover:border-[var(--accent-blue)] px-3 py-1 rounded-full transition-colors cursor-pointer"
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
 
-          {/* Form input */}
+          {/* Input Form */}
           <form
             onSubmit={handleQuerySubmit}
-            className="border-t border-white/20 flex items-center bg-black shrink-0"
+            className="border-t border-[var(--color-border)] flex items-center shrink-0"
           >
             <input
               type="text"
-              placeholder="Ask umu about Umesh's background, projects, or github repos..."
+              placeholder="Ask umu about Umesh's background, projects, or repos..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-black text-xs text-white border-none focus:outline-none focus:ring-0 px-3 py-3 select-text"
+              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] border-none focus:outline-none focus:ring-0 px-4 py-3 placeholder:text-[var(--text-faint)] select-text"
               disabled={isQuerying}
             />
             <button
               type="submit"
               disabled={isQuerying || !query.trim()}
-              className="h-full px-4 border-l border-white/20 bg-white/5 hover:bg-white hover:text-black text-white transition-colors cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-white"
+              className="h-full px-4 text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-colors cursor-pointer flex items-center justify-center disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--accent-blue)] rounded-r-xl"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4" />
             </button>
           </form>
         </div>

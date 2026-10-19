@@ -229,45 +229,51 @@ function escapeHtml(value: string) {
 
 const RESUME_TEXT = `
 UMESH KUMAR SAHOO
-Bhubaneswar, Odisha | sahooumesh2003@gmail.com | +91-7735203945 | GitHub | LinkedIn | LeetCode
+Bhubaneswar, Odisha | sahooumesh2003@gmail.com | github.com/umeshkumarsahoo | linkedin.com/in/umesh-kumar-sahoo-94626727a
+
+PROFILE SUMMARY
+Computer Science undergraduate with hands-on experience building web applications, ML APIs, and RAG-based AI systems. Skilled in Python, Basic JavaScript, SQL, REST APIs, machine learning, embeddings, vector search, and LLM integration, with a strong interest in software development and AI engineering.
+
 EDUCATION
-- Silicon University, Bhubaneswar · B.Tech – Computer Science & Engineering (4th Year, CGPA: 9.60 / 10) | 2023–2027
-- Jawahar Navodaya Vidyalaya, Panikoili · Senior Secondary (PCMB) · CBSE | 91.2% | 2021
-- Jawahar Navodaya Vidyalaya, Panikoili · Secondary · CBSE | 95.8% | 2019
+- Silicon University, Bhubaneswar · B.Tech in Computer Science & Engineering (2023–2027) | CGPA: 9.60 / 10.0
+- JNV Panikoili · Senior Secondary (2021) | Percentage: 91.2%
+- JNV Panikoili · Secondary (2019) | Percentage: 95.8%
 
 TECHNICAL SKILLS
-- Languages: Python, Java, JavaScript (ES6+), SQL, C
-- AI / ML / Gen AI: Machine Learning, NLP, RAG Pipelines, LLM Integration, Vector Embeddings, Whisper, Scikit-learn, XGBoost, Gradient Boosting, LSTM, RNN, ARIMA, Time Series Forecasting
-- Data Engineering: Pandas, NumPy, Feature Engineering, Data Preprocessing, Regression, Classification, Clustering, Statistical Modeling
-- Cloud & DevOps: GitHub Actions (CI/CD), Terraform, Infrastructure as Code (IaC), Linux
-- Web & Backend: React.js, Node.js, Express.js, MongoDB, Flask, REST APIs
-- Tools: TensorFlow, Keras, Jupyter Notebook, Postman, Matplotlib, Seaborn, Plotly, Git, GitHub
+- Programming: Python, C, SQL
+- Machine Learning / AI: Scikit-learn, XGBoost, Gradient Boosting, Random Forest, Keras, RAG Pipelines, LLM Integration, Embeddings, Vector Similarity Search, Feature Engineering, Model Evaluation
+- Frameworks / Libraries: FastAPI, Flask, React.js, Node.js, Pandas, NumPy, Matplotlib, Seaborn
+- Tools / DevOps: Git, GitHub, GitHub Actions, Terraform, Linux, Postman, Jupyter Notebook, VS Code
 
-EXPERIENCE
-- DevOps Engineer Intern · Ingenious Tech World (Jun 2025 – Jul 2025)
-  * Engineered CI/CD pipelines via GitHub Actions — automated build, test & deploy workflows, cutting manual deployment effort by 40%.
-  * Provisioned scalable cloud infrastructure using Terraform (IaC), ensuring environment consistency across dev and staging; applied distributed-systems principles for multi-region reliability.
-- MERN Stack Developer Intern · Syllogistick (Jun 2024 – Jul 2024)
-  * Built production e-commerce platform: MongoDB + Express.js + React.js + Node.js with JWT auth and 10+ REST API endpoints.
-  * Improved frontend responsiveness via React code-splitting; optimized MongoDB schema design to reduce query latency.
+PROFESSIONAL EXPERIENCE
+- DevOps Engineer Intern · Ingenious Tech World (June 2025 – July 2025)
+  * Worked with GitHub Actions and Terraform on CI/CD and Infrastructure-as-Code workflows.
+- MERN Stack Developer Intern · Syllogistick (June 2024 – July 2024)
+  * Worked on a MERN-based application involving React, REST APIs, authentication, and MongoDB.
 
 PROJECTS
-- RAG-Based Video Teaching Assistant (Python, Whisper, RAG, LLM, Vector Embeddings, Streamlit)
-  * Designed Gen AI Q&A system using Retrieval-Augmented Generation (RAG): Whisper transcription → semantic embeddings → cosine similarity retrieval → timestamp-aware chunking.
-  * Implemented confidence-threshold filtering to suppress hallucinated responses, improving reliability across educational LLM workflows.
-- FreshGuard – Shelf-Life Prediction System (Python, Gradient Boosting, Scikit-learn, Flask, GitHub Actions CI/CD)
-  * Led end-to-end ML pipeline on 3,552 real-world records; achieved R²=0.89 with Gradient Boosting — 31% improvement over baseline after benchmarking 5+ regression models.
-  * Deployed trained model as Flask REST API with GitHub Actions CI/CD, enabling automated testing and cloud-ready continuous deployment.
-- Nifty-50 Stock Price Forecasting (ARIMAX, LSTM, RNN) (Python, TensorFlow, Keras, pmdarima, Statsmodels, LightGBM)
-  * Forecasted VWAP on 20-year ICICI Bank / Nifty-50 dataset; engineered 32 lag features via 3d/7d/30d rolling mean+std sliding windows across 5 financial indicators.
-  * Confirmed non-stationarity (ADF stat: −2.69); applied Box-Cox transformation + additive/multiplicative seasonal decomposition + ACF/PACF analysis before modelling.
-  * Benchmarked AR(3), ARIMAX (auto_arima/pmdarima), LSTM (100 units), SimpleRNN; LSTM outperformed RNN by ~3–4% MAE with EarlyStopping (patience=21) on 80/20 split.
+- AI-Powered Terminal Portfolio (React, FastAPI, Gemini, REST APIs, Security)
+  * Built a React + FastAPI terminal-style portfolio with a backend, integrating GitHub and Hacker News APIs with server-side caching for dynamic content.
+  * Developed a Gemini-powered assistant using resume and public repository context to answer questions about projects, skills, and experience.
+  * Implemented API security controls including Helmet security headers, rate limiting, CSRF protection, input validation, and server-side secret management.
+- RAG-Based Teaching Assistant System (Python, RAG, Embeddings, Vector Search, LLM Integration)
+  * Built an end-to-end RAG pipeline covering document ingestion, chunking, embedding generation, vector similarity search, retrieval, and LLM-based response generation.
+  * Used semantic retrieval to provide relevant source context to the language model for context-aware question answering over educational content.
+- Emotion Detection API (Python, Keras, BiGRU, FastAPI, NLP)
+  * Built a Keras Bidirectional GRU model for text emotion classification and exposed inference through a FastAPI REST service.
+  * Implemented inference preprocessing, tokenizer-based sequence conversion, padding, and prediction with emotion probabilities and confidence scores.
+  * Added health and prediction endpoints with validation and error handling for unavailable model or tokenizer artifacts.
 
-ACHIEVEMENTS & CERTIFICATIONS
-- Runner-Up — SPEC2MODEL ML Challenge (Food Delivery Delay Prediction)
-- 2nd Place — Algo Arena 2.0, Silicon University
-- Selected for the PwC Launchpad Program (Ongoing)
-- Google Generative AI (Intro) · IBM Introduction to AI · Job Ready Data Science · Active LeetCode problem-solver (DSA & Design Thinking, username: phribbi39)
+ACHIEVEMENTS
+- Runner-Up – SPEC2MODEL ML Challenge: Secured 2nd place in the Food Delivery Delay Prediction competition.
+- Algo Arena 2.0: Secured 2nd Place at Silicon University.
+- PwC Launchpad: Selected for the PwC Launchpad program.
+- Kaggle Agents Intensive Capstone: Participated in the Google x Kaggle Agents Intensive program and built an agent-based AI application using Google ADK and Gemini.
+
+CERTIFICATIONS
+- Google – Generative AI Introduction
+- IBM – Introduction to Artificial Intelligence
+- CodeWithHarry – Job Ready Data Science
 `;
 
 async function fetchHackerNewsStories(limit = 7) {
@@ -578,35 +584,54 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
       const safeName = escapeHtml(trimmedName);
       const safeEmail = escapeHtml(trimmedEmail);
       const safeMessage = escapeHtml(trimmedMessage);
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: Number(smtpPort) || 587,
-        secure: smtpPort === "465",
-        auth: {
-          user: smtpUser,
-          pass: smtpPass
-        }
-      });
 
-      await transporter.sendMail({
-        from: `"${trimmedName} (Portfolio Contact)" <${smtpUser}>`,
-        to: mailTo,
-        replyTo: trimmedEmail,
-        subject: `New Portfolio Message from ${trimmedName}`,
-        text: `You have received a new contact submission from your portfolio.\n\nFrom: ${trimmedName} <${trimmedEmail}>\nDate: ${new Date().toLocaleString()}\n\nMessage:\n${trimmedMessage}\n\n(Persisted durably in contacts.json)`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #ccc; padding: 20px;">
-            <h2 style="border-bottom: 2px solid #333; padding-bottom: 8px;">New Portfolio Contact</h2>
-            <p><strong>From:</strong> ${safeName} (&lt;${safeEmail}&gt;)</p>
-            <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-            <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #333; margin-top: 15px; white-space: pre-wrap;">${safeMessage}</div>
-            <p style="font-size: 11px; color: #777; margin-top: 25px;">This message was also securely saved to your contacts.json file on the server.</p>
-          </div>
-        `
-      });
-      console.log(`[BACKEND] SMTP email sent successfully.`);
+      const port = Number(smtpPort) || 587;
+      const isSecure = port === 465;
+
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: port,
+          secure: isSecure,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
+          tls: {
+            rejectUnauthorized: false
+          }
+        });
+
+        await transporter.sendMail({
+          from: `"${trimmedName} (Portfolio Contact)" <${smtpUser}>`,
+          to: mailTo,
+          replyTo: trimmedEmail,
+          subject: `New Portfolio Message from ${trimmedName}`,
+          text: `You have received a new contact submission from your portfolio.\n\nFrom: ${trimmedName} <${trimmedEmail}>\nDate: ${new Date().toLocaleString()}\n\nMessage:\n${trimmedMessage}\n\n(Persisted durably in contacts.json)`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; border: 1px solid #e7e2d8; padding: 24px; border-radius: 8px; background: #fdfcf9; color: #171717;">
+              <h2 style="margin-top: 0; padding-bottom: 12px; border-bottom: 1px solid #e7e2d8; font-size: 20px; font-weight: 600;">New Portfolio Contact</h2>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>From:</strong> ${safeName} &lt;<a href="mailto:${safeEmail}" style="color: #2468B4;">${safeEmail}</a>&gt;</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+              <div style="background: #f7f4ec; padding: 16px; border-left: 3px solid #2468B4; margin-top: 16px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; border-radius: 4px;">${safeMessage}</div>
+              <p style="font-size: 11px; color: #888; margin-top: 24px; border-top: 1px solid #e7e2d8; padding-top: 12px;">This message was also securely saved to your contacts.json file on the server.</p>
+            </div>
+          `
+        });
+        console.log(`[BACKEND] SMTP email dispatched successfully to ${mailTo}`);
+      } catch (mailError: any) {
+        console.error(`[BACKEND] SMTP Dispatch Warning (${mailError.code || "ERR"}):`, mailError.message);
+        if (mailError.code === "EAUTH") {
+          console.error(`[BACKEND] SMTP Auth Hint: Google/Provider rejected credentials. If using Gmail, make sure SMTP_PASS is a 16-character Google App Password (not your normal password).`);
+        } else if (mailError.code === "ETIMEDOUT" || mailError.code === "ECONNREFUSED" || mailError.code === "ESOCKET") {
+          console.error(`[BACKEND] SMTP Network Hint: Outbound connection timed out. On Render Free tier, ports 465/587 may be blocked. The contact message was safely saved in contacts.json.`);
+        }
+      }
     } else {
-      console.log(`[BACKEND] SMTP credentials not configured. Simulation succeeded. Message logged locally in contacts.json.`);
+      console.log(`[BACKEND] SMTP credentials not configured (needs SMTP_HOST, SMTP_USER, SMTP_PASS). Message logged locally in contacts.json.`);
     }
 
     res.json({ success: true, message: "Transmission complete. Your direct message has been securely submitted." });
@@ -750,6 +775,36 @@ async function startServer() {
 
   const server = app.listen(PORT, HOST, () => {
     console.log(`[BACKEND] Server running on http://localhost:${PORT}`);
+
+    // Non-blocking SMTP diagnostic check on startup
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    if (smtpHost && smtpUser && smtpPass) {
+      const port = Number(smtpPort) || 587;
+      const isSecure = port === 465;
+      const testTransporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: port,
+        secure: isSecure,
+        auth: { user: smtpUser, pass: smtpPass },
+        connectionTimeout: 8000,
+        tls: { rejectUnauthorized: false },
+      });
+      testTransporter.verify((err) => {
+        if (err) {
+          console.warn(`[BACKEND] SMTP Initial Check Warning: ${err.message}`);
+          if ((err as any).code === "EAUTH") {
+            console.warn("[BACKEND] SMTP Auth Hint: Google/Provider rejected credentials. For Gmail, make sure SMTP_PASS is a 16-character Google App Password (not your normal password).");
+          }
+        } else {
+          console.log(`[BACKEND] SMTP Initial Check: Verified and ready to send via ${smtpUser}`);
+        }
+      });
+    } else {
+      console.log("[BACKEND] SMTP Note: SMTP_HOST/USER/PASS not fully set. Form submissions are safely logged to contacts.json.");
+    }
   });
 
   server.on("error", (error: NodeJS.ErrnoException) => {
