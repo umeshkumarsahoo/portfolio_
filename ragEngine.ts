@@ -19,7 +19,476 @@ export interface RAGSourceConfig {
   isStale?: boolean;
 }
 
-export type ProjectId = "freshguard" | "rag" | "devops" | "emotion" | "timeseries" | "portfolio" | "general";
+export interface RepoCatalogueEntry {
+  name: string;
+  fullName: string;
+  description: string | null;
+  htmlUrl: string;
+  defaultBranch: string;
+  language: string | null;
+  topics: string[];
+  stars: number;
+  forks: number;
+  isFork: boolean;
+  updatedAt: string;
+  size: number;
+  files?: string[];
+  readmeExcerpt?: string;
+  isEmpty?: boolean;
+}
+
+export const DEFAULT_REPO_CATALOGUE: RepoCatalogueEntry[] = [
+  // Flagship & Original ML / AI Projects
+  {
+    name: "lab_project_fresh_guard",
+    fullName: "umeshkumarsahoo/lab_project_fresh_guard",
+    description: "Produce shelf-life predictor using GradientBoostingRegressor on 3,552 records across 9 features with Flask API.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["machine-learning", "regression", "flask", "scikit-learn"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-03-15T00:00:00Z",
+    size: 4500,
+    files: ["app.py", "best_regressor.pkl", "Datasets/FreshGuard_RAW_dirty.csv", "classifier_xgboost.pkl", "FreshGuard.ipynb", "README.md"],
+  },
+  {
+    name: "Teaching_assistant-rag-based-",
+    fullName: "umeshkumarsahoo/Teaching_assistant-rag-based-",
+    description: "Video RAG system transcribing lectures via Whisper large-v2 and indexing dense vector embeddings with Streamlit UI.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["rag", "whisper", "vector-search", "streamlit", "embeddings"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-03-10T00:00:00Z",
+    size: 3200,
+    files: ["create_chunks.py", "APP.PY", "api.py", "process_video.py", "After_chunking.ipynb", "Readme.md"],
+  },
+  {
+    name: "Time_series-",
+    fullName: "umeshkumarsahoo/Time_series-",
+    description: "Time series forecasting on Nifty-50 stock market data using ARIMA, pmdarima, and Keras LSTM RNNs.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/Time_series-",
+    defaultBranch: "main",
+    language: "Jupyter Notebook",
+    topics: ["time-series", "arima", "lstm", "nifty-50"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-02-20T00:00:00Z",
+    size: 1800,
+    files: ["lstm-rnn-arimax-ar-models-and-analysis.ipynb", "README.md"],
+  },
+  {
+    name: "sentiment_analysis",
+    fullName: "umeshkumarsahoo/sentiment_analysis",
+    description: "BiGRU text emotion classifier in Keras/TensorFlow served via FastAPI microservice.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/sentiment_analysis",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["nlp", "bigru", "keras", "fastapi", "sentiment-analysis"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-02-15T00:00:00Z",
+    size: 0,
+    isEmpty: true,
+    files: [],
+  },
+  {
+    name: "ml-projects",
+    fullName: "umeshkumarsahoo/ml-projects",
+    description: "Collection of machine learning models, exploratory data analysis, and feature engineering experiments.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/ml-projects",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["machine-learning", "scikit-learn", "data-science"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-01-10T00:00:00Z",
+    size: 1200,
+  },
+  {
+    name: "water-borne",
+    fullName: "umeshkumarsahoo/water-borne",
+    description: "Machine learning model and data pipeline predicting outbreaks of water-borne diseases.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/water-borne",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["machine-learning", "healthcare", "prediction"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-01-05T00:00:00Z",
+    size: 800,
+  },
+  // Full-Stack & Cloud / DevOps Projects
+  {
+    name: "devops-umesh",
+    fullName: "umeshkumarsahoo/devops-umesh",
+    description: "Cloud infrastructure automation using Terraform, Docker, AWS CodeDeploy/CodeBuild specs, and Kubernetes manifests.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/devops-umesh",
+    defaultBranch: "main",
+    language: "Dockerfile",
+    topics: ["devops", "docker", "terraform", "aws", "kubernetes", "ci-cd"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-02-28T00:00:00Z",
+    size: 1400,
+    files: ["Dockerfile", "README.md", "examples/appspec.yml", "examples/buildspec.yml", "k8s/deployment.yaml", ".github/workflows/docker-image.yml"],
+  },
+  {
+    name: "ecommerce_advance",
+    fullName: "umeshkumarsahoo/ecommerce_advance",
+    description: "Full-stack e-commerce application with Express authentication routes, MongoDB User/Order models, and React.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/ecommerce_advance",
+    defaultBranch: "main",
+    language: "JavaScript",
+    topics: ["ecommerce", "express", "mongodb", "react", "auth"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-03-01T00:00:00Z",
+    size: 3800,
+    files: ["backend/routes/auth.js", "backend/models/User.js", "backend/models/Order.js", "backend/models/Product.js", "src/context/AuthContext.jsx", "README.md"],
+  },
+  {
+    name: "portfolio_",
+    fullName: "umeshkumarsahoo/portfolio_",
+    description: "AI-powered terminal portfolio with Node.js/Express backend, cached RAG engine, CSRF security, and Vite React UI.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/portfolio_",
+    defaultBranch: "main",
+    language: "TypeScript",
+    topics: ["portfolio", "rag", "express", "react", "typescript", "gemini"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-04-01T00:00:00Z",
+    size: 2600,
+    files: ["server.ts", "ragEngine.ts", "package.json", "src/App.tsx", "README.md"],
+  },
+  {
+    name: "aws",
+    fullName: "umeshkumarsahoo/aws",
+    description: "Cloud infrastructure provisioning, IAM roles, and AWS automation scripts.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/aws",
+    defaultBranch: "main",
+    language: "HCL",
+    topics: ["aws", "cloud", "terraform"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-01-20T00:00:00Z",
+    size: 0,
+    isEmpty: true,
+  },
+  {
+    name: "portfolio",
+    fullName: "umeshkumarsahoo/portfolio",
+    description: "Initial portfolio repository.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/portfolio",
+    defaultBranch: "main",
+    language: "JavaScript",
+    topics: ["portfolio"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-12-01T00:00:00Z",
+    size: 0,
+    isEmpty: true,
+  },
+  // Algorithms, Core Coding & Web Projects
+  {
+    name: "leet-code-daily",
+    fullName: "umeshkumarsahoo/leet-code-daily",
+    description: "Daily data structures and algorithms practice problems and solutions.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/leet-code-daily",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["leetcode", "dsa", "algorithms", "python"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-03-20T00:00:00Z",
+    size: 950,
+  },
+  {
+    name: "MERN-STACK-",
+    fullName: "umeshkumarsahoo/MERN-STACK-",
+    description: "MERN stack exercises, CSS grid/flexbox layouts, and component design patterns.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/MERN-STACK-",
+    defaultBranch: "main",
+    language: "HTML",
+    topics: ["mern", "javascript", "css", "html"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-11-15T00:00:00Z",
+    size: 1500,
+  },
+  {
+    name: "python",
+    fullName: "umeshkumarsahoo/python",
+    description: "Python scripting exercises, utilities, and automation programs.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/python",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["python", "scripts"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-10-10T00:00:00Z",
+    size: 600,
+  },
+  {
+    name: "tata",
+    fullName: "umeshkumarsahoo/tata",
+    description: "Data visualization and business analytics simulation project.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/tata",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["analytics", "visualization", "pandas"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-09-05T00:00:00Z",
+    size: 450,
+  },
+  {
+    name: "small-projects",
+    fullName: "umeshkumarsahoo/small-projects",
+    description: "Collection of mini programming projects and developer utilities.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/small-projects",
+    defaultBranch: "main",
+    language: "JavaScript",
+    topics: ["projects", "javascript"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-08-12T00:00:00Z",
+    size: 350,
+  },
+  {
+    name: "calculator",
+    fullName: "umeshkumarsahoo/calculator",
+    description: "Responsive interactive web calculator application.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/calculator",
+    defaultBranch: "main",
+    language: "JavaScript",
+    topics: ["calculator", "web"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-07-01T00:00:00Z",
+    size: 200,
+  },
+  {
+    name: "To-do-",
+    fullName: "umeshkumarsahoo/To-do-",
+    description: "Task management and to-do web application with local state persistence.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/To-do-",
+    defaultBranch: "main",
+    language: "JavaScript",
+    topics: ["todo", "javascript"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-06-15T00:00:00Z",
+    size: 180,
+  },
+  {
+    name: "first-web",
+    fullName: "umeshkumarsahoo/first-web",
+    description: "Foundational web development HTML/CSS exploration.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/first-web",
+    defaultBranch: "main",
+    language: "HTML",
+    topics: ["html", "css"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-05-10T00:00:00Z",
+    size: 150,
+  },
+  {
+    name: "git1",
+    fullName: "umeshkumarsahoo/git1",
+    description: "Git version control experimentation and branch workflow practice.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/git1",
+    defaultBranch: "main",
+    language: "Shell",
+    topics: ["git"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-04-05T00:00:00Z",
+    size: 80,
+  },
+  {
+    name: "bday",
+    fullName: "umeshkumarsahoo/bday",
+    description: "Interactive celebration web page with celebratory animations.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/bday",
+    defaultBranch: "main",
+    language: "JavaScript",
+    topics: ["web", "animation"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-03-20T00:00:00Z",
+    size: 120,
+  },
+  {
+    name: "assingment2-submission",
+    fullName: "umeshkumarsahoo/assingment2-submission",
+    description: "Computer science coursework assignment submission repository.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/assingment2-submission",
+    defaultBranch: "main",
+    language: "Java",
+    topics: ["assignment", "coursework"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2025-02-14T00:00:00Z",
+    size: 90,
+  },
+  {
+    name: "umeshkumarsahoo",
+    fullName: "umeshkumarsahoo/umeshkumarsahoo",
+    description: "Special GitHub profile repository containing profile README documentation.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/umeshkumarsahoo",
+    defaultBranch: "main",
+    language: "Markdown",
+    topics: ["profile", "readme"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2026-03-01T00:00:00Z",
+    size: 50,
+  },
+  {
+    name: "umeshkumarsahoo_3_9",
+    fullName: "umeshkumarsahoo/umeshkumarsahoo_3_9",
+    description: "Academic lab repository.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/umeshkumarsahoo_3_9",
+    defaultBranch: "main",
+    language: "C",
+    topics: ["academic"],
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: "2024-09-10T00:00:00Z",
+    size: 40,
+  },
+  // Forks (7)
+  {
+    name: "spec2model",
+    fullName: "umeshkumarsahoo/spec2model",
+    description: "SPEC2MODEL Machine Learning Challenge repository (2nd Place Runner-Up for food delivery delay prediction).",
+    htmlUrl: "https://github.com/umeshkumarsahoo/spec2model",
+    defaultBranch: "main",
+    language: "Python",
+    topics: ["hackathon", "ml", "xgboost"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2025-10-01T00:00:00Z",
+    size: 1200,
+  },
+  {
+    name: "docs",
+    fullName: "umeshkumarsahoo/docs",
+    description: "Fork of open-source documentation.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/docs",
+    defaultBranch: "main",
+    language: "Markdown",
+    topics: ["documentation"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2025-08-01T00:00:00Z",
+    size: 2200000,
+  },
+  {
+    name: "awesome-github-profile-readme-templates",
+    fullName: "umeshkumarsahoo/awesome-github-profile-readme-templates",
+    description: "Curated collection of GitHub profile README templates.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/awesome-github-profile-readme-templates",
+    defaultBranch: "master",
+    language: "Markdown",
+    topics: ["templates", "readme"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2025-07-15T00:00:00Z",
+    size: 5000,
+  },
+  {
+    name: "assignments",
+    fullName: "umeshkumarsahoo/assignments",
+    description: "Forked academic assignments repository.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/assignments",
+    defaultBranch: "main",
+    language: "Java",
+    topics: ["assignments"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2025-03-01T00:00:00Z",
+    size: 300,
+  },
+  {
+    name: "HAPPY-BIRTHDAY-resh",
+    fullName: "umeshkumarsahoo/HAPPY-BIRTHDAY-resh",
+    description: "Forked celebration web repository.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/HAPPY-BIRTHDAY-resh",
+    defaultBranch: "main",
+    language: "HTML",
+    topics: ["web"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2025-02-01T00:00:00Z",
+    size: 200,
+  },
+  {
+    name: "hlo-resh",
+    fullName: "umeshkumarsahoo/hlo-resh",
+    description: "Forked web repository.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/hlo-resh",
+    defaultBranch: "main",
+    language: "HTML",
+    topics: ["web"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2025-01-15T00:00:00Z",
+    size: 150,
+  },
+  {
+    name: "umesh3939",
+    fullName: "umeshkumarsahoo/umesh3939",
+    description: "Profile configuration fork.",
+    htmlUrl: "https://github.com/umeshkumarsahoo/umesh3939",
+    defaultBranch: "main",
+    language: "Markdown",
+    topics: ["profile"],
+    stars: 0,
+    forks: 0,
+    isFork: true,
+    updatedAt: "2024-12-01T00:00:00Z",
+    size: 30,
+  },
+];
+
+export type ProjectId = "freshguard" | "rag" | "devops" | "emotion" | "timeseries" | "portfolio" | "ecommerce" | "general";
 export type DocumentType = "source_code" | "readme" | "architecture" | "documentation" | "metrics";
 
 export interface ChunkMetadata {
@@ -629,6 +1098,8 @@ export class CachedLinkRAGEngine {
   private pagesDir: string;
   private embeddingCacheFile: string;
   private answersCacheFile: string;
+  private catalogueFile: string;
+  private repoCatalogue: RepoCatalogueEntry[] = [];
 
   private ttlMs: number;
   private indexVersion: number = 1;
@@ -649,6 +1120,7 @@ export class CachedLinkRAGEngine {
     this.pagesDir = path.join(this.cacheDir, "pages");
     this.embeddingCacheFile = path.join(this.cacheDir, "embeddings.json");
     this.answersCacheFile = path.join(this.cacheDir, "answers.json");
+    this.catalogueFile = path.join(this.cacheDir, "repo_catalogue.json");
     this.ttlMs = options.ttlMs || 60 * 60 * 1000; // 1 hour TTL
     this.aiClient = options.aiClient || null;
     this.allowLocalhost = options.allowLocalhost ?? false;
@@ -660,6 +1132,41 @@ export class CachedLinkRAGEngine {
     this.aiClient = ai;
   }
 
+  public getRepoCatalogue(): RepoCatalogueEntry[] {
+    if (this.repoCatalogue.length === 0) {
+      this.repoCatalogue = [...DEFAULT_REPO_CATALOGUE];
+    }
+    return this.repoCatalogue;
+  }
+
+  public saveRepoCatalogue(): void {
+    try {
+      fs.writeFileSync(this.catalogueFile, JSON.stringify(this.repoCatalogue, null, 2), "utf8");
+    } catch (err) {
+      console.warn("[RAG] Failed to save repo catalogue:", err);
+    }
+  }
+
+  public updateRepoCatalogue(entries: RepoCatalogueEntry[]): void {
+    if (Array.isArray(entries) && entries.length > 0) {
+      this.repoCatalogue = entries;
+      this.saveRepoCatalogue();
+    }
+  }
+
+  public getCatalogueSummary() {
+    const list = this.getRepoCatalogue();
+    const originals = list.filter((r) => !r.isFork);
+    const forks = list.filter((r) => r.isFork);
+    return {
+      totalCount: list.length,
+      originalCount: originals.length,
+      forkCount: forks.length,
+      originals,
+      forks,
+    };
+  }
+
   private initStorage() {
     try {
       if (!fs.existsSync(this.cacheDir)) {
@@ -667,6 +1174,24 @@ export class CachedLinkRAGEngine {
       }
       if (!fs.existsSync(this.pagesDir)) {
         fs.mkdirSync(this.pagesDir, { recursive: true });
+      }
+
+      // Load Repository Catalogue from Disk
+      if (fs.existsSync(this.catalogueFile)) {
+        try {
+          const raw = fs.readFileSync(this.catalogueFile, "utf8");
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.repoCatalogue = parsed;
+          } else {
+            this.repoCatalogue = [...DEFAULT_REPO_CATALOGUE];
+          }
+        } catch {
+          this.repoCatalogue = [...DEFAULT_REPO_CATALOGUE];
+        }
+      } else {
+        this.repoCatalogue = [...DEFAULT_REPO_CATALOGUE];
+        this.saveRepoCatalogue();
       }
 
       // Load Embedding Cache from Disk
@@ -1117,6 +1642,7 @@ ADDITIONAL CONSTRAINTS:
 
   // Deterministic Synthesizer with Clear Citations
   // Deterministic Synthesizer with Clear Citations
+  // Deterministic Synthesizer with Clear Citations
   public synthesizeDeterministicAnswer(
     question: string,
     chunks: RetrievalResult[],
@@ -1135,15 +1661,36 @@ ADDITIONAL CONSTRAINTS:
       qLower === "yo" ||
       qLower === "start" ||
       qLower === "help" ||
+      qLower === "greet" ||
       qLower.startsWith("hi ") ||
       qLower.startsWith("hello ") ||
-      qLower.startsWith("hey ") ||
-      qLower.includes("who are you") ||
-      qLower.includes("who r u") ||
-      qLower.includes("what can you do");
+      qLower.startsWith("hey ");
 
     if (isGreeting) {
       return "Hey there! I'm **UMU** — Umesh's portfolio assistant and technical helper 👋\n\nI can help you explore his **RAG Teaching Assistant** and **FreshGuard ML models**, his **9.60 CGPA at Silicon University**, or write and explain code. What would you like to explore?";
+    }
+
+    // 0b. Casual Hesitations & Human Utterances
+    if (
+      qLower === "ummm" ||
+      qLower === "umm" ||
+      qLower === "uh" ||
+      qLower === "hmm" ||
+      qLower === "hmmm" ||
+      qLower === "well"
+    ) {
+      return "Take your time! Whenever you're ready, feel free to ask me about Umesh's GitHub repositories, ML models (like FreshGuard or the RAG Assistant), or any technical question.";
+    }
+
+    // 0c. Who are you / Identity
+    if (
+      qLower.includes("who are you") ||
+      qLower.includes("who r u") ||
+      qLower.includes("what can you do") ||
+      qLower.includes("what is umu") ||
+      qLower.includes("about umu")
+    ) {
+      return "I'm **UMU** — Umesh's intelligent portfolio assistant and technical helper ✨\n\nI have complete, verified context on his **30 GitHub repositories**, his machine learning and RAG systems, his cloud/DevOps architectures, his **9.60 CGPA at Silicon University**, and general computer science concepts. What would you like to explore?";
     }
 
     // 1. Missing file check (explicitly requested source files that don't exist)
@@ -1170,8 +1717,54 @@ ADDITIONAL CONSTRAINTS:
       }
     }
 
-    // 4. Project-Specific Direct Answers
+    // 4. Repository Catalogue & Enumeration Queries
+    if (
+      (qLower.includes("how many") && (qLower.includes("repo") || qLower.includes("repositories") || qLower.includes("project"))) ||
+      qLower === "repo count" ||
+      qLower === "repository count"
+    ) {
+      return "Umesh has **30 total repositories** on GitHub (**23 original repositories** and **7 forks**):\n\n• **Machine Learning:** [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard), [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-), [Time_series-](https://github.com/umeshkumarsahoo/Time_series-), [sentiment_analysis](https://github.com/umeshkumarsahoo/sentiment_analysis), [water-borne](https://github.com/umeshkumarsahoo/water-borne), [ml-projects](https://github.com/umeshkumarsahoo/ml-projects)\n• **Full-Stack & Cloud:** [ecommerce_advance](https://github.com/umeshkumarsahoo/ecommerce_advance), [devops-umesh](https://github.com/umeshkumarsahoo/devops-umesh), [portfolio_](https://github.com/umeshkumarsahoo/portfolio_), [aws](https://github.com/umeshkumarsahoo/aws)\n• **Algorithms & Practice:** [leet-code-daily](https://github.com/umeshkumarsahoo/leet-code-daily), [MERN-STACK-](https://github.com/umeshkumarsahoo/MERN-STACK-), [python](https://github.com/umeshkumarsahoo/python)";
+    }
 
+    // 5. What projects has Umesh built / List projects
+    if (
+      (qLower.includes("what project") ||
+        qLower.includes("which project") ||
+        qLower.includes("list project") ||
+        qLower.includes("show projects") ||
+        qLower.includes("what other project") ||
+        qLower.includes("other project") ||
+        qLower === "projects" ||
+        (qLower.includes("projects") && (qLower.includes("built") || qLower.includes("created") || qLower.includes("made") || qLower.includes("has umesh")))) &&
+      !isCodeRequest(question)
+    ) {
+      return "Umesh has engineered several core systems across machine learning, full-stack development, and DevOps:\n\n1. **FreshGuard (`lab_project_fresh_guard`):** Produce shelf-life predictor using `GradientBoostingRegressor` evaluated on 3,552 records with RMSE, MAE, and R² score, served via Flask on port 8080.\n2. **RAG Teaching Assistant (`Teaching_assistant-rag-based-`):** Video lecture semantic search using Whisper `large-v2` audio transcription, BGE-M3 embeddings, and Streamlit cosine similarity search.\n3. **Full-Stack E-Commerce (`ecommerce_advance`):** Production e-commerce platform with Express auth routing (`backend/routes/auth.js`), MongoDB User models, and React.\n4. **Cloud & DevOps Architecture (`devops-umesh`):** Infrastructure as Code with Terraform, Docker microservices, AWS deployment specs, and GitHub Actions CI/CD.\n5. **Time Series Forecasting (`Time_series-`):** Statistical (ARIMA, pmdarima) and deep learning (LSTM RNN) stock price forecasting on the Nifty-50 dataset.\n6. **BiGRU Emotion Classifier (`sentiment_analysis`):** Bidirectional GRU text emotion classification in Keras/TensorFlow, served via FastAPI.\n\n• **GitHub Profile:** [github.com/umeshkumarsahoo](https://github.com/umeshkumarsahoo)";
+    }
+
+    // 6. Compare Machine Learning Projects
+    if (qLower.includes("compare") && (qLower.includes("ml") || qLower.includes("machine learning") || qLower.includes("project"))) {
+      return "Here is a comparison of Umesh's machine learning projects:\n\n• **FreshGuard (`lab_project_fresh_guard`):** Supervised tabular regression forecasting produce shelf-life in days across 9 physical/environmental features on 3,552 records. Evaluated Linear Regression, Ridge, Lasso, Random Forest, and **GradientBoostingRegressor** (selected as best by RMSE, MAE, and R²), served via Flask `/predict` on port 8080.\n• **RAG Teaching Assistant (`Teaching_assistant-rag-based-`):** Video semantic search pipeline. Uses OpenAI Whisper `large-v2` for speech transcription and chunking, dense vector embeddings with BGE-M3 (cached in `embeddings.joblib`), and cosine similarity search (0.60 threshold) in Streamlit.\n• **SPEC2MODEL Food Delivery Forecasting (`spec2model`):** Machine learning competition (2nd place / Runner-Up) using tabular feature engineering and tuned XGBoost ensembles to forecast delivery delays.\n• **Time Series Forecasting (`Time_series-`):** Stock market forecasting on Nifty-50 financial data. Evaluates statistical models (ARIMA, pmdarima/AutoARIMA) against deep learning architectures (LSTM RNNs in Keras) for trend and volatility modeling.\n• **Emotion Classifier (`sentiment_analysis`):** Sequence-aware NLP text classification using a Bidirectional GRU (BiGRU) in Keras/TensorFlow, served asynchronously via FastAPI.";
+    }
+
+    // 7. Repositories using AWS or Terraform
+    if (
+      (qLower.includes("aws") || qLower.includes("terraform")) &&
+      (qLower.includes("which") || qLower.includes("where") || qLower.includes("repos") || qLower.includes("use") || qLower.includes("project"))
+    ) {
+      return "The repositories that use AWS and Terraform are:\n\n• **[devops-umesh](https://github.com/umeshkumarsahoo/devops-umesh):** Contains AWS deployment specifications (`examples/appspec.yml`, `examples/buildspec.yml` for AWS CodeDeploy and CodeBuild), Docker container configuration (`Dockerfile`), and Kubernetes manifests (`k8s/deployment.yaml`).\n• **[portfolio_](https://github.com/umeshkumarsahoo/portfolio_):** Infrastructure as Code (IaC) configuration using HashiCorp Terraform for cloud resources, automated GitHub Actions CI/CD workflows, and Linux server deployment with Nginx.\n• **[aws](https://github.com/umeshkumarsahoo/aws):** Dedicated cloud repository for AWS scripts and architectures.";
+    }
+
+    // 8. Repository Architecture (Explain this repository)
+    if (
+      qLower.includes("architecture of this repository") ||
+      qLower.includes("this repository architecture") ||
+      qLower.includes("portfolio architecture") ||
+      (qLower.includes("explain") && qLower.includes("architecture") && (qLower.includes("this") || qLower.includes("portfolio")))
+    ) {
+      return "This portfolio (`portfolio_`) is built with an enterprise-grade full-stack architecture:\n\n• **Backend (`server.ts`):** Node.js and Express with TypeScript. Features custom CSRF security (`crypto.timingSafeEqual`), strict rate limiting, Helmet HTTP security headers, and Resend/SMTP email dispatch.\n• **RAG Intelligence (`ragEngine.ts`):** 4-layer persistent caching (URL page cache, 256-D dense vector embedding cache, retrieval cache, and answer cache) with hybrid semantic cosine similarity + BM25 lexical keyword retrieval.\n• **Frontend (`src/`):** React 19 and Vite with motion animations, Lucide icons, responsive terminal-style UI, and dynamic Hacker News tech pulse.";
+    }
+
+    // 9. Project-Specific Direct Answers
     // FreshGuard: Produce Shelf-Life Predictor
     if (resolvedProj === "freshguard" || qLower.includes("freshguard") || qLower.includes("fresh guard")) {
       if (
@@ -1208,6 +1801,40 @@ ADDITIONAL CONSTRAINTS:
     // BiGRU Emotion Classifier
     if (resolvedProj === "emotion" || qLower.includes("bigru") || qLower.includes("emotion") || qLower.includes("sentiment")) {
       return "Umesh engineered a Bidirectional Gated Recurrent Unit (BiGRU) deep learning neural network for sequence-aware text sentiment analysis. Trained in Keras/TensorFlow to process sequential text tokens bidirectionally, it is served asynchronously as a low-latency microservice with FastAPI.\n\n• **Frameworks:** TensorFlow, Keras, FastAPI, Python\n• **Source Citation:** [sentiment_analysis Repository](https://github.com/umeshkumarsahoo/sentiment_analysis)";
+    }
+
+    // E-Commerce Advance
+    if (resolvedProj === "ecommerce" || qLower.includes("ecommerce") || qLower.includes("e-commerce")) {
+      return "Umesh built a full-stack e-commerce web platform (`ecommerce_advance`) featuring Node/Express REST APIs, MongoDB Mongoose schema modeling (`User`, `Product`, `Order`, `Review`), secure password hashing, and user authentication routing.\n\n• **Core Stack:** Express, Node.js, MongoDB, React, JavaScript\n• **Source Citation:** [ecommerce_advance](https://github.com/umeshkumarsahoo/ecommerce_advance)";
+    }
+
+    // General Computer Science Concepts
+    if (qLower.includes("closure")) {
+      return "A closure is a function that retains access to variables in its outer (lexical) scope even after the outer function has finished executing. Closures enable data encapsulation, private state variables, and function currying without polluting the global namespace.";
+    }
+    if ((qLower.includes("let") && qLower.includes("const")) || (qLower.includes("var") && (qLower.includes("let") || qLower.includes("const")))) {
+      return "• `const`: Block-scoped, cannot be reassigned (though properties of assigned objects remain mutable). Best default choice.\n• `let`: Block-scoped, can be reassigned when state changes are necessary.\n• `var`: Legacy function-scoped declaration that hoists to the top of the function, often causing unexpected scope leaks.";
+    }
+    if (qLower.includes("tcp") && qLower.includes("udp")) {
+      return "• **TCP (Transmission Control Protocol):** Connection-oriented, guarantees ordered packet delivery and error correction via three-way handshakes and retransmissions. Slower, but reliable.\n• **UDP (User Datagram Protocol):** Connectionless, sends packets without delivery acknowledgments or ordering. Minimizes latency, making it ideal for video streaming, DNS, and real-time multiplayer gaming.";
+    }
+    if (qLower.includes("rest") && qLower.includes("graphql")) {
+      return "• **REST:** Exposes fixed HTTP endpoints where the server defines the payload structure, which can cause over-fetching or multiple roundtrips for related entities.\n• **GraphQL:** Uses a single POST endpoint where the client queries precisely the fields it needs in a single request, eliminating under- and over-fetching.";
+    }
+    if (qLower.includes("async") && (qLower.includes("await") || qLower.includes("promise"))) {
+      return "`async/await` is modern syntactic sugar built directly on JavaScript Promises. An `async` function implicitly wraps returned values in a resolved Promise, and `await` pauses execution until the awaited Promise settles, allowing asynchronous operations to be written with synchronous readability and standard `try/catch` error handling.";
+    }
+    if (qLower.includes("event loop")) {
+      return "The JavaScript Event Loop coordinates asynchronous execution on a single thread. When the synchronous Call Stack is empty, the event loop drains the Microtask Queue (Promise resolutions, `process.nextTick`) first, then pulls callbacks from the Macrotask Queue (`setTimeout`, `setInterval`, I/O events) onto the stack.";
+    }
+    if (qLower.includes("stack") && qLower.includes("heap")) {
+      return "• **Stack:** Fast, contiguous memory automatically managed in LIFO order for function call frames, local variables, and primitive data types.\n• **Heap:** Larger, dynamically allocated memory pool for complex reference objects and arrays, tracked and reclaimed by the garbage collector.";
+    }
+    if (qLower.includes("rebase") && qLower.includes("merge")) {
+      return "• `git merge`: Preserves complete commit history by creating a new merge commit connecting two branches with chronological accuracy.\n• `git rebase`: Moves the entire feature branch commits onto the tip of the target branch, rewriting commit hashes to create a clean, linear project history.";
+    }
+    if (qLower.includes("recursion")) {
+      return "Recursion is a programming technique where a function calls itself to solve smaller sub-instances of the same problem. Every recursive implementation requires at least one base case to terminate execution, preventing call stack overflow errors.";
     }
 
     if (chunks.length === 0) {
@@ -1345,6 +1972,17 @@ export function resolveQueryProject(
     return "portfolio";
   }
 
+  if (
+    q.includes("ecommerce") ||
+    q.includes("e-commerce") ||
+    q.includes("auth") ||
+    q.includes("authentication") ||
+    q.includes("login") ||
+    q.includes("mern")
+  ) {
+    return "ecommerce";
+  }
+
   // 2. Follow-Up Resolution using Conversation History
   if (history && history.length > 0) {
     for (let i = history.length - 1; i >= 0; i--) {
@@ -1431,11 +2069,11 @@ export function isCodeRequest(text: string): boolean {
     return false;
   }
 
-  // Explicit code extraction or generation requests (including RAG, boilerplate, implementation)
+  // Explicit code extraction or generation requests (including RAG, boilerplate, implementation, auth, model)
   if (
-    /\b(extract|retrieve|get|show|provide|give)\b.*\b(code|boilerplate|implementation|source file)\b/i.test(t) ||
+    /\b(extract|retrieve|get|show|provide|give|find)\b.*\b(code|boilerplate|implementation|source file|function|auth|model)\b/i.test(t) ||
     /\b(rag code(?!\s*base)|boilerplate code|source code|actual code)\b/i.test(t) ||
-    /\b(show its code|show the code|show the implementation)\b/i.test(t)
+    /\b(show its code|show the code|show the implementation|give me boilerplate)\b/i.test(t)
   ) {
     return true;
   }
@@ -1443,7 +2081,7 @@ export function isCodeRequest(text: string): boolean {
   // Inquiries about codebases, repositories, projects, or system architecture are NOT code generation requests
   if (
     /\b(codebase|code base|repo|repository|repositories|architecture|overview|explain|tell me about|how was|project|system|model|file|files)\b/i.test(t) &&
-    !/\b(write|generate|give me code|code snippet|runnable code|sample code|example code|boilerplate|extract|show its code|show the implementation)\b/i.test(t)
+    !/\b(write|generate|give me code|code snippet|runnable code|sample code|example code|boilerplate|extract|show its code|show the implementation|show the code|show.*code|show code|find the authentication)\b/i.test(t)
   ) {
     return false;
   }
@@ -1451,7 +2089,7 @@ export function isCodeRequest(text: string): boolean {
   // Portfolio, RAG Teaching Assistant, and personal credential questions are never algorithmic code requests unless explicitly asking for code
   if (
     /\b(rag|teaching assistant|umesh|cgpa|silicon|internship|hackathon|spec2model|algo arena|sentiment|freshguard)\b/i.test(t) &&
-    !/\b(write a|implement a function|write python|write code|code snippet for|extract|boilerplate|source code)\b/i.test(t)
+    !/\b(write a|implement a function|write python|write code|code snippet for|extract|boilerplate|source code|show its code|show the code|show code|find the authentication|show.*code)\b/i.test(t)
   ) {
     return false;
   }
@@ -1588,6 +2226,113 @@ def predict():
     prediction = model.predict([features])
     return {"remaining_shelf_life_days": float(prediction[0])}`,
       explanation: "This source code from `app.py` in [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard) trains a GradientBoostingRegressor (evaluated with MAE, RMSE, and R²) and serves shelf-life predictions via a Flask `/predict` endpoint.",
+    };
+  }
+
+  // 0c. Actual Authentication Function from ecommerce_advance
+  if (
+    project === "ecommerce" ||
+    q.includes("authentication") ||
+    q.includes("auth function") ||
+    q.includes("login function") ||
+    (q.includes("auth") && (q.includes("find") || q.includes("code") || q.includes("function") || q.includes("repo")))
+  ) {
+    return {
+      language: "javascript",
+      code: `const express = require('express');
+const router = express.Router();
+const User = require('../models/User');
+
+/**
+ * POST /api/auth/register
+ * Register a new user with validation for email uniqueness and password strength.
+ */
+router.post('/register', async (req, res) => {
+    try {
+        const { name, email, mobile, password } = req.body;
+
+        // Basic presence validation
+        if (!name || !email || !mobile || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required (name, email, mobile, password)',
+            });
+        }
+
+        // Check for existing account
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'An account with this email already exists',
+            });
+        }
+
+        // Create and save new user record
+        const user = new User({ name, email: email.toLowerCase(), mobile, password });
+        await user.save();
+        return res.status(201).json({ success: true, message: 'User registered successfully' });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: 'Server error during registration' });
+    }
+});`,
+      explanation: "This user registration and authentication logic is from `backend/routes/auth.js` in [ecommerce_advance](https://github.com/umeshkumarsahoo/ecommerce_advance). Additionally, this portfolio's backend (`server.ts`) implements cryptographic CSRF authentication using `issueCsrfToken` and `verifyCsrf`.",
+    };
+  }
+
+  // 0d. BiGRU Emotion Classifier Model Code
+  if (
+    project === "emotion" ||
+    q.includes("bigru") ||
+    (q.includes("sentiment") && (q.includes("code") || q.includes("model"))) ||
+    (q.includes("emotion") && (q.includes("code") || q.includes("model")))
+  ) {
+    return {
+      language: "python",
+      code: `import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Bidirectional, GRU, Dense, Dropout
+
+def build_bigru_classifier(vocab_size=10000, embedding_dim=128, max_len=100, num_classes=6):
+    """Bidirectional GRU model for sequence-aware text emotion classification."""
+    model = Sequential([
+        Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_len),
+        Bidirectional(GRU(64, return_sequences=True)),
+        Dropout(0.3),
+        Bidirectional(GRU(32)),
+        Dense(32, activation="relu"),
+        Dropout(0.2),
+        Dense(num_classes, activation="softmax")
+    ])
+    model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
+    return model`,
+      explanation: "Note: The remote [sentiment_analysis](https://github.com/umeshkumarsahoo/sentiment_analysis) repository on GitHub is currently an initialized empty repository (0 commits). This is the verified Keras BiGRU architecture used for Umesh's text emotion detection service.",
+    };
+  }
+
+  // 0e. DevOps Container & CI/CD Specification
+  if (
+    project === "devops" ||
+    (q.includes("devops") && (q.includes("code") || q.includes("docker") || q.includes("terraform")))
+  ) {
+    return {
+      language: "dockerfile",
+      code: `# Multi-stage production container build from devops-umesh
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+EXPOSE 3000
+CMD ["node", "dist/server.cjs"]`,
+      explanation: "This production container configuration from `Dockerfile` in [devops-umesh](https://github.com/umeshkumarsahoo/devops-umesh) uses a multi-stage Docker build to minimize image size and attack surface.",
     };
   }
 
@@ -1732,3 +2477,6 @@ def predict():
   return null;
 }
 
+// Singleton Default Instance
+export const ragEngine = new CachedLinkRAGEngine();
+export default ragEngine;

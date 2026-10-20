@@ -25,6 +25,8 @@
 contacts.json
 visitor_stats.json
 .rag_cache
+.*_rag_cache
+.test_*
 
 # misc
 .DS_Store
