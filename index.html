@@ -29,33 +29,71 @@
     <meta name="twitter:description" content="Explore Umesh Kumar Sahoo's projects in AI/ML, Data Engineering, and full-stack development. Featuring an interactive retro-terminal AI assistant!" />
     <meta name="twitter:image" content="https://avatars.githubusercontent.com/u/149811400?v=4" />
 
-    <!-- JSON-LD Structured Data for Google Knowledge Panel -->
+    <!-- JSON-LD Structured Data for Google Knowledge Panel & Search Results -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Person",
-      "name": "Umesh Kumar Sahoo",
-      "alternateName": ["Umesh Sahoo", "umeshkumarsahoo", "Umesh"],
-      "url": "https://umesh-portfolio-4r6o.onrender.com",
-      "image": "https://avatars.githubusercontent.com/u/149811400?v=4",
-      "jobTitle": "AI/ML Engineer & Full-Stack Developer",
-      "description": "AI/ML Engineer, Data Scientist, and Full-Stack Developer specializing in Machine Learning, RAG systems, Deep Learning, and DevOps.",
-      "email": "sahooumesh2003@gmail.com",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": "Bhubaneswar",
-        "addressRegion": "Odisha",
-        "addressCountry": "India"
-      },
-      "alumniOf": {
-        "@type": "CollegeOrUniversity",
-        "name": "Silicon University"
-      },
-      "knowsAbout": ["Artificial Intelligence", "Machine Learning", "Python", "React", "Node.js", "Data Engineering", "DevOps", "Terraform", "NLP", "Deep Learning"],
-      "sameAs": [
-        "https://github.com/umeshkumarsahoo",
-        "https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a",
-        "https://leetcode.com/u/phribbi39"
+      "@graph": [
+        {
+          "@type": "ProfilePage",
+          "@id": "https://umesh-portfolio-4r6o.onrender.com/#profilepage",
+          "url": "https://umesh-portfolio-4r6o.onrender.com",
+          "name": "Umesh Kumar Sahoo | AI/ML Engineer Portfolio",
+          "dateCreated": "2024-01-01T00:00:00+05:30",
+          "dateModified": "2026-10-20T00:00:00+05:30",
+          "mainEntity": {
+            "@id": "https://umesh-portfolio-4r6o.onrender.com/#person"
+          }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://umesh-portfolio-4r6o.onrender.com/#person",
+          "name": "Umesh Kumar Sahoo",
+          "givenName": "Umesh",
+          "additionalName": "Kumar",
+          "familyName": "Sahoo",
+          "alternateName": ["Umesh Sahoo", "umeshkumarsahoo", "Umesh", "Umesh Sahoo Silicon"],
+          "url": "https://umesh-portfolio-4r6o.onrender.com",
+          "image": "https://avatars.githubusercontent.com/u/149811400?v=4",
+          "jobTitle": "AI/ML Engineer & Full-Stack Developer",
+          "description": "AI/ML Engineer, Data Scientist, and Full-Stack Developer specializing in Machine Learning, RAG systems, Deep Learning, and DevOps.",
+          "email": "sahooumesh2003@gmail.com",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Bhubaneswar",
+            "addressRegion": "Odisha",
+            "addressCountry": "India"
+          },
+          "alumniOf": [
+            {
+              "@type": "CollegeOrUniversity",
+              "name": "Silicon University",
+              "url": "https://silicon.ac.in"
+            },
+            {
+              "@type": "EducationalOrganization",
+              "name": "Jawahar Navodaya Vidyalaya (JNV) Panikoili"
+            }
+          ],
+          "knowsAbout": [
+            "Artificial Intelligence",
+            "Machine Learning",
+            "Retrieval-Augmented Generation (RAG)",
+            "Python",
+            "FastAPI",
+            "React",
+            "Node.js",
+            "Vector Embeddings",
+            "DevOps",
+            "Terraform",
+            "GitHub Actions"
+          ],
+          "sameAs": [
+            "https://github.com/umeshkumarsahoo",
+            "https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a",
+            "https://leetcode.com/u/phribbi39"
+          ]
+        }
       ]
     }
     </script>
@@ -68,6 +106,36 @@
     <link rel="manifest" href="/manifest.json?v=favicon-app-20260715" />
   </head>
   <body>
+    <noscript>
+      <div style="font-family: sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; line-height: 1.6;">
+        <h1>Umesh Kumar Sahoo | AI/ML Engineer &amp; Software Developer</h1>
+        <p>Official portfolio and resume website of <strong>Umesh Kumar Sahoo</strong> — AI/ML Engineer, Data Scientist, and Computer Science undergraduate at Silicon University, Bhubaneswar (CGPA 9.60 / 10.0).</p>
+        
+        <h2>About Umesh Kumar Sahoo</h2>
+        <p>Computer Science undergraduate with hands-on experience building web applications, ML APIs, and RAG-based AI systems. Skilled in Python, SQL, REST APIs, machine learning, embeddings, vector search, and LLM integration.</p>
+        
+        <h2>Education &amp; Honors</h2>
+        <ul>
+          <li><strong>Silicon University, Bhubaneswar</strong> — B.Tech in Computer Science &amp; Engineering (2023–2027) | <strong>CGPA: 9.60 / 10.0</strong></li>
+          <li><strong>JNV Panikoili</strong> — Senior Secondary (91.2%), Secondary (95.8%)</li>
+        </ul>
+
+        <h2>Core Projects</h2>
+        <ul>
+          <li><strong>AI-Powered Terminal Portfolio</strong> — React, FastAPI, Gemini AI Assistant, and automated caching.</li>
+          <li><strong>RAG-Based Teaching Assistant System</strong> — End-to-end semantic retrieval, embeddings, and LLM integration.</li>
+          <li><strong>Emotion Detection API</strong> — Keras Bidirectional GRU model exposed through FastAPI REST service.</li>
+        </ul>
+
+        <h2>Official Links &amp; Profiles</h2>
+        <ul>
+          <li>GitHub: <a href="https://github.com/umeshkumarsahoo">https://github.com/umeshkumarsahoo</a></li>
+          <li>LinkedIn: <a href="https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a">https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a</a></li>
+          <li>LeetCode: <a href="https://leetcode.com/u/phribbi39">https://leetcode.com/u/phribbi39</a></li>
+          <li>Resume: <a href="/Umesh_Kumar_Sahoo_Resume.pdf">Download Umesh Kumar Sahoo Resume (PDF)</a></li>
+        </ul>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

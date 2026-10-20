@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://umesh-portfolio-4r6o.onrender.com/sitemap.xml

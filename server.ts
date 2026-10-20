@@ -572,38 +572,94 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
       console.error("[BACKEND] Error writing to contacts.json file:", err);
     }
 
-    // 2. Dispatch real email if SMTP credentials are provided
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const mailTo = process.env.SMTP_TO || "sahooumesh2003@gmail.com";
+    // 2. Dispatch real email via Resend HTTPS (port 443, Render Free compatible) or SMTP
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
+    const smtpHost = process.env.SMTP_HOST?.trim();
+    const smtpPort = process.env.SMTP_PORT?.trim();
+    const smtpUser = process.env.SMTP_USER?.trim();
+    const smtpPass = process.env.SMTP_PASS?.trim();
+    const mailTo = process.env.SMTP_TO?.trim() || "sahooumesh2003@gmail.com";
 
-    if (smtpHost && smtpUser && smtpPass) {
-      console.log(`[BACKEND] Attempting real SMTP email dispatch to ${mailTo}...`);
-      const safeName = escapeHtml(trimmedName);
-      const safeEmail = escapeHtml(trimmedEmail);
-      const safeMessage = escapeHtml(trimmedMessage);
+    const safeName = escapeHtml(trimmedName);
+    const safeEmail = escapeHtml(trimmedEmail);
+    const safeMessage = escapeHtml(trimmedMessage);
+    let emailSent = false;
 
-      const port = Number(smtpPort) || 587;
+    // Option A: Resend HTTPS API (Works 100% on Render Free Tier on Port 443)
+    if (resendApiKey) {
+      try {
+        console.log(`[BACKEND] Dispatching email via Resend HTTPS API (port 443) to ${mailTo}...`);
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: "Portfolio Contact <onboarding@resend.dev>",
+            to: [mailTo],
+            reply_to: trimmedEmail,
+            subject: `New Portfolio Message from ${trimmedName}`,
+            text: `You have received a new contact submission from your portfolio.\n\nFrom: ${trimmedName} <${trimmedEmail}>\nDate: ${new Date().toLocaleString()}\n\nMessage:\n${trimmedMessage}\n\n(Persisted durably in contacts.json)`,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; border: 1px solid #e7e2d8; padding: 24px; border-radius: 8px; background: #fdfcf9; color: #171717;">
+                <h2 style="margin-top: 0; padding-bottom: 12px; border-bottom: 1px solid #e7e2d8; font-size: 20px; font-weight: 600;">New Portfolio Contact</h2>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>From:</strong> ${safeName} &lt;<a href="mailto:${safeEmail}" style="color: #2468B4;">${safeEmail}</a>&gt;</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                <div style="background: #f7f4ec; padding: 16px; border-left: 3px solid #2468B4; margin-top: 16px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; border-radius: 4px;">${safeMessage}</div>
+                <p style="font-size: 11px; color: #888; margin-top: 24px; border-top: 1px solid #e7e2d8; padding-top: 12px;">This message was also securely saved to your contacts.json file on the server.</p>
+              </div>
+            `
+          })
+        });
+
+        if (resendRes.ok) {
+          console.log(`[BACKEND] Resend HTTPS email dispatched successfully to ${mailTo}`);
+          emailSent = true;
+        } else {
+          const errBody = await resendRes.text();
+          console.error(`[BACKEND] Resend API error: ${resendRes.status} - ${errBody}`);
+        }
+      } catch (err: any) {
+        console.error(`[BACKEND] Resend connection error:`, err.message);
+      }
+    }
+
+    // Option B: Standard SMTP (Nodemailer - Gmail / Brevo / Custom)
+    if (!emailSent && smtpUser && smtpPass && (smtpHost || process.env.SMTP_SERVICE === "gmail")) {
+      const cleanPass = smtpPass.replace(/\s+/g, ""); // Remove accidental spaces from Google 16-char app passwords
+      const isGmail = (smtpHost && smtpHost.includes("gmail")) || process.env.SMTP_SERVICE === "gmail";
+      const port = Number(smtpPort) || (isGmail ? 465 : 587);
       const isSecure = port === 465;
 
+      console.log(`[BACKEND] Attempting SMTP dispatch via ${isGmail ? "Gmail service" : `${smtpHost}:${port}`} to ${mailTo}...`);
+
       try {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: port,
-          secure: isSecure,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass
-          },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 15000,
-          tls: {
-            rejectUnauthorized: false
-          }
-        });
+        const transportConfig: any = isGmail
+          ? {
+              service: "gmail",
+              auth: {
+                user: smtpUser,
+                pass: cleanPass
+              }
+            }
+          : {
+              host: smtpHost,
+              port: port,
+              secure: isSecure,
+              auth: {
+                user: smtpUser,
+                pass: cleanPass
+              },
+              connectionTimeout: 10000,
+              greetingTimeout: 10000,
+              socketTimeout: 15000,
+              tls: {
+                rejectUnauthorized: false
+              }
+            };
+
+        const transporter = nodemailer.createTransport(transportConfig);
 
         await transporter.sendMail({
           from: `"${trimmedName} (Portfolio Contact)" <${smtpUser}>`,
@@ -622,16 +678,17 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
           `
         });
         console.log(`[BACKEND] SMTP email dispatched successfully to ${mailTo}`);
+        emailSent = true;
       } catch (mailError: any) {
         console.error(`[BACKEND] SMTP Dispatch Warning (${mailError.code || "ERR"}):`, mailError.message);
         if (mailError.code === "EAUTH") {
-          console.error(`[BACKEND] SMTP Auth Hint: Google/Provider rejected credentials. If using Gmail, make sure SMTP_PASS is a 16-character Google App Password (not your normal password).`);
+          console.error(`[BACKEND] SMTP Auth Hint: Google/Provider rejected credentials. For Gmail, make sure SMTP_PASS is a 16-character Google App Password (generate at https://myaccount.google.com/apppasswords).`);
         } else if (mailError.code === "ETIMEDOUT" || mailError.code === "ECONNREFUSED" || mailError.code === "ESOCKET") {
-          console.error(`[BACKEND] SMTP Network Hint: Outbound connection timed out. On Render Free tier, ports 465/587 may be blocked. The contact message was safely saved in contacts.json.`);
+          console.error(`[BACKEND] SMTP Network Hint: Outbound connection timed out. Note: Render Free Tier blocks outbound SMTP ports 25, 465, and 587. To send emails on Render Free tier, add RESEND_API_KEY (over HTTPS port 443). The contact message was safely saved in contacts.json.`);
         }
       }
-    } else {
-      console.log(`[BACKEND] SMTP credentials not configured (needs SMTP_HOST, SMTP_USER, SMTP_PASS). Message logged locally in contacts.json.`);
+    } else if (!emailSent) {
+      console.log(`[BACKEND] No active email provider configured (set RESEND_API_KEY or SMTP_USER/PASS). Message saved locally in contacts.json.`);
     }
 
     res.json({ success: true, message: "Transmission complete. Your direct message has been securely submitted." });
@@ -776,34 +833,49 @@ async function startServer() {
   const server = app.listen(PORT, HOST, () => {
     console.log(`[BACKEND] Server running on http://localhost:${PORT}`);
 
-    // Non-blocking SMTP diagnostic check on startup
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    if (smtpHost && smtpUser && smtpPass) {
-      const port = Number(smtpPort) || 587;
+    // Non-blocking Email diagnostics on startup
+    const resendKey = process.env.RESEND_API_KEY?.trim();
+    const smtpHost = process.env.SMTP_HOST?.trim();
+    const smtpPort = process.env.SMTP_PORT?.trim();
+    const smtpUser = process.env.SMTP_USER?.trim();
+    const smtpPass = process.env.SMTP_PASS?.trim();
+
+    if (resendKey) {
+      console.log("[BACKEND] Email Engine: Resend HTTPS API configured (Port 443). Outbound emails are active and immune to Render SMTP restrictions.");
+    }
+
+    if (smtpUser && smtpPass && (smtpHost || process.env.SMTP_SERVICE === "gmail")) {
+      const cleanPass = smtpPass.replace(/\s+/g, "");
+      const isGmail = (smtpHost && smtpHost.includes("gmail")) || process.env.SMTP_SERVICE === "gmail";
+      const port = Number(smtpPort) || (isGmail ? 465 : 587);
       const isSecure = port === 465;
-      const testTransporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: port,
-        secure: isSecure,
-        auth: { user: smtpUser, pass: smtpPass },
-        connectionTimeout: 8000,
-        tls: { rejectUnauthorized: false },
-      });
+
+      const testConfig: any = isGmail
+        ? { service: "gmail", auth: { user: smtpUser, pass: cleanPass } }
+        : {
+            host: smtpHost,
+            port: port,
+            secure: isSecure,
+            auth: { user: smtpUser, pass: cleanPass },
+            connectionTimeout: 8000,
+            tls: { rejectUnauthorized: false },
+          };
+
+      const testTransporter = nodemailer.createTransport(testConfig);
       testTransporter.verify((err) => {
         if (err) {
           console.warn(`[BACKEND] SMTP Initial Check Warning: ${err.message}`);
           if ((err as any).code === "EAUTH") {
             console.warn("[BACKEND] SMTP Auth Hint: Google/Provider rejected credentials. For Gmail, make sure SMTP_PASS is a 16-character Google App Password (not your normal password).");
+          } else if ((err as any).code === "ETIMEDOUT") {
+            console.warn("[BACKEND] SMTP Network Hint: Connection timed out. Render Free tier blocks outbound SMTP ports 25, 465, and 587. Consider using RESEND_API_KEY (HTTPS port 443).");
           }
         } else {
           console.log(`[BACKEND] SMTP Initial Check: Verified and ready to send via ${smtpUser}`);
         }
       });
-    } else {
-      console.log("[BACKEND] SMTP Note: SMTP_HOST/USER/PASS not fully set. Form submissions are safely logged to contacts.json.");
+    } else if (!resendKey) {
+      console.log("[BACKEND] Email Note: No live email provider configured (set RESEND_API_KEY or SMTP_USER/PASS). Form submissions are safely logged to contacts.json.");
     }
   });
 
