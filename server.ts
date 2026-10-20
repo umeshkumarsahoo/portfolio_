@@ -1301,10 +1301,11 @@ ${sourceEvidenceSection}${newsContextSection}`;
         });
 
         console.log(`[BACKEND] Querying Gemini for user request (${isCode ? "code" : "general"})...`);
+        const primaryModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
         let response;
         try {
           response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: primaryModel,
             contents,
             config: {
               systemInstruction,
@@ -1313,9 +1314,9 @@ ${sourceEvidenceSection}${newsContextSection}`;
             }
           });
         } catch (firstErr: any) {
-          console.warn("[BACKEND] gemini-2.0-flash failed, trying gemini-1.5-flash fallback:", firstErr?.message || firstErr);
+          console.warn(`[BACKEND] ${primaryModel} failed, trying gemini-2.5-pro fallback:`, firstErr?.message || firstErr);
           response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-pro",
             contents,
             config: {
               systemInstruction,

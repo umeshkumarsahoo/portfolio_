@@ -1568,10 +1568,11 @@ ADDITIONAL CONSTRAINTS:
 3. If code is requested, provide the actual source code first in a markdown block, then a brief 1-2 sentence explanation.
 4. Output strictly in English.`;
 
+        const primaryModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
         let response;
         try {
           response = await this.aiClient.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: primaryModel,
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
               temperature: 0.2,
@@ -1580,7 +1581,7 @@ ADDITIONAL CONSTRAINTS:
           });
         } catch (firstErr) {
           response = await this.aiClient.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-pro",
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
               temperature: 0.2,
