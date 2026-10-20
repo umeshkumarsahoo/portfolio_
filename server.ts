@@ -89,15 +89,10 @@ const agentLimiter = rateLimit({
 
 app.use("/api", apiLimiter);
 
-const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+const geminiApiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY)?.trim();
 const ai = geminiApiKey
   ? new GoogleGenAI({
       apiKey: geminiApiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
     })
   : null;
 
@@ -110,9 +105,18 @@ const ragEngine = new CachedLinkRAGEngine({
 
 const DEFAULT_RAG_SOURCES: string[] = process.env.RAG_SOURCES
   ? process.env.RAG_SOURCES.split(",").map((u) => u.trim()).filter(Boolean)
-  : [
-      "https://raw.githubusercontent.com/umeshkumarsahoo/portfolio_/main/README.md",
-    ];
+  : [];
+
+// Index local README into RAG engine for verified documentation grounding
+try {
+  const localReadmePath = path.join(process.cwd(), "README.md");
+  if (fs.existsSync(localReadmePath)) {
+    const readmeContent = fs.readFileSync(localReadmePath, "utf-8");
+    ragEngine.indexDirectDocument("local://README.md", "Umesh Portfolio Documentation", readmeContent).catch(() => {});
+  }
+} catch (err: any) {
+  console.warn("[BACKEND] Local README indexing notice:", err?.message || err);
+}
 
 // Pre-warm configured RAG sources asynchronously without blocking startup
 for (const sourceUrl of DEFAULT_RAG_SOURCES) {
@@ -1077,6 +1081,14 @@ Here is Umesh's verified technical proficiency:
 • **DevOps & Cloud:** Git, GitHub Actions (CI/CD), Terraform, Linux, Postman, Docker`;
   }
 
+  // Check if query mentions any specific scanned repository
+  if (repos && repos.length > 0) {
+    const matchedRepo = repos.find(r => q.includes(r.name.toLowerCase()));
+    if (matchedRepo) {
+      return `### 📦 Repository: ${matchedRepo.name} (${matchedRepo.language || "Code"})\n${matchedRepo.description || "Open-source repository."}\n\n• **GitHub Link:** [${matchedRepo.html_url}](${matchedRepo.html_url})\n• **Stars:** ${matchedRepo.stargazers_count} · **Forks:** ${matchedRepo.forks_count}`;
+    }
+  }
+
   // 10. RAG Retrieval: Projects & GitHub Repositories
   if (
     q.includes("project") || q.includes("portfolio") || q.includes("repo") ||
@@ -1246,8 +1258,8 @@ You can also use the **Contact** tab in this portfolio to dispatch a direct mess
     return generateLiveTechPulseBriefing(news);
   }
 
-  // 13. Default Fallback (Concise, honest, no resume dumping)
-  return "I don't have verified information about that topic in my configured sources or portfolio knowledge base. Feel free to ask about Umesh's engineering work, projects, or programming concepts!";
+  // 13. Default Grounded Fallback Response (Warm, helpful, non-robotic)
+  return `I'm right here with you! 😊 While my primary expertise is Umesh's engineering portfolio and live tech news, feel free to ask about his **projects (RAG & ML)**, his **9.60 CGPA at Silicon University**, his **GitHub repositories**, or say *"brief me on the news"*. How can I help?`;
 }
 
 // UMU Chat Agent Endpoint (Dual-Persona: Portfolio Digital Twin + Tech News Analyst)
@@ -1306,129 +1318,59 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       lowerMsg.startsWith("brief on") ||
       lowerMsg.includes("briefing");
 
-    // Check if query is targeting configured links, documentation, or explicit URLs
+    // Ingest any explicit URLs detected in the query for real-time link RAG
     const detectedUrls = extractUrlsFromText(trimmedMessage);
-    const isExplicitUrlOrDocQuery =
-      detectedUrls.length > 0 ||
-      lowerMsg.includes("http") ||
-      lowerMsg.includes("url") ||
-      lowerMsg.includes("readme") ||
-      lowerMsg.includes("documentation") ||
-      lowerMsg.includes("configured link") ||
-      lowerMsg.startsWith("check ");
-
-    if (isExplicitUrlOrDocQuery) {
-      try {
-        const ragResult = await ragEngine.answerQuestion(
-          trimmedMessage,
-          Array.isArray(history) ? history : [],
-          DEFAULT_RAG_SOURCES
-        );
-        if (ragResult && ragResult.answer) {
-          res.json({
-            reply: ragResult.answer,
-            sources: ragResult.sources,
-            ragMetrics: ragResult.metrics,
-            reposScanned: repos.length,
-          });
-          return;
-        }
-      } catch (ragErr) {
-        console.warn("[BACKEND] Link RAG query warning:", ragErr);
-      }
+    for (const u of detectedUrls) {
+      ragEngine.ingestUrl(u).catch(() => {});
     }
 
     // Retrieve top 3 relevant evidence chunks from indexed URLs for LLM context augmentation
     const urlEvidence = ragEngine.retrieve(trimmedMessage, 3, 0.18);
     const sourceEvidenceSection = urlEvidence.results.length > 0
-      ? `\n=== VERIFIED EVIDENCE FROM CONFIGURED SOURCES ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 320)}`).join("\n\n")}\n`
+      ? `\n=== VERIFIED SOURCE EVIDENCE ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 320)}`).join("\n\n")}\n`
       : "";
 
     // If Gemini client is active, try primary and fallback models with strict token & context limits
     if (ai) {
       try {
         const isCode = isCodeRequest(trimmedMessage);
-        const isPortfolio = isPortfolioQuery(trimmedMessage);
-        const hasEvidence = urlEvidence.results.length > 0;
+        const topRepos = repos.slice(0, 8);
+        const reposContextText = topRepos.map((r, i) => {
+          const shortDesc = r.description ? r.description.substring(0, 100) : "Open-source repository.";
+          return `#${i + 1} ${r.name} (${r.language || "Code"}, ★${r.stargazers_count}): ${shortDesc}`;
+        }).join("\n");
 
-        let systemInstruction = "";
-        let maxOutputTokens = 300;
-        let temperature = 0.4;
+        const newsContextSection = (hasExplicitNewsIntent && liveNewsContextText)
+          ? `\n=== TOP TECH NEWS (Use ONLY because user asked about news) ===\n${liveNewsContextText}\n`
+          : "";
 
-        if (isCode) {
-          systemInstruction = `You are an expert, precise software engineer and programming assistant.
+        const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's ultra-smart, witty, and warmly human AI companion and digital twin living inside his retro-editorial portfolio terminal.
 
-CRITICAL CODE-FIRST MANDATE:
-1. Provide complete, clean, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`).
-2. Follow the code with a brief 1-2 sentence explanation. Do NOT put explanations before the code block.
-3. Do NOT mention Umesh, resumes, or portfolios unless explicitly requested.
-4. Return runnable code immediately.`;
-          maxOutputTokens = 600;
-          temperature = 0.2;
-        } else if (isPortfolio) {
-          const topRepos = repos.slice(0, 6);
-          const reposContextText = topRepos.map((r, i) => {
-            const shortDesc = r.description ? r.description.substring(0, 80) : "Open-source repository.";
-            return `#${i + 1} ${r.name} (${r.language || "Code"}): ${shortDesc}`;
-          }).join("\n");
-
-          systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's grounded RAG digital twin and AI assistant living inside his portfolio terminal.
-
-MANDATORY PORTFOLIO RAG RULES:
-1. STRICT RAG GROUNDING: Ground your answers strictly in Umesh's Authoritative Resume below.
-   - When asked about Umesh's grades, CGPA, or "how he got 9.60", answer strictly about his 9.60 / 10.0 CGPA at Silicon University, Bhubaneswar (2023–2027), foundational mastery in Data Structures, OS, and ML, competitive coding (2nd place in Algo Arena 2.0), and JNV Panikoili (91.2% in 12th, 95.8% in 10th).
-   - NEVER confuse questions about Umesh with any external news story or article!
-2. Answer the exact question directly first in 2 to 4 sentences or a compact 3-bullet list. Never write long rambling essays or unrequested background information.
-3. Do not output news unless explicitly requested.
-4. English only.
+MANDATORY RESPONSE POLICIES:
+1. ANSWER THE EXACT QUESTION FIRST: Provide a direct, relevant answer immediately without unsolicited architecture essays or verbose disclaimers.
+2. CODE-FIRST POLICY: If the user requests code or implementation, provide complete, clean, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write long essays before the code.
+3. CONCISENESS & CLARITY: For simple questions, answer directly in 2 to 5 sentences. For technical explanations or lists, use clear, concise bullet points. Expand only when explicitly requested.
+4. AUTHORITATIVE GROUNDING:
+   - Ground all answers about Umesh, his projects, and his background in the Authoritative Resume and GitHub Repositories below.
+   - For his 9.60 CGPA, cite Silicon University, Bhubaneswar (2023–2027), foundational mastery in Data Structures, OS, and ML, 2nd Place in Algo Arena 2.0, and 91.2% at JNV Panikoili.
+   - If asked about GitHub repos or projects, discuss the real repositories listed below.
+   - For general programming questions, answer directly and accurately without repeating unrequested portfolio descriptions.
+   - If relevant information is genuinely unavailable, state what is unknown briefly in 1 sentence.
+5. TECH NEWS: Only discuss tech news if the user explicitly asks for news, headlines, or a briefing.
+6. ENGLISH ONLY: Always output in English.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
 ${RESUME_TEXT}
 
-=== FEATURED REPOSITORIES ===
-${reposContextText}`;
-          maxOutputTokens = 350;
-          temperature = 0.4;
-        } else if (hasEvidence) {
-          systemInstruction = `You are a grounded technical assistant for Umesh's verified sources and documentation.
-
-MANDATORY RAG RULES:
-1. Answer the exact question directly based on the verified evidence chunks below.
-2. For simple questions, answer directly in 2 to 5 sentences. For technical explanations, use concise bullet points.
-3. If user requested code, provide runnable code first, followed by a 1-sentence explanation.
-4. If information is unavailable in the evidence, state that briefly in 1 sentence. Do not invent details.
-5. Include markdown source links [Title](URL) for citations.
-
-=== VERIFIED EVIDENCE (Top 3 Chunks) ===
-${sourceEvidenceSection}`;
-          maxOutputTokens = 350;
-          temperature = 0.25;
-        } else if (hasExplicitNewsIntent && liveNewsContextText) {
-          systemInstruction = `You are umu's Tech Pulse analyst. Summarize trending tech news stories accurately in concise bullet points.
-
-=== TOP TECH NEWS ===
-${liveNewsContextText}`;
-          maxOutputTokens = 350;
-          temperature = 0.4;
-        } else {
-          // General programming, CS concepts, or general queries
-          systemInstruction = `You are an expert, direct AI technical assistant.
-
-MANDATORY RESPONSE RULES:
-1. Answer the exact question directly first.
-2. For simple questions, answer in 2 to 5 sentences. For technical explanations, use concise bullet points. Expand only when explicitly requested.
-3. Do NOT repeat portfolio descriptions, resumes, or unrelated personal projects.
-4. If asked about an unavailable, non-existent, or unverified topic, state that the information is unavailable in 1 brief sentence. Do not invent facts.
-5. English only.`;
-          maxOutputTokens = 300;
-          temperature = 0.35;
-        }
+=== TOP GITHUB REPOSITORIES ===
+${reposContextText}
+${sourceEvidenceSection}${newsContextSection}`;
 
         const contents: any[] = [];
-        const safeHistory = Array.isArray(history) ? history.slice(-3) : [];
+        const safeHistory = Array.isArray(history) ? history.slice(-4) : [];
         for (const h of safeHistory) {
-          const content = normalizeText(h?.content, 300, true);
+          const content = normalizeText(h?.content, 400, true);
           if (!content) continue;
           contents.push({
             role: h.role === "user" ? "user" : "model",
@@ -1440,7 +1382,7 @@ MANDATORY RESPONSE RULES:
           parts: [{ text: trimmedMessage }]
         });
 
-        console.log(`[BACKEND] Querying Gemini for user request (${isCode ? "code" : isPortfolio ? "portfolio" : "general"})...`);
+        console.log(`[BACKEND] Querying Gemini for user request (${isCode ? "code" : "general"})...`);
         let response;
         try {
           response = await ai.models.generateContent({
@@ -1448,19 +1390,19 @@ MANDATORY RESPONSE RULES:
             contents,
             config: {
               systemInstruction,
-              temperature,
-              maxOutputTokens,
+              temperature: isCode ? 0.2 : 0.6,
+              maxOutputTokens: isCode ? 600 : 350,
             }
           });
-        } catch (firstErr) {
-          console.warn("[BACKEND] gemini-2.0-flash failed, trying gemini-1.5-flash fallback:", firstErr);
+        } catch (firstErr: any) {
+          console.warn("[BACKEND] gemini-2.0-flash failed, trying gemini-1.5-flash fallback:", firstErr?.message || firstErr);
           response = await ai.models.generateContent({
             model: "gemini-1.5-flash",
             contents,
             config: {
               systemInstruction,
-              temperature,
-              maxOutputTokens,
+              temperature: isCode ? 0.2 : 0.6,
+              maxOutputTokens: isCode ? 600 : 350,
             }
           });
         }
@@ -1468,8 +1410,8 @@ MANDATORY RESPONSE RULES:
         if (response && response.text) {
           reply = response.text;
         }
-      } catch (geminiErr) {
-        console.warn("[BACKEND] Gemini API execution warning, falling back to smart heuristic engine:", geminiErr);
+      } catch (geminiErr: any) {
+        console.warn("[BACKEND] Gemini API execution warning, falling back to smart heuristic engine:", geminiErr?.message || geminiErr);
       }
     }
 

@@ -160,6 +160,23 @@ export async function validateSafeUrl(
   }
 }
 
+export function normalizeTargetUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host === "github.com") {
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (parts.length === 2) {
+        return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/main/README.md`;
+      }
+      if (parts.length >= 4 && parts[2] === "blob") {
+        return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${parts.slice(3).join("/")}`;
+      }
+    }
+  } catch {}
+  return rawUrl;
+}
+
 // Safe HTTP Fetch with Timeout, Size Limit, and Redirect Protection
 export async function safeFetch(
   targetUrl: string,
@@ -171,9 +188,9 @@ export async function safeFetch(
     allowLocalhost?: boolean;
   } = {}
 ): Promise<{ status: number; content?: string; etag?: string; lastModified?: string; redirectedUrl?: string }> {
-  const timeoutMs = options.timeoutMs ?? 6000;
+  const timeoutMs = options.timeoutMs ?? 8000;
   const maxRedirects = options.maxRedirects ?? 3;
-  let currentUrl = targetUrl;
+  let currentUrl = normalizeTargetUrl(targetUrl);
   let redirectsRemaining = maxRedirects;
 
   while (redirectsRemaining >= 0) {
@@ -190,6 +207,11 @@ export async function safeFetch(
       "User-Agent": "Portfolio-RAG-Bot/2.0 (+https://github.com/umeshkumarsahoo)",
       "Accept": "text/html,text/plain,application/json;q=0.9,*/*;q=0.5",
     };
+
+    const githubToken = process.env.GITHUB_TOKEN?.trim();
+    if (githubToken && (parsed.hostname.includes("github.com") || parsed.hostname.includes("githubusercontent.com"))) {
+      headers["Authorization"] = `token ${githubToken}`;
+    }
 
     if (options.etag) headers["If-None-Match"] = options.etag;
     if (options.lastModified) headers["If-Modified-Since"] = options.lastModified;
@@ -778,6 +800,20 @@ export class CachedLinkRAGEngine {
     });
   }
 
+  public async indexDirectDocument(id: string, title: string, text: string) {
+    const contentHash = crypto.createHash("sha256").update(text).digest("hex");
+    const entry: PageCacheEntry = {
+      url: id,
+      title,
+      content: text,
+      contentHash,
+      fetchedAt: Date.now(),
+      expiresAt: Date.now() + this.ttlMs,
+      isStale: false,
+    };
+    await this.indexPage(entry);
+  }
+
   // ==========================================
   // Layer C: Hybrid Semantic + Lexical Retrieval
   // ==========================================
@@ -937,14 +973,26 @@ STRICT ANSWER RULES:
 6. Provide markdown source links [Title](URL) for citations.`;
 
         const isCode = isCodeRequest(question);
-        const response = await this.aiClient.models.generateContent({
-          model: "gemini-2.0-flash",
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          config: {
-            temperature: 0.2,
-            maxOutputTokens: isCode ? 600 : 350,
-          },
-        });
+        let response;
+        try {
+          response = await this.aiClient.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              temperature: 0.2,
+              maxOutputTokens: isCode ? 600 : 350,
+            },
+          });
+        } catch (firstErr) {
+          response = await this.aiClient.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              temperature: 0.2,
+              maxOutputTokens: isCode ? 600 : 350,
+            },
+          });
+        }
 
         if (response && response.text) {
           answerText = response.text.trim();
