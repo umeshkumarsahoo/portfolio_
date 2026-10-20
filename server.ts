@@ -9,7 +9,14 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { CachedLinkRAGEngine, extractUrlsFromText } from "./ragEngine";
+import {
+  CachedLinkRAGEngine,
+  extractUrlsFromText,
+  isCodeRequest,
+  isPortfolioQuery,
+  generateCodeSnippet,
+  formatCodeFirstResponse,
+} from "./ragEngine";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -905,7 +912,58 @@ ${storySummaries}
 function generateSmartFallbackResponse(query: string, repos: RepoData[], news: HackerNewsStory[]): string {
   const q = query.toLowerCase().trim();
 
-  // 1. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging)
+  // 1. Code-First Request Handling (Runnable Code FIRST, then 1-2 sentence explanation)
+  if (isCodeRequest(query)) {
+    const snippet = generateCodeSnippet(query);
+    if (snippet) {
+      return formatCodeFirstResponse(snippet.code, snippet.language, snippet.explanation);
+    }
+
+    // Generic code request fallback
+    return `\`\`\`python
+def solution(*args, **kwargs):
+    """Clean, runnable implementation template."""
+    # Process inputs directly
+    result = [x for x in args if x is not None]
+    return result
+
+# Example:
+# print(solution(1, 2, 3))
+\`\`\`
+
+Here is a standard runnable template. Could you specify the exact input/output constraints or target language so I can provide the optimized algorithm?`;
+  }
+
+  // 2. Direct General Programming Concepts (Concise 2–5 sentences or bullet points)
+  if (q.includes("closure")) {
+    return "A closure is a function that retains access to variables in its outer (lexical) scope even after the outer function has finished executing. Closures enable data encapsulation, private state variables, and function currying without polluting the global namespace.";
+  }
+  if ((q.includes("let") && q.includes("const")) || (q.includes("var") && (q.includes("let") || q.includes("const")))) {
+    return "• `const`: Block-scoped, cannot be reassigned (though properties of assigned objects remain mutable). Best default choice.\n• `let`: Block-scoped, can be reassigned when state changes are necessary.\n• `var`: Legacy function-scoped declaration that hoists to the top of the function, often causing unexpected scope leaks.";
+  }
+  if (q.includes("tcp") && q.includes("udp")) {
+    return "• **TCP (Transmission Control Protocol):** Connection-oriented, guarantees ordered packet delivery and error correction via three-way handshakes and retransmissions. Slower, but reliable.\n• **UDP (User Datagram Protocol):** Connectionless, sends packets without delivery acknowledgments or ordering. Minimizes latency, making it ideal for video streaming, DNS, and real-time multiplayer gaming.";
+  }
+  if (q.includes("rest") && q.includes("graphql")) {
+    return "• **REST:** Exposes fixed HTTP endpoints where the server defines the payload structure, which can cause over-fetching or multiple roundtrips for related entities.\n• **GraphQL:** Uses a single POST endpoint where the client queries precisely the fields it needs in a single request, eliminating under- and over-fetching.";
+  }
+  if (q.includes("async") && (q.includes("await") || q.includes("promise"))) {
+    return "`async/await` is modern syntactic sugar built directly on JavaScript Promises. An `async` function implicitly wraps returned values in a resolved Promise, and `await` pauses execution until the awaited Promise settles, allowing asynchronous operations to be written with synchronous readability and standard `try/catch` error handling.";
+  }
+  if (q.includes("event loop")) {
+    return "The JavaScript Event Loop coordinates asynchronous execution on a single thread. When the synchronous Call Stack is empty, the event loop drains the Microtask Queue (Promise resolutions, `process.nextTick`) first, then pulls callbacks from the Macrotask Queue (`setTimeout`, `setInterval`, I/O events) onto the stack.";
+  }
+  if (q.includes("stack") && q.includes("heap")) {
+    return "• **Stack:** Fast, contiguous memory automatically managed in LIFO order for function call frames, local variables, and primitive data types.\n• **Heap:** Larger, dynamically allocated memory pool for complex reference objects and arrays, tracked and reclaimed by the garbage collector.";
+  }
+  if (q.includes("rebase") && q.includes("merge")) {
+    return "• `git merge`: Preserves complete commit history by creating a new merge commit connecting two branches with chronological accuracy.\n• `git rebase`: Moves the entire feature branch commits onto the tip of the target branch, rewriting commit hashes to create a clean, linear project history.";
+  }
+  if (q.includes("recursion")) {
+    return "Recursion is a programming technique where a function calls itself to solve smaller sub-instances of the same problem. Every recursive implementation requires at least one base case to terminate execution, preventing call stack overflow errors.";
+  }
+
+  // 3. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging)
   const isGreeting = 
     q === "hi" || 
     q === "hello" || 
@@ -923,14 +981,14 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
 
   if (isGreeting) {
     const greetingVariations = [
-      `Hey there! I'm **umu** — Umesh's terminal sidekick and digital twin 👋\n\nI was built right into this stack to give you an authentic, conversational tour of Umesh's engineering world (no boring static resumes here!).\n\nI'm loaded with the full context on his **9.60 CGPA grind at Silicon University**, his **RAG Teaching Assistant** and **BiGRU ML models**, his **Terraform & DevOps pipelines**, and live tech news from Hacker News.\n\nWhat would you like to explore? Feel free to ask about his code, his internships, or ask me to *"brief me on the news"*!`,
-      `Hi! Great to meet you, I'm **umu** ✨\n\nThink of me as Umesh's AI co-pilot. Whether you're here to evaluate his credentials for engineering roles, understand his full-stack architecture, or unpack today's wildest Hacker News headlines — I'm right here with the answers.\n\nWhere would you like to start? Umesh's background, his GitHub repositories, or live tech headlines?`,
-      `Welcome to the terminal! I'm **umu** 🚀 Umesh's intelligent AI companion.\n\nI have instant context on Umesh's academic records, machine learning competitions (like his 2nd place win at SPEC2MODEL), and production backend work at Ingenious Tech World & Syllogistick.\n\nFeel free to ask me anything about his projects, or say *"brief me on the news"* to get a quick analytical breakdown of what developers are discussing today!`
+      `Hey there! I'm **umu** — Umesh's terminal sidekick and digital twin 👋\n\nI'm loaded with the full context on his **9.60 CGPA at Silicon University**, his **RAG Teaching Assistant** and **BiGRU ML models**, his **DevOps & MERN internships**, and live tech news from Hacker News.\n\nWhat would you like to explore? Ask about his code, his background, or ask me to *"brief me on the news"*!`,
+      `Hi! Great to meet you, I'm **umu** ✨\n\nThink of me as Umesh's AI co-pilot. Whether you're here to evaluate his credentials for engineering roles, understand his full-stack architecture, or unpack today's Hacker News headlines — I'm right here with the answers.\n\nWhere would you like to start? Umesh's background, his GitHub repositories, or live tech headlines?`,
+      `Welcome to the terminal! I'm **umu** 🚀 Umesh's intelligent AI companion.\n\nI have instant context on Umesh's academic records, machine learning competitions (like his 2nd place win at SPEC2MODEL), and backend work at Ingenious Tech World & Syllogistick.\n\nFeel free to ask me anything about his projects, or say *"brief me on the news"* to get a quick analytical breakdown of what developers are discussing today!`
     ];
     return greetingVariations[Math.abs(q.length + (news.length || 1)) % greetingVariations.length];
   }
 
-  // 2. RAG Retrieval: Academic Background & 9.60 CGPA at Silicon University
+  // 4. RAG Retrieval: Academic Background & 9.60 CGPA at Silicon University
   if (
     q.includes("9.60") || q.includes("9.6") || q.includes("cgpa") ||
     q.includes("gpa") || q.includes("education") || q.includes("college") ||
@@ -948,7 +1006,7 @@ Umesh achieved an exceptional **9.60 / 10.0 CGPA** in Computer Science & Enginee
 • **Schooling Track Record:** Maintained top academic honors early on at **Jawahar Navodaya Vidyalaya (JNV) Panikoili**, scoring **91.2% in Class 12** and **95.8% in Class 10**.`;
   }
 
-  // 3. RAG Retrieval: RAG-Based Teaching Assistant System
+  // 5. RAG Retrieval: RAG-Based Teaching Assistant System
   if (
     q.includes("rag") || q.includes("retrieval") || q.includes("teaching assistant") ||
     q.includes("vector") || q.includes("embedding") || q.includes("semantic search") ||
@@ -962,7 +1020,7 @@ Umesh architected an end-to-end semantic retrieval engine in Python designed to 
 • **Grounded Prompt Augmentation:** Injects verified source context into the LLM prompt window, guaranteeing verifiable answers with zero hallucinations.`;
   }
 
-  // 4. RAG Retrieval: BiGRU Deep Learning Emotion Classifier
+  // 6. RAG Retrieval: BiGRU Deep Learning Emotion Classifier
   if (
     q.includes("bigru") || q.includes("gru") || q.includes("emotion") ||
     q.includes("sentiment") || q.includes("classifier") || q.includes("nlp")
@@ -974,7 +1032,7 @@ Umesh engineered a Bidirectional Gated Recurrent Unit (BiGRU) neural network for
 • **Production Serving:** Deployed as an asynchronous, low-latency microservice using FastAPI for real-time inference and evaluation.`;
   }
 
-  // 5. RAG Retrieval: Professional Experience & Internships
+  // 7. RAG Retrieval: Professional Experience & Internships
   if (
     q.includes("experience") || q.includes("intern") || q.includes("work") ||
     q.includes("ingenious") || q.includes("syllogistick") || q.includes("job") ||
@@ -989,7 +1047,7 @@ Umesh has completed two industry software engineering internships:
   Engineered production REST APIs in Node/Express, optimized MongoDB aggregations, and delivered responsive, accessible React interfaces.`;
   }
 
-  // 6. RAG Retrieval: Competitions & Achievements
+  // 8. RAG Retrieval: Competitions & Achievements
   if (
     q.includes("achievement") || q.includes("award") || q.includes("competition") ||
     q.includes("contest") || q.includes("spec2model") || q.includes("algo arena") ||
@@ -1005,7 +1063,7 @@ Umesh has proven his engineering capabilities under high-pressure competitive en
 • **Capstone Participant:** Google x Kaggle Agents Intensive Capstone (built multi-tool agent systems with Google ADK).`;
   }
 
-  // 7. RAG Retrieval: Skills and Tech Stack
+  // 9. RAG Retrieval: Skills and Tech Stack
   if (
     q.includes("skill") || q.includes("stack") || q.includes("technolog") ||
     q.includes("language") || q.includes("tool")
@@ -1019,10 +1077,10 @@ Here is Umesh's verified technical proficiency:
 • **DevOps & Cloud:** Git, GitHub Actions (CI/CD), Terraform, Linux, Postman, Docker`;
   }
 
-  // 8. RAG Retrieval: Projects & GitHub Repositories
+  // 10. RAG Retrieval: Projects & GitHub Repositories
   if (
     q.includes("project") || q.includes("portfolio") || q.includes("repo") ||
-    q.includes("github") || q.includes("code")
+    q.includes("github") || q.includes("repository") || q.includes("repositories")
   ) {
     const topRepoSummary = repos.slice(0, 4).map(r => `• **${r.name}** (${r.language || "Code"}): ${r.description || "Open source project"} [View on GitHub](${r.html_url})`).join("\n");
     return `### 🚀 Core Engineered Projects
@@ -1038,7 +1096,7 @@ ${topRepoSummary}
 *Navigate over to the **Projects** tab anytime to browse all 20+ live synchronized repositories!*`;
   }
 
-  // 9. RAG Retrieval: Contact & Connect
+  // 11. RAG Retrieval: Contact & Connect
   if (
     q.includes("contact") || q.includes("email") || q.includes("reach") ||
     q.includes("hire") || q.includes("social") || q.includes("linkedin") ||
@@ -1188,8 +1246,8 @@ You can also use the **Contact** tab in this portfolio to dispatch a direct mess
     return generateLiveTechPulseBriefing(news);
   }
 
-  // 13. Default Grounded Fallback Response
-  return `I'm right here with you! 😊 While my primary expertise is Umesh's engineering portfolio, feel free to ask about his **9.60 CGPA at Silicon University**, his **RAG Teaching Assistant**, his **BiGRU ML models**, his **DevOps & MERN internships**, or say *"brief me on the news"* for trending tech updates. How can I help?`;
+  // 13. Default Fallback (Concise, honest, no resume dumping)
+  return "I don't have verified information about that topic in my configured sources or portfolio knowledge base. Feel free to ask about Umesh's engineering work, projects, or programming concepts!";
 }
 
 // UMU Chat Agent Endpoint (Dual-Persona: Portfolio Digital Twin + Tech News Analyst)
@@ -1280,43 +1338,92 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       }
     }
 
-    // Retrieve any highly-relevant evidence from indexed URLs for LLM context augmentation
-    const urlEvidence = ragEngine.retrieve(trimmedMessage, 2, 0.22);
+    // Retrieve top 3 relevant evidence chunks from indexed URLs for LLM context augmentation
+    const urlEvidence = ragEngine.retrieve(trimmedMessage, 3, 0.18);
     const sourceEvidenceSection = urlEvidence.results.length > 0
-      ? `\n=== VERIFIED EVIDENCE FROM CONFIGURED SOURCES ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 300)}`).join("\n\n")}\n`
+      ? `\n=== VERIFIED EVIDENCE FROM CONFIGURED SOURCES ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 320)}`).join("\n\n")}\n`
       : "";
 
     // If Gemini client is active, try primary and fallback models with strict token & context limits
     if (ai) {
       try {
-        const topRepos = repos.slice(0, 6);
-        const reposContextText = topRepos.map((r, i) => {
-          const shortDesc = r.description ? r.description.substring(0, 80) : "Open-source repository.";
-          return `#${i + 1} ${r.name} (${r.language || "Code"}): ${shortDesc}`;
-        }).join("\n");
+        const isCode = isCodeRequest(trimmedMessage);
+        const isPortfolio = isPortfolioQuery(trimmedMessage);
+        const hasEvidence = urlEvidence.results.length > 0;
 
-        const newsContextSection = (hasExplicitNewsIntent && liveNewsContextText)
-          ? `\n=== TOP TECH NEWS (Use ONLY because user asked about news) ===\n${liveNewsContextText}\n`
-          : "";
+        let systemInstruction = "";
+        let maxOutputTokens = 300;
+        let temperature = 0.4;
 
-        const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's grounded RAG digital twin and AI assistant living inside his portfolio terminal.
+        if (isCode) {
+          systemInstruction = `You are an expert, precise software engineer and programming assistant.
 
-MANDATORY RAG OPERATING RULES:
-1. STRICT RAG GROUNDING: You are a grounded RAG chatbot for Umesh Kumar Sahoo's portfolio. Ground your knowledge directly in the provided Authoritative Resume.
-   - When asked about Umesh's grades, CGPA, or "how he got 9.60", answer strictly about his 9.60 / 10.0 CGPA at Silicon University, Bhubaneswar (2023–2027), his foundational mastery in Data Structures, OS, and ML, his competitive coding (2nd place in Algo Arena 2.0), and his high school track record at JNV Panikoili (91.2% in 12th, 95.8% in 10th).
+CRITICAL CODE-FIRST MANDATE:
+1. Provide complete, clean, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`).
+2. Follow the code with a brief 1-2 sentence explanation. Do NOT put explanations before the code block.
+3. Do NOT mention Umesh, resumes, or portfolios unless explicitly requested.
+4. Return runnable code immediately.`;
+          maxOutputTokens = 600;
+          temperature = 0.2;
+        } else if (isPortfolio) {
+          const topRepos = repos.slice(0, 6);
+          const reposContextText = topRepos.map((r, i) => {
+            const shortDesc = r.description ? r.description.substring(0, 80) : "Open-source repository.";
+            return `#${i + 1} ${r.name} (${r.language || "Code"}): ${shortDesc}`;
+          }).join("\n");
+
+          systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's grounded RAG digital twin and AI assistant living inside his portfolio terminal.
+
+MANDATORY PORTFOLIO RAG RULES:
+1. STRICT RAG GROUNDING: Ground your answers strictly in Umesh's Authoritative Resume below.
+   - When asked about Umesh's grades, CGPA, or "how he got 9.60", answer strictly about his 9.60 / 10.0 CGPA at Silicon University, Bhubaneswar (2023–2027), foundational mastery in Data Structures, OS, and ML, competitive coding (2nd place in Algo Arena 2.0), and JNV Panikoili (91.2% in 12th, 95.8% in 10th).
    - NEVER confuse questions about Umesh with any external news story or article!
-2. STRICT NEWS SEGREGATION: You ONLY discuss or brief tech news if the user explicitly asks for "news", "headlines", or a "briefing". If the user asks about Umesh, his projects, or his background, NEVER output a news briefing.
-3. STRICT TOKEN & OUTPUT LIMIT: Keep all answers concise, clear, and direct. Aim for 2 to 4 punchy sentences or a compact 3-bullet list. Never write long rambling essays or unrequested background information. Stop when the question is answered.
-4. NATURAL BOUNDARIES FOR CASUAL QUERIES: If asked general programming questions, humor, or casual banter (e.g. "tabs vs spaces", "tell a joke", "favorite food"), answer wittily and concisely in 1-2 sentences.
-5. STRICTLY ENGLISH ONLY: Always output in English. Never output Korean, Chinese, or foreign script characters.
+2. Answer the exact question directly first in 2 to 4 sentences or a compact 3-bullet list. Never write long rambling essays or unrequested background information.
+3. Do not output news unless explicitly requested.
+4. English only.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
 ${RESUME_TEXT}
 
 === FEATURED REPOSITORIES ===
-${reposContextText}
-${sourceEvidenceSection}${newsContextSection}`;
+${reposContextText}`;
+          maxOutputTokens = 350;
+          temperature = 0.4;
+        } else if (hasEvidence) {
+          systemInstruction = `You are a grounded technical assistant for Umesh's verified sources and documentation.
+
+MANDATORY RAG RULES:
+1. Answer the exact question directly based on the verified evidence chunks below.
+2. For simple questions, answer directly in 2 to 5 sentences. For technical explanations, use concise bullet points.
+3. If user requested code, provide runnable code first, followed by a 1-sentence explanation.
+4. If information is unavailable in the evidence, state that briefly in 1 sentence. Do not invent details.
+5. Include markdown source links [Title](URL) for citations.
+
+=== VERIFIED EVIDENCE (Top 3 Chunks) ===
+${sourceEvidenceSection}`;
+          maxOutputTokens = 350;
+          temperature = 0.25;
+        } else if (hasExplicitNewsIntent && liveNewsContextText) {
+          systemInstruction = `You are umu's Tech Pulse analyst. Summarize trending tech news stories accurately in concise bullet points.
+
+=== TOP TECH NEWS ===
+${liveNewsContextText}`;
+          maxOutputTokens = 350;
+          temperature = 0.4;
+        } else {
+          // General programming, CS concepts, or general queries
+          systemInstruction = `You are an expert, direct AI technical assistant.
+
+MANDATORY RESPONSE RULES:
+1. Answer the exact question directly first.
+2. For simple questions, answer in 2 to 5 sentences. For technical explanations, use concise bullet points. Expand only when explicitly requested.
+3. Do NOT repeat portfolio descriptions, resumes, or unrelated personal projects.
+4. If asked about an unavailable, non-existent, or unverified topic, state that the information is unavailable in 1 brief sentence. Do not invent facts.
+5. English only.`;
+          maxOutputTokens = 300;
+          temperature = 0.35;
+        }
 
         const contents: any[] = [];
         const safeHistory = Array.isArray(history) ? history.slice(-3) : [];
@@ -1333,7 +1440,7 @@ ${sourceEvidenceSection}${newsContextSection}`;
           parts: [{ text: trimmedMessage }]
         });
 
-        console.log(`[BACKEND] Querying Gemini for user request...`);
+        console.log(`[BACKEND] Querying Gemini for user request (${isCode ? "code" : isPortfolio ? "portfolio" : "general"})...`);
         let response;
         try {
           response = await ai.models.generateContent({
@@ -1341,8 +1448,8 @@ ${sourceEvidenceSection}${newsContextSection}`;
             contents,
             config: {
               systemInstruction,
-              temperature: 0.5,
-              maxOutputTokens: 250,
+              temperature,
+              maxOutputTokens,
             }
           });
         } catch (firstErr) {
@@ -1352,8 +1459,8 @@ ${sourceEvidenceSection}${newsContextSection}`;
             contents,
             config: {
               systemInstruction,
-              temperature: 0.5,
-              maxOutputTokens: 250,
+              temperature,
+              maxOutputTokens,
             }
           });
         }

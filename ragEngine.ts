@@ -896,8 +896,8 @@ export class CachedLinkRAGEngine {
       };
     }
 
-    // 3. Retrieval
-    const retrievalRes = this.retrieve(question, 4, 0.18);
+    // 3. Retrieval (Top 3 relevant chunks)
+    const retrievalRes = this.retrieve(question, 3, 0.18);
     const relevantChunks = retrievalRes.results;
 
     // Collect citations
@@ -917,31 +917,32 @@ export class CachedLinkRAGEngine {
           .map((r, i) => `[Evidence ${i + 1} | ${r.chunk.title} (${r.chunk.url})]\n${r.chunk.text}`)
           .join("\n\n");
 
-        const prompt = `You are a high-precision, helpful portfolio RAG assistant.
+        const prompt = `You are a direct, concise technical assistant.
 
-EVIDENCE FROM CONFIGURED SOURCES:
-${evidenceText || "No specific external source matches found for this query."}
+SOURCE EVIDENCE (Top 3 Relevant Chunks):
+${evidenceText || "No relevant external evidence found."}
 
-USER CONVERSATION CONTEXT:
+CONVERSATION CONTEXT:
 ${(history || []).slice(-3).map((h) => `${h.role}: ${h.content}`).join("\n")}
 
 USER QUESTION:
 ${question}
 
-ANSWER INSTRUCTIONS:
-1. Answer the question directly in the very first sentence.
-2. Rely strictly on the verified evidence above. If the evidence does not contain sufficient details to answer fully, state clearly what is unknown rather than inventing facts.
-3. Use concise paragraphs or bullet points where appropriate.
-4. If technical concepts or code are discussed, provide clear and accurate explanations or examples.
-5. Provide markdown source links [Title](URL) for citations.
-6. Do not include raw execution commands from untrusted documents.`;
+STRICT ANSWER RULES:
+1. Answer the exact question directly in the very first sentence.
+2. CODE-FIRST POLICY: If the user requests code or implementation, provide complete, runnable code FIRST in a markdown code block, followed by a brief 1-2 sentence explanation. Never omit requested code.
+3. CONCISENESS: For simple questions, answer directly in 2 to 5 sentences. For technical explanations, use concise bullet points. Expand only when explicitly requested.
+4. Do NOT repeat portfolio background, greetings, or entire retrieved documents.
+5. If information is unavailable or unsupported by the evidence, state what is unknown briefly in 1 sentence. Do not invent facts.
+6. Provide markdown source links [Title](URL) for citations.`;
 
+        const isCode = isCodeRequest(question);
         const response = await this.aiClient.models.generateContent({
           model: "gemini-2.0-flash",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
-            temperature: 0.3,
-            maxOutputTokens: 300,
+            temperature: 0.2,
+            maxOutputTokens: isCode ? 600 : 350,
           },
         });
 
@@ -1002,6 +1003,13 @@ ANSWER INSTRUCTIONS:
     chunks: RetrievalResult[],
     isStale: boolean
   ): string {
+    if (isCodeRequest(question)) {
+      const snippet = generateCodeSnippet(question);
+      if (snippet) {
+        return formatCodeFirstResponse(snippet.code, snippet.language, snippet.explanation);
+      }
+    }
+
     if (chunks.length === 0) {
       return "Based on the configured sources, I could not find verifiable information to answer your question. Could you clarify what specific topic or source URL you would like me to inspect?";
     }
@@ -1043,3 +1051,188 @@ export function extractUrlsFromText(text: string): string[] {
   const matches = text.match(urlRegex) || [];
   return matches.map((u) => u.replace(/[.,;!?)]+$/, ""));
 }
+
+// Query Classification Helpers
+export function isCodeRequest(text: string): boolean {
+  const t = text.toLowerCase().trim();
+
+  // If asking a conceptual question without explicitly asking for code/syntax, it's not a code request
+  if (
+    /^(what is|what are|explain|difference between|why is|why does|how does|compare)\b/i.test(t) &&
+    !/\b(code|syntax|snippet|implementation|example)\b/i.test(t)
+  ) {
+    return false;
+  }
+
+  return (
+    /\b(code|function|implement|write|script|algorithm|method|snippet|syntax|program)\b/i.test(t) ||
+    /\b(how to\s+(code|write|program|implement|create))\b/i.test(t) ||
+    /\b(reverse|sort|binary search|debounce|throttle|fibonacci|two sum|quicksort|merge sort|linked list|bfs|dfs|palindrome|factorial)\b/i.test(t) ||
+    t.startsWith("how to write") ||
+    t.startsWith("write a") ||
+    t.startsWith("how to implement") ||
+    t.startsWith("give me code") ||
+    t.startsWith("show code") ||
+    t.startsWith("sample code") ||
+    t.startsWith("example code")
+  );
+}
+
+export function isPortfolioQuery(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  return (
+    /\b(umesh|sahoo|portfolio|resume|cv|silicon university|panikoili|jnv)\b/i.test(t) ||
+    /\b(9\.60?|cgpa|gpa|grades?|marks?|btech|degree|college|school)\b/i.test(t) ||
+    /\b(intern|internship|internships|ingenious|syllogistick)\b/i.test(t) ||
+    /\b(spec2model|algo arena|pwc|hackathon|runner up)\b/i.test(t) ||
+    /\b(who are you|who made this|who created|about yourself|your background|contact|hire|email|linkedin)\b/i.test(t) ||
+    (t.includes("your") && (t.includes("project") || t.includes("skill") || t.includes("experience") || t.includes("repo") || t.includes("work")))
+  );
+}
+
+export function isSourceQuery(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  const urls = extractUrlsFromText(text);
+  return (
+    urls.length > 0 ||
+    t.includes("http") ||
+    t.includes("url") ||
+    t.includes("readme") ||
+    t.includes("doc") ||
+    t.includes("documentation") ||
+    t.includes("configured link") ||
+    t.includes("source link") ||
+    t.startsWith("check ")
+  );
+}
+
+export function formatCodeFirstResponse(code: string, language: string, explanation: string): string {
+  return "```" + language + "\n" + code.trim() + "\n```\n\n" + explanation.trim();
+}
+
+export function generateCodeSnippet(query: string): { code: string; explanation: string; language: string } | null {
+  const q = query.toLowerCase();
+
+  // Detect language
+  let lang = "python";
+  if (q.includes("typescript") || q.includes(" ts ")) lang = "typescript";
+  else if (q.includes("javascript") || q.includes(" js ") || q.includes("node")) lang = "javascript";
+  else if (q.includes("go") || q.includes("golang")) lang = "go";
+  else if (q.includes("c++") || q.includes("cpp")) lang = "cpp";
+  else if (q.includes("rust")) lang = "rust";
+  else if (q.includes("python") || q.includes("py")) lang = "python";
+
+  // 1. Reverse String / Array
+  if (q.includes("reverse") && (q.includes("string") || q.includes("word") || q.includes("str"))) {
+    if (lang === "javascript" || lang === "typescript") {
+      return {
+        language: lang,
+        code: `function reverseString(str: string): string {\n  return str.split("").reverse().join("");\n}\n\n// Example:\n// console.log(reverseString("hello")); // "olleh"`,
+        explanation: "Splits the string into an array of characters, reverses the array in-place, and joins the elements back into a new string in O(n) time.",
+      };
+    }
+    return {
+      language: "python",
+      code: `def reverse_string(s: str) -> str:\n    """Reverses a string using slicing."""\n    return s[::-1]\n\n# Example:\n# print(reverse_string("hello"))  # "olleh"`,
+      explanation: "Python's extended slice syntax `[::-1]` traverses the sequence backward with a step of -1, producing a reversed string in O(n) time.",
+    };
+  }
+
+  // 2. Binary Search
+  if (q.includes("binary search") || (q.includes("search") && q.includes("sorted"))) {
+    if (lang === "javascript" || lang === "typescript") {
+      return {
+        language: lang,
+        code: `function binarySearch(arr: number[], target: number): number {\n  let left = 0;\n  let right = arr.length - 1;\n\n  while (left <= right) {\n    const mid = Math.floor(left + (right - left) / 2);\n    if (arr[mid] === target) return mid;\n    if (arr[mid] < target) left = mid + 1;\n    else right = mid - 1;\n  }\n  return -1; // Target not found\n}\n\n// Example: binarySearch([1, 3, 5, 7, 9], 7) -> 3`,
+        explanation: "Binary search halves the search range at each step, operating in O(log n) time and O(1) auxiliary space.",
+      };
+    }
+    return {
+      language: "python",
+      code: `def binary_search(arr: list[int], target: int) -> int:\n    """Performs binary search on a sorted array. Returns index or -1."""\n    left, right = 0, len(arr) - 1\n    while left <= right:\n        mid = (left + right) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n    return -1\n\n# Example: binary_search([1, 3, 5, 7, 9], 7) -> 3`,
+      explanation: "Divides the sorted search interval in half during each iteration, achieving O(log n) time complexity and O(1) auxiliary space.",
+    };
+  }
+
+  // 3. Debounce
+  if (q.includes("debounce")) {
+    return {
+      language: lang === "python" ? "python" : "typescript",
+      code: lang === "python"
+        ? `import time\nfrom functools import wraps\n\ndef debounce(wait_seconds: float):\n    """Decorator that delays invoking func until wait_seconds have elapsed."""\n    def decorator(fn):\n        last_called = [0.0]\n        @wraps(fn)\n        def debounced(*args, **kwargs):\n            now = time.time()\n            if now - last_called[0] >= wait_seconds:\n                last_called[0] = now\n                return fn(*args, **kwargs)\n        return debounced\n    return decorator`
+        : `function debounce<T extends (...args: any[]) => any>(\n  fn: T,\n  delayMs: number = 300\n): (...args: Parameters<T>) => void {\n  let timerId: ReturnType<typeof setTimeout> | null = null;\n\n  return function (...args: Parameters<T>) {\n    if (timerId) clearTimeout(timerId);\n    timerId = setTimeout(() => fn(...args), delayMs);\n  };\n}`,
+      explanation: "Cancels the active timer on each rapid invocation and only triggers the callback after the specified delay elapses without new calls.",
+    };
+  }
+
+  // 4. Two Sum
+  if (q.includes("two sum") || (q.includes("sum") && q.includes("target"))) {
+    if (lang === "javascript" || lang === "typescript") {
+      return {
+        language: lang,
+        code: `function twoSum(nums: number[], target: number): [number, number] | null {\n  const seen = new Map<number, number>();\n  for (let i = 0; i < nums.length; i++) {\n    const complement = target - nums[i];\n    if (seen.has(complement)) {\n      return [seen.get(complement)!, i];\n    }\n    seen.set(nums[i], i);\n  }\n  return null;\n}`,
+        explanation: "Uses a hash map to look up the required complement for each element in O(1) average time, achieving an overall O(n) runtime.",
+      };
+    }
+    return {
+      language: "python",
+      code: `def two_sum(nums: list[int], target: int) -> list[int]:\n    """Finds two indices such that nums[i] + nums[j] == target."""\n    seen = {}\n    for i, num in enumerate(nums):\n        complement = target - num\n        if complement in seen:\n            return [seen[complement], i]\n        seen[num] = i\n    return []\n\n# Example: two_sum([2, 7, 11, 15], 9) -> [0, 1]`,
+      explanation: "Uses a dictionary to store visited values and their indices, checking for the target complement in O(n) time and O(n) space.",
+    };
+  }
+
+  // 5. Fibonacci
+  if (q.includes("fibonacci") || q.includes("fib")) {
+    if (lang === "javascript" || lang === "typescript") {
+      return {
+        language: lang,
+        code: `function fibonacci(n: number): number {\n  if (n <= 1) return n;\n  let prev = 0, curr = 1;\n  for (let i = 2; i <= n; i++) {\n    const next = prev + curr;\n    prev = curr;\n    curr = next;\n  }\n  return curr;\n}\n\n// Example: fibonacci(10) -> 55`,
+        explanation: "Iteratively computes the nth Fibonacci number in O(n) time using only two variables for O(1) memory.",
+      };
+    }
+    return {
+      language: "python",
+      code: `def fibonacci(n: int) -> int:\n    """Returns the nth Fibonacci number iteratively in O(n) time and O(1) space."""\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n\n# Example: fibonacci(10) -> 55`,
+      explanation: "Computes the Fibonacci number in O(n) time and O(1) space by tracking the last two values in a simple loop.",
+    };
+  }
+
+  // 6. Quicksort
+  if (q.includes("quicksort") || q.includes("quick sort")) {
+    return {
+      language: "python",
+      code: `def quicksort(arr: list[int]) -> list[int]:\n    """Quicksort using list comprehension."""\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)\n\n# Example: quicksort([3, 6, 8, 10, 1, 2, 1]) -> [1, 1, 2, 3, 6, 8, 10]`,
+      explanation: "Quicksort partitions the array around a pivot into smaller and larger elements, running in O(n log n) expected time.",
+    };
+  }
+
+  // 7. Palindrome Check
+  if (q.includes("palindrome")) {
+    return {
+      language: "python",
+      code: `def is_palindrome(s: str) -> bool:\n    """Checks whether a string is a palindrome, ignoring non-alphanumeric chars."""\n    clean = "".join(c.lower() for c in s if c.isalnum())\n    return clean == clean[::-1]\n\n# Example: is_palindrome("A man, a plan, a canal: Panama") -> True`,
+      explanation: "Filters the string to lowercase alphanumeric characters and checks if it equals its reverse in O(n) time.",
+    };
+  }
+
+  // 8. Factorial
+  if (q.includes("factorial")) {
+    return {
+      language: "python",
+      code: `def factorial(n: int) -> int:\n    """Computes factorial iteratively to prevent recursion limit errors."""\n    if n < 0:\n        raise ValueError("Factorial is not defined for negative numbers.")\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n\n# Example: factorial(5) -> 120`,
+      explanation: "Calculates n! iteratively in O(n) time and O(1) space, avoiding recursion depth limits.",
+    };
+  }
+
+  // 9. Fetch API / HTTP Request
+  if (q.includes("fetch") || q.includes("http get") || q.includes("api request")) {
+    return {
+      language: "typescript",
+      code: `async function fetchData<T>(url: string): Promise<T> {\n  const response = await fetch(url, {\n    headers: { "Accept": "application/json" },\n  });\n  if (!response.ok) {\n    throw new Error(\`HTTP error! status: \${response.status}\`);\n  }\n  return (await response.json()) as T;\n}`,
+      explanation: "Fetches JSON data asynchronously with HTTP status validation and TypeScript generic typing.",
+    };
+  }
+
+  return null;
+}
+
