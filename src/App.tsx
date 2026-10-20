@@ -243,11 +243,13 @@ export default function App() {
     ]);
   };
 
-  const handleBriefNews = () => {
+  const handleBriefNews = (topic?: string) => {
+    setActiveTab("agent");
     updateLogsForTab("agent");
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("ask-news-brief"));
-    }, 100);
+    const query = topic && topic !== "top-news"
+      ? `Give me a technical briefing on: "${topic}"`
+      : "Brief me on the latest top trending tech news headlines.";
+    setInitialAgentQuery(query);
   };
 
   const getNavIllustration = (id: string) => {

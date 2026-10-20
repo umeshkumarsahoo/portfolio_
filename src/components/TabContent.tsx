@@ -94,12 +94,12 @@ export default function TabContent({
     const handleRefresh = () => {
       loadRepos();
     };
-    const handleNewsBriefPrompt = () => {
-      setMessages(prev => [...prev, {
-        role: "agent",
-        content: "I have the top daily tech news loaded in my cache! Which specific news item or topic would you like me to brief you on?",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      }]);
+    const handleNewsBriefPrompt = (e: any) => {
+      const topic = e?.detail?.topic;
+      const prompt = topic && topic !== "top-news"
+        ? `Give me a technical briefing on: "${topic}"`
+        : "Brief me on the latest top trending tech news headlines.";
+      handleQuerySubmit(undefined, prompt);
     };
     window.addEventListener("github-data-refreshed", handleRefresh);
     window.addEventListener("ask-news-brief", handleNewsBriefPrompt);
