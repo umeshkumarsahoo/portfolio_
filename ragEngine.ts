@@ -1127,6 +1127,25 @@ ADDITIONAL CONSTRAINTS:
     const qLower = question.toLowerCase().trim();
     const resolvedProj = projectFilter || resolveQueryProject(question, history);
 
+    // 0. Greetings & Friendly Casual Queries
+    const isGreeting =
+      qLower === "hi" ||
+      qLower === "hello" ||
+      qLower === "hey" ||
+      qLower === "yo" ||
+      qLower === "start" ||
+      qLower === "help" ||
+      qLower.startsWith("hi ") ||
+      qLower.startsWith("hello ") ||
+      qLower.startsWith("hey ") ||
+      qLower.includes("who are you") ||
+      qLower.includes("who r u") ||
+      qLower.includes("what can you do");
+
+    if (isGreeting) {
+      return "Hey there! I'm **UMU** — Umesh's portfolio assistant and technical helper 👋\n\nI can help you explore his **RAG Teaching Assistant** and **FreshGuard ML models**, his **9.60 CGPA at Silicon University**, or write and explain code. What would you like to explore?";
+    }
+
     // 1. Missing file check (explicitly requested source files that don't exist)
     if (qLower.includes("sentence_extractor")) {
       return "The requested source file `sentence_extractor.py` was not found in the repository. Available source files include `create_chunks.py`, `api.py`, `APP.PY`, and `process_video.py` in [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-).";
@@ -1196,9 +1215,18 @@ ADDITIONAL CONSTRAINTS:
     }
 
     const topChunk = chunks[0];
+    if (topChunk.combinedScore < 0.25 || (topChunk.lexicalScore === 0 && !isSourceQuery(question))) {
+      return "Based on the configured sources, I could not find verifiable information to answer your question. Could you clarify what specific topic or source URL you would like me to inspect?";
+    }
+
     const cleanExcerpt = topChunk.chunk.text
       .replace(/^\[Source:.*?\]\s*\[Section:.*?\]\s*/, "")
+      .replace(/^Repository:\s*\S+\s*/i, "")
+      .replace(/^Language:\s*\S+\s*/i, "")
+      .replace(/^URL:\s*\S+\s*/i, "")
+      .replace(/=== README & DOCUMENTATION ===/gi, "")
       .replace(/\n+/g, " ")
+      .trim()
       .substring(0, 360);
 
     const staleNotice = isStale ? "\n\n*(Note: Sourced from a cached copy as the upstream URL is temporarily unreachable)*" : "";

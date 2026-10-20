@@ -1595,8 +1595,21 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     const projectFilter = resolveQueryProject(trimmedMessage, safeHistory);
     const isCode = isCodeRequest(trimmedMessage);
 
-    // Retrieve top 3-5 relevant evidence chunks from indexed URLs for LLM context augmentation
-    const urlEvidence = ragEngine.retrieve(trimmedMessage, 4, 0.15, projectFilter, isCode);
+    const isGreeting =
+      lowerMsg === "hi" ||
+      lowerMsg === "hello" ||
+      lowerMsg === "hey" ||
+      lowerMsg === "yo" ||
+      lowerMsg === "help" ||
+      lowerMsg.startsWith("hi ") ||
+      lowerMsg.startsWith("hello ") ||
+      lowerMsg.startsWith("hey ") ||
+      lowerMsg.includes("who are you") ||
+      lowerMsg.includes("who r u") ||
+      lowerMsg.includes("what can you do");
+
+    // Retrieve top 3-5 relevant evidence chunks from indexed URLs (skip noisy search for greetings)
+    const urlEvidence = isGreeting ? { results: [] } : ragEngine.retrieve(trimmedMessage, 4, 0.15, projectFilter, isCode);
     const sourceEvidenceSection = urlEvidence.results.length > 0
       ? `\n=== VERIFIED SOURCE EVIDENCE ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 320)}`).join("\n\n")}\n`
       : "";
@@ -1624,7 +1637,8 @@ ADDITIONAL CONTEXT & GUIDELINES:
 2. CONCISENESS & CLARITY: For simple questions, answer directly in 2 to 5 sentences. For technical explanations or lists, use clear, concise bullet points. Expand only when explicitly requested. Never dump an entire README or unrelated project descriptions.
 3. CODE-FIRST POLICY: When the user requests code or implementation, provide complete, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write dummy placeholder functions.
 4. CORRECT PROJECT IDENTITY: Maintain strict boundaries for FreshGuard (lab_project_fresh_guard produce shelf life), RAG Teaching Assistant (Teaching_assistant-rag-based-), DevOps (Terraform, Docker, CI/CD), BiGRU Emotion Classifier (sentiment_analysis), and Time Series Forecasting (Time_series-). Link to the exact repository or source file used. Never cite an unrelated repository.
-5. ENGLISH ONLY: Always output in English.
+5. GREETINGS & CASUAL INTROS: If the user says hello or greets you, respond warmly and briefly in 1-2 sentences as UMU and offer to help with projects or coding.
+6. ENGLISH ONLY: Always output in English.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
@@ -1635,13 +1649,24 @@ ${reposContextText}
 ${sourceEvidenceSection}${newsContextSection}`;
 
         const contents: any[] = [];
+        let lastRole = "";
         for (const h of safeHistory) {
+          const role = h.role === "user" ? "user" : "model";
+          // Gemini requires the conversation history to start with a user turn
+          if (contents.length === 0 && role !== "user") continue;
+          // Gemini requires strictly alternating roles
+          if (role === lastRole) continue;
           const content = normalizeText(h?.content, 400, true);
           if (!content) continue;
           contents.push({
-            role: h.role === "user" ? "user" : "model",
+            role,
             parts: [{ text: content }]
           });
+          lastRole = role;
+        }
+        // If the last message in history was user, remove it so we can cleanly push current user query
+        if (lastRole === "user") {
+          contents.pop();
         }
         contents.push({
           role: "user",
