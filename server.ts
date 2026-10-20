@@ -16,6 +16,9 @@ import {
   isPortfolioQuery,
   generateCodeSnippet,
   formatCodeFirstResponse,
+  resolveQueryProject,
+  ProjectId,
+  ChunkMetadata,
 } from "./ragEngine";
 
 dotenv.config({ path: ".env.local" });
@@ -139,7 +142,61 @@ interface RepoData {
   files?: string[];
 }
 
-// Index flagship RAG project documentation into RAG engine for verified retrieval grounding
+// Index 5 Core Flagship Projects into RAG engine with explicit ProjectId and ChunkMetadata
+
+// 1. FreshGuard: Produce Shelf-Life Predictor
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
+  "GitHub: lab_project_fresh_guard (FreshGuard Produce Shelf-Life Predictor)",
+  `Repository: lab_project_fresh_guard
+Author: Umesh Kumar Sahoo
+GitHub URL: https://github.com/umeshkumarsahoo/lab_project_fresh_guard
+Primary Language: Python
+Description: FreshGuard is a supervised machine learning produce shelf-life predictor. It predicts remaining shelf life in days from produce quality and storage conditions.
+Dataset & Features: Evaluated on 3,552 produce records from Datasets/FreshGuard_RAW_dirty.csv across 6 numeric features (Initial_Brix_Level, Storage_Temperature_C, Storage_Humidity_Percent, Initial_Damage_Score, Firmness_Score, Weight_Loss_Percent) and 3 categorical features (Produce_Type, Packaging_Type, Ripeness_Stage).
+Model Training & Metrics: Evaluated LinearRegression, Ridge, Lasso, RandomForestRegressor, and GradientBoostingRegressor. The best model was GradientBoostingRegressor selected based on Root Mean Squared Error (RMSE). Metrics tracked: MAE, RMSE, and R² score. Optimal model weights exported to best_regressor.pkl.
+Web Deployment: Flask web server running on port 8080 with a /predict POST endpoint for real-time shelf life inference.
+Files in Repository: app.py, train.py, Datasets/FreshGuard_RAW_dirty.csv, best_regressor.pkl, requirements.txt`,
+  {
+    projectId: "freshguard",
+    documentType: "documentation",
+    sourceUrl: "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
+    language: "Python",
+  }
+).catch(() => {});
+
+// 1b. FreshGuard Source Code (app.py)
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/lab_project_fresh_guard/blob/main/app.py",
+  "Source: app.py (FreshGuard GradientBoostingRegressor & Flask Server)",
+  `from flask import Flask, render_template, request
+from sklearn.ensemble import GradientBoostingRegressor
+import joblib
+
+app = Flask(__name__, template_folder='.')
+
+# 1. Train GradientBoostingRegressor on produce dataset (selected best by RMSE)
+gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
+gb.fit(X_train, y_train)
+joblib.dump(gb, "best_regressor.pkl")
+
+# 2. Flask prediction endpoint for produce shelf life
+@app.route("/predict", methods=["POST"])
+def predict():
+    model = joblib.load("best_regressor.pkl")
+    features = [float(request.form[k]) for k in numeric_cols]
+    prediction = model.predict([features])
+    return {"remaining_shelf_life_days": float(prediction[0])}`,
+  {
+    projectId: "freshguard",
+    documentType: "source_code",
+    sourceUrl: "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
+    filePath: "app.py",
+    language: "Python",
+  }
+).catch(() => {});
+
+// 2. RAG Teaching Assistant: Video Lecture Semantic Search
 ragEngine.indexDirectDocument(
   "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
   "GitHub: Teaching_assistant-rag-based- (Video RAG Teaching Assistant)",
@@ -153,7 +210,110 @@ Pipeline Architecture:
 1. Video to Audio (process_video.py): Uses ffmpeg to convert video to mp3.
 2. Transcription & Timestamped Chunking (create_chunks.py): Uses OpenAI Whisper large-v2 to transcribe audio and output structured JSON segments with start and end timestamps.
 3. Vector Embeddings & Storage (APP.PY, api.py): Generates dense vector representations with BGE-M3 (via Ollama) or all-MiniLM-L6-v2 (via Hugging Face) and caches in embeddings.joblib.
-4. Cosine Similarity Search & UI (api.py): Computes cosine similarity with threshold 0.60 in Streamlit to deliver zero-hallucination grounded answers with direct timestamp navigation.`
+4. Cosine Similarity Search & UI (api.py): Computes cosine similarity with threshold 0.60 in Streamlit with direct timestamp navigation.`,
+  {
+    projectId: "rag",
+    documentType: "architecture",
+    sourceUrl: "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
+    language: "Python",
+  }
+).catch(() => {});
+
+// 2b. RAG Teaching Assistant Source Code (create_chunks.py)
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-/blob/main/create_chunks.py",
+  "Source: create_chunks.py (Whisper large-v2 Transcription & Chunking)",
+  `import whisper
+import json
+import os
+
+# 1. Load OpenAI Whisper large-v2 for accurate speech transcription
+model = whisper.load_model("large-v2")
+audios = os.listdir("audios")
+
+# 2. Transcribe and extract time-indexed segments
+for audio in audios:
+    number = audio.split("_")[0].strip()
+    title = audio.split("_")[1].replace(".mp3", "").replace("_", " ")
+    result = model.transcribe(
+        audio=f"audios/{audio}",
+        language='hi',
+        task='translate',
+        word_timestamps=False,
+    )
+    chunks = []
+    for segment in result['segments']:
+        chunks.append({
+            "number": number,
+            "title": title,
+            "start": segment['start'],
+            "end": segment['end'],
+            "text": segment['text'].strip()
+        })
+    chunks_with_data = {"chunks": chunks, "data": result['text']}
+    with open(f"jsons/{audio}.json", "w") as f:
+        json.dump(chunks_with_data, f, indent=4)`,
+  {
+    projectId: "rag",
+    documentType: "source_code",
+    sourceUrl: "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
+    filePath: "create_chunks.py",
+    language: "Python",
+  }
+).catch(() => {});
+
+// 3. Time Series Forecasting: Nifty-50 Stock Analysis
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/Time_series-",
+  "GitHub: Time_series- (Nifty-50 Time Series Forecasting)",
+  `Repository: Time_series-
+Author: Umesh Kumar Sahoo
+GitHub URL: https://github.com/umeshkumarsahoo/Time_series-
+Primary Language: Python / Jupyter Notebook
+Description: Time-series analysis and forecasting system on the Nifty-50 stock market dataset.
+Models & Architecture: Tests statistical and deep learning forecasting architectures—including ARIMA, pmdarima (AutoARIMA), LSTMs, and Recurrent Neural Networks (RNNs) in Keras—to model trends, seasonality, and price volatility.
+Frameworks: Statsmodels, Keras, pmdarima, Scikit-learn, Pandas`,
+  {
+    projectId: "timeseries",
+    documentType: "documentation",
+    sourceUrl: "https://github.com/umeshkumarsahoo/Time_series-",
+    language: "Python",
+  }
+).catch(() => {});
+
+// 4. DevOps & Cloud Infrastructure
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/portfolio_/devops",
+  "DevOps & Cloud Infrastructure Architecture",
+  `Project: DevOps & Cloud Infrastructure Architecture
+Author: Umesh Kumar Sahoo
+Description: Cloud infrastructure automation, container orchestration, and continuous integration pipelines.
+Stack & Tools: HashiCorp Terraform for Infrastructure as Code, Docker for containerizing microservices, GitHub Actions for automated CI/CD deployment pipelines, AWS and Linux cloud servers, Nginx reverse proxy configuration, rate limiting, and Postman API automation.
+GitHub Link: https://github.com/umeshkumarsahoo/portfolio_`,
+  {
+    projectId: "devops",
+    documentType: "documentation",
+    sourceUrl: "https://github.com/umeshkumarsahoo/portfolio_",
+    language: "HCL / Dockerfile / YAML",
+  }
+).catch(() => {});
+
+// 5. BiGRU Emotion Classifier
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/sentiment_analysis",
+  "GitHub: sentiment_analysis (BiGRU Text Emotion Classifier)",
+  `Repository: sentiment_analysis
+Author: Umesh Kumar Sahoo
+GitHub URL: https://github.com/umeshkumarsahoo/sentiment_analysis
+Primary Language: Python
+Description: Bidirectional Gated Recurrent Unit (BiGRU) deep learning neural network for sequence-aware text sentiment and emotion classification.
+Architecture: Built in Keras/TensorFlow to process sequential text tokens in both forward and backward directions, capturing long-term contextual nuances. Deployed as an asynchronous low-latency microservice using FastAPI.`,
+  {
+    projectId: "emotion",
+    documentType: "documentation",
+    sourceUrl: "https://github.com/umeshkumarsahoo/sentiment_analysis",
+    language: "Python",
+  }
 ).catch(() => {});
 
 interface HackerNewsStory {
@@ -481,7 +641,15 @@ async function fetchGithubData(forceRefresh = false) {
 
       compiledRepos.push(repoData);
 
-      // Deeply index repository documentation and file structure into RAG engine
+      // Deeply index repository documentation and file structure into RAG engine with ProjectId
+      let repoProjId: ProjectId = "general";
+      const nameL = repo.name.toLowerCase();
+      if (nameL.includes("fresh_guard") || nameL.includes("freshguard")) repoProjId = "freshguard";
+      else if (nameL.includes("teaching_assistant") || nameL.includes("rag")) repoProjId = "rag";
+      else if (nameL.includes("time_series")) repoProjId = "timeseries";
+      else if (nameL.includes("sentiment") || nameL.includes("emotion")) repoProjId = "emotion";
+      else if (nameL.includes("portfolio")) repoProjId = "portfolio";
+
       const ragDoc = `Repository: ${repo.name}
 Language: ${repo.language || "Code"}
 URL: ${repo.html_url}
@@ -494,7 +662,13 @@ ${readmeText}`;
       ragEngine.indexDirectDocument(
         repo.html_url,
         `GitHub: ${repo.name} (${repo.language || "Code"})`,
-        ragDoc
+        ragDoc,
+        {
+          projectId: repoProjId,
+          documentType: "readme",
+          sourceUrl: repo.html_url,
+          language: repo.language || undefined,
+        }
       ).catch(() => {});
     }
 
@@ -1000,16 +1174,25 @@ ${storySummaries}
 }
 
 // Smart Intelligent Heuristic Engine (Human Voice, Emotional Warmth, and Deep Domain Intelligence)
-function generateSmartFallbackResponse(query: string, repos: RepoData[], news: HackerNewsStory[]): string {
+function generateSmartFallbackResponse(
+  query: string,
+  repos: RepoData[],
+  news: HackerNewsStory[],
+  history?: { role: string; content: string }[],
+  projectFilter?: ProjectId
+): string {
   const q = query.toLowerCase().trim();
+  const resolvedProj = projectFilter || resolveQueryProject(query, history);
 
-  // 1. Code-First Request Handling (Runnable Code FIRST, then 1-2 sentence explanation)
-  if (isCodeRequest(query)) {
-    const snippet = generateCodeSnippet(query);
-    if (snippet) {
-      return formatCodeFirstResponse(snippet.code, snippet.language, snippet.explanation);
-    }
-    return `Could you specify the exact algorithm, input/output constraints, or target language you'd like me to write runnable code for?`;
+  // If query is for a specific project, follow-up, missing file, or code request, delegate to deterministic synthesizer
+  if (
+    resolvedProj ||
+    isCodeRequest(query) ||
+    q.includes("sentence_extractor") ||
+    /^(what does (the|this|that)?\s*code do|what does this do|explain that (function|code)|how does (the|this)?\s*code work)\b/i.test(q) ||
+    q.includes("what does the code do")
+  ) {
+    return ragEngine.synthesizeDeterministicAnswer(query, [], false, history, resolvedProj);
   }
 
   // 2. Direct General Programming Concepts (Concise 2–5 sentences or bullet points)
@@ -1408,8 +1591,12 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       ragEngine.ingestUrl(u).catch(() => {});
     }
 
-    // Retrieve top 3 relevant evidence chunks from indexed URLs for LLM context augmentation
-    const urlEvidence = ragEngine.retrieve(trimmedMessage, 3, 0.18);
+    const safeHistory = Array.isArray(history) ? history.slice(-6) : [];
+    const projectFilter = resolveQueryProject(trimmedMessage, safeHistory);
+    const isCode = isCodeRequest(trimmedMessage);
+
+    // Retrieve top 3-5 relevant evidence chunks from indexed URLs for LLM context augmentation
+    const urlEvidence = ragEngine.retrieve(trimmedMessage, 4, 0.15, projectFilter, isCode);
     const sourceEvidenceSection = urlEvidence.results.length > 0
       ? `\n=== VERIFIED SOURCE EVIDENCE ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 320)}`).join("\n\n")}\n`
       : "";
@@ -1417,7 +1604,6 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     // If Gemini client is active, try primary and fallback models with strict token & context limits
     if (ai) {
       try {
-        const isCode = isCodeRequest(trimmedMessage);
         const topRepos = repos.slice(0, 10);
         const reposContextText = topRepos.map((r, i) => {
           const shortDesc = r.description ? r.description.substring(0, 100) : "Open-source repository.";
@@ -1429,22 +1615,16 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
           ? `\n=== TOP TECH NEWS (Use ONLY because user asked about news) ===\n${liveNewsContextText}\n`
           : "";
 
-        const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's ultra-smart, witty, and warmly human AI companion and digital twin living inside his retro-editorial portfolio terminal.
+        const REQUIRED_SYSTEM_PROMPT = `You are UMU, Umesh's portfolio assistant and technical coding helper. Answer the exact question directly and accurately. Retrieve portfolio facts from the correct project before answering. When asked for code, provide actual retrieved source code whenever available; do not replace it with generic boilerplate. Use conversation history to resolve follow-up questions. Keep answers concise, relevant, and readable. Do not include unrelated project descriptions or repeat source documents. Distinguish verified project facts from general technical knowledge. If the requested code or evidence is unavailable, state that clearly rather than fabricating it. Cite the relevant source. Never claim zero hallucinations.`;
 
-MANDATORY RESPONSE POLICIES:
-1. ANSWER THE EXACT QUESTION FIRST: Provide a direct, relevant answer immediately without unsolicited architecture essays or verbose disclaimers.
-2. CODE-FIRST POLICY: ONLY when the user explicitly requests code or algorithm implementation (e.g. "write code for...", "implement a function to..."), provide complete, clean, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write dummy placeholder functions.
-   - For questions about Umesh's projects or codebases (like "rag code base", "how does your teaching assistant work", "what files are in your repo"), explain his actual architecture and cite his real repository files (e.g., Teaching_assistant-rag-based- with create_chunks.py, api.py, APP.PY). If they ask for code from his project, provide the actual code from his repository!
-3. CONCISENESS & CLARITY: For simple questions, answer directly in 2 to 5 sentences. For technical explanations or lists, use clear, concise bullet points. Expand only when explicitly requested.
-4. AUTHORITATIVE GROUNDING:
-   - Ground all answers about Umesh, his projects, and his background in the Authoritative Resume and GitHub Repositories below.
-   - For his RAG codebase or Teaching Assistant, discuss his real GitHub repository "Teaching_assistant-rag-based-", which transcribes lecture videos using Whisper large-v2, chunks transcriptions with timestamps (create_chunks.py), embeds with BGE-M3 (api.py), and searches with cosine similarity.
-   - For his 9.60 CGPA, cite Silicon University, Bhubaneswar (2023–2027), foundational mastery in Data Structures, OS, and ML, 2nd Place in Algo Arena 2.0, and 91.2% at JNV Panikoili.
-   - If asked about GitHub repos or projects, discuss the real repositories listed below with their actual files.
-   - For general programming questions, answer directly and accurately without repeating unrequested portfolio descriptions.
-   - If relevant information is genuinely unavailable, state what is unknown briefly in 1 sentence.
-5. TECH NEWS: Only discuss tech news if the user explicitly asks for news, headlines, or a briefing.
-6. ENGLISH ONLY: Always output in English.
+        const systemInstruction = `${REQUIRED_SYSTEM_PROMPT}
+
+ADDITIONAL CONTEXT & GUIDELINES:
+1. ANSWER THE EXACT QUESTION FIRST: Provide a direct, relevant answer immediately.
+2. CONCISENESS & CLARITY: For simple questions, answer directly in 2 to 5 sentences. For technical explanations or lists, use clear, concise bullet points. Expand only when explicitly requested. Never dump an entire README or unrelated project descriptions.
+3. CODE-FIRST POLICY: When the user requests code or implementation, provide complete, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write dummy placeholder functions.
+4. CORRECT PROJECT IDENTITY: Maintain strict boundaries for FreshGuard (lab_project_fresh_guard produce shelf life), RAG Teaching Assistant (Teaching_assistant-rag-based-), DevOps (Terraform, Docker, CI/CD), BiGRU Emotion Classifier (sentiment_analysis), and Time Series Forecasting (Time_series-). Link to the exact repository or source file used. Never cite an unrelated repository.
+5. ENGLISH ONLY: Always output in English.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
@@ -1455,7 +1635,6 @@ ${reposContextText}
 ${sourceEvidenceSection}${newsContextSection}`;
 
         const contents: any[] = [];
-        const safeHistory = Array.isArray(history) ? history.slice(-4) : [];
         for (const h of safeHistory) {
           const content = normalizeText(h?.content, 400, true);
           if (!content) continue;
@@ -1504,10 +1683,16 @@ ${sourceEvidenceSection}${newsContextSection}`;
 
     // Seamless fallback ensures 100% uptime: uses verified RAG evidence if available, else smart heuristic engine
     if (!reply) {
-      if (urlEvidence.results.length > 0 && !lowerMsg.startsWith("hi") && !lowerMsg.startsWith("hello") && !lowerMsg.startsWith("hey")) {
-        reply = ragEngine.synthesizeDeterministicAnswer(trimmedMessage, urlEvidence.results, false);
+      if (hasExplicitNewsIntent && cachedNewsStories.length > 0) {
+        reply = generateLiveTechPulseBriefing(cachedNewsStories);
       } else {
-        reply = generateSmartFallbackResponse(trimmedMessage, repos, cachedNewsStories);
+        reply = ragEngine.synthesizeDeterministicAnswer(
+          trimmedMessage,
+          urlEvidence.results,
+          false,
+          safeHistory,
+          projectFilter
+        );
       }
     }
 

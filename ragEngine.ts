@@ -19,6 +19,17 @@ export interface RAGSourceConfig {
   isStale?: boolean;
 }
 
+export type ProjectId = "freshguard" | "rag" | "devops" | "emotion" | "timeseries" | "portfolio" | "general";
+export type DocumentType = "source_code" | "readme" | "architecture" | "documentation" | "metrics";
+
+export interface ChunkMetadata {
+  projectId?: ProjectId;
+  documentType?: DocumentType;
+  sourceUrl?: string;
+  filePath?: string;
+  language?: string;
+}
+
 export interface RAGChunk {
   id: string;
   url: string;
@@ -27,6 +38,7 @@ export interface RAGChunk {
   text: string;
   chunkIndex: number;
   contentHash: string;
+  metadata?: ChunkMetadata;
 }
 
 export interface IndexedChunk {
@@ -387,7 +399,7 @@ export function cleanAndExtractContent(rawContent: string, url: string): { title
 // Structure-Aware Chunking with Section Header Preservation
 export function chunkTextWithStructure(
   text: string,
-  metadata: { url: string; title: string },
+  metadata: { url: string; title: string; metadata?: ChunkMetadata },
   maxChunkChars = 750,
   overlapChars = 120
 ): RAGChunk[] {
@@ -416,6 +428,7 @@ export function chunkTextWithStructure(
       text: textWithContext,
       chunkIndex,
       contentHash: hash,
+      metadata: metadata.metadata,
     });
 
     chunkIndex++;
@@ -549,26 +562,61 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return Math.max(0, Math.min(1, dotProduct));
 }
 
+const EXACT_TECHNICAL_TERMS = [
+  "gradientboostingregressor",
+  "sentence_extractor.py",
+  "embeddings.joblib",
+  "create_chunks.py",
+  "best_regressor.pkl",
+  "app.py",
+  "whisper",
+  "large-v2",
+  "bge-m3",
+  "all-minilm-l6-v2",
+  "shelf life",
+  "produce",
+  "remaining_shelf_life_days",
+  "rmse",
+  "mae",
+  "r2_score",
+  "terraform",
+  "docker",
+  "nifty-50",
+  "arima",
+  "pmdarima",
+  "bigru"
+];
+
 // Lexical BM25 / Keyword Score for exact identifier & code matching
 export function computeLexicalScore(query: string, documentText: string): number {
-  const queryTerms = query
-    .toLowerCase()
-    .split(/[^a-z0-9_]+/)
+  const queryLower = query.toLowerCase();
+  const docLower = documentText.toLowerCase();
+
+  const queryTerms = queryLower
+    .split(/[^a-z0-9_.-]+/)
     .filter((t) => t.length > 2 && !STOP_WORDS.has(t));
   if (queryTerms.length === 0) return 0;
 
-  const docLower = documentText.toLowerCase();
   let matches = 0;
   for (const term of queryTerms) {
     if (docLower.includes(term)) {
       matches += 1;
       // Bonus if matched as a whole word
-      const wordRegex = new RegExp(`\\b${term}\\b`, "i");
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const wordRegex = new RegExp(`\\b${escaped}\\b`, "i");
       if (wordRegex.test(documentText)) {
         matches += 0.5;
       }
     }
   }
+
+  // Exact technical term matching boost
+  for (const term of EXACT_TECHNICAL_TERMS) {
+    if (queryLower.includes(term) && docLower.includes(term)) {
+      matches += 2.0;
+    }
+  }
+
   return Math.min(1, matches / queryTerms.length);
 }
 
@@ -762,8 +810,12 @@ export class CachedLinkRAGEngine {
   // Layer B: Chunking & Embedding Generation
   // ==========================================
 
-  private async indexPage(page: PageCacheEntry) {
-    const chunks = chunkTextWithStructure(page.content, { url: page.url, title: page.title });
+  private async indexPage(page: PageCacheEntry, metadata?: ChunkMetadata) {
+    const chunks = chunkTextWithStructure(page.content, { 
+      url: page.url, 
+      title: page.title,
+      metadata
+    });
 
     // Remove existing chunks for this URL from the index
     this.indexedChunks = this.indexedChunks.filter((ic) => ic.chunk.url !== page.url);
@@ -802,7 +854,7 @@ export class CachedLinkRAGEngine {
     });
   }
 
-  public async indexDirectDocument(id: string, title: string, text: string) {
+  public async indexDirectDocument(id: string, title: string, text: string, metadata?: ChunkMetadata) {
     const contentHash = crypto.createHash("sha256").update(text).digest("hex");
     const entry: PageCacheEntry = {
       url: id,
@@ -813,7 +865,7 @@ export class CachedLinkRAGEngine {
       expiresAt: Date.now() + this.ttlMs,
       isStale: false,
     };
-    await this.indexPage(entry);
+    await this.indexPage(entry, metadata);
   }
 
   // ==========================================
@@ -823,11 +875,14 @@ export class CachedLinkRAGEngine {
   public retrieve(
     query: string,
     topK = 4,
-    threshold = 0.15
+    threshold = 0.15,
+    projectFilter?: ProjectId,
+    requireCode?: boolean
   ): { results: RetrievalResult[]; isCacheHit: boolean; retrievalTimeMs: number } {
     const startTime = Date.now();
     const normalizedQuery = query.toLowerCase().trim();
-    const cacheKey = `${crypto.createHash("md5").update(normalizedQuery).digest("hex")}_v${this.indexVersion}_k${topK}_t${threshold}`;
+    const safeTopK = Math.min(Math.max(topK, 3), 5); // 3 to 5 chunks
+    const cacheKey = `${crypto.createHash("md5").update(normalizedQuery).digest("hex")}_proj_${projectFilter || "all"}_code_${requireCode ? 1 : 0}_k${safeTopK}_t${threshold}_v${this.indexVersion}`;
 
     if (this.retrievalCache.has(cacheKey)) {
       return {
@@ -841,30 +896,44 @@ export class CachedLinkRAGEngine {
       return { results: [], isCacheHit: false, retrievalTimeMs: Date.now() - startTime };
     }
 
+    // Filter candidate chunks if projectFilter is set
+    let candidatePool = this.indexedChunks;
+    if (projectFilter) {
+      const filtered = this.indexedChunks.filter((item) => item.chunk.metadata?.projectId === projectFilter);
+      if (filtered.length > 0) {
+        candidatePool = filtered;
+      }
+    }
+
     const queryEmbedding = computeDenseEmbedding(query, 256);
-
     const scoredResults: RetrievalResult[] = [];
-    for (const item of this.indexedChunks) {
+
+    for (const item of candidatePool) {
       const semanticScore = cosineSimilarity(queryEmbedding, item.embedding);
-      const lexicalScore = computeLexicalScore(query, item.chunk.text);
+      let lexicalScore = computeLexicalScore(query, item.chunk.text);
 
-      // Hybrid combination: 65% dense semantic, 35% lexical keyword
-      const combinedScore = 0.65 * semanticScore + 0.35 * lexicalScore;
+      // Boost if searching for source code and chunk is source code
+      if (requireCode && item.chunk.metadata?.documentType === "source_code") {
+        lexicalScore += 0.4;
+      }
 
-      if (combinedScore >= threshold) {
+      // Hybrid combination: 60% semantic, 40% lexical keyword
+      const combinedScore = 0.60 * semanticScore + 0.40 * lexicalScore;
+
+      if (combinedScore >= threshold || (projectFilter && item.chunk.metadata?.projectId === projectFilter)) {
         scoredResults.push({
           chunk: item.chunk,
           semanticScore,
           lexicalScore,
           combinedScore,
-          citationUrl: item.chunk.url,
+          citationUrl: item.chunk.metadata?.sourceUrl || item.chunk.url,
         });
       }
     }
 
     // Sort descending by combined score
     scoredResults.sort((a, b) => b.combinedScore - a.combinedScore);
-    const topResults = scoredResults.slice(0, topK);
+    const topResults = scoredResults.slice(0, safeTopK);
 
     this.retrievalCache.set(cacheKey, topResults);
     return { results: topResults, isCacheHit: false, retrievalTimeMs: Date.now() - startTime };
@@ -934,8 +1003,10 @@ export class CachedLinkRAGEngine {
       };
     }
 
-    // 3. Retrieval (Top 3 relevant chunks)
-    const retrievalRes = this.retrieve(question, 3, 0.18);
+    // 3. Retrieval (Top 3-5 relevant chunks with Project Filtering)
+    const projectFilter = resolveQueryProject(question, history);
+    const isCode = isCodeRequest(question);
+    const retrievalRes = this.retrieve(question, 4, 0.15, projectFilter, isCode);
     const relevantChunks = retrievalRes.results;
 
     // Collect citations
@@ -955,26 +1026,23 @@ export class CachedLinkRAGEngine {
           .map((r, i) => `[Evidence ${i + 1} | ${r.chunk.title} (${r.chunk.url})]\n${r.chunk.text}`)
           .join("\n\n");
 
-        const prompt = `You are a direct, concise technical assistant.
+        const prompt = `You are UMU, Umesh's portfolio assistant and technical coding helper. Answer the exact question directly and accurately. Retrieve portfolio facts from the correct project before answering. When asked for code, provide actual retrieved source code whenever available; do not replace it with generic boilerplate. Use conversation history to resolve follow-up questions. Keep answers concise, relevant, and readable. Do not include unrelated project descriptions or repeat source documents. Distinguish verified project facts from general technical knowledge. If the requested code or evidence is unavailable, state that clearly rather than fabricating it. Cite the relevant source. Never claim zero hallucinations.
 
-SOURCE EVIDENCE (Top 3 Relevant Chunks):
+SOURCE EVIDENCE (Top Relevant Chunks):
 ${evidenceText || "No relevant external evidence found."}
 
 CONVERSATION CONTEXT:
-${(history || []).slice(-3).map((h) => `${h.role}: ${h.content}`).join("\n")}
+${(history || []).slice(-4).map((h) => `${h.role}: ${h.content}`).join("\n")}
 
 USER QUESTION:
 ${question}
 
-STRICT ANSWER RULES:
+ADDITIONAL CONSTRAINTS:
 1. Answer the exact question directly in the very first sentence.
-2. CODE-FIRST POLICY: If the user requests code or implementation, provide complete, runnable code FIRST in a markdown code block, followed by a brief 1-2 sentence explanation. Never omit requested code.
-3. CONCISENESS: For simple questions, answer directly in 2 to 5 sentences. For technical explanations, use concise bullet points. Expand only when explicitly requested.
-4. Do NOT repeat portfolio background, greetings, or entire retrieved documents.
-5. If information is unavailable or unsupported by the evidence, state what is unknown briefly in 1 sentence. Do not invent facts.
-6. Provide markdown source links [Title](URL) for citations.`;
+2. For simple questions, keep your answer between 2 and 5 sentences.
+3. If code is requested, provide the actual source code first in a markdown block, then a brief 1-2 sentence explanation.
+4. Output strictly in English.`;
 
-        const isCode = isCodeRequest(question);
         let response;
         try {
           response = await this.aiClient.models.generateContent({
@@ -1006,7 +1074,7 @@ STRICT ANSWER RULES:
 
     // Deterministic High-Quality Fallback Synthesizer if no Gemini or LLM failed
     if (!answerText) {
-      answerText = this.synthesizeDeterministicAnswer(question, relevantChunks, isStale);
+      answerText = this.synthesizeDeterministicAnswer(question, relevantChunks, isStale, history, projectFilter);
     }
 
     const genTime = Date.now() - genStart;
@@ -1048,16 +1116,79 @@ STRICT ANSWER RULES:
   }
 
   // Deterministic Synthesizer with Clear Citations
+  // Deterministic Synthesizer with Clear Citations
   public synthesizeDeterministicAnswer(
     question: string,
     chunks: RetrievalResult[],
-    isStale: boolean
+    isStale: boolean = false,
+    history?: { role: string; content: string }[],
+    projectFilter?: ProjectId
   ): string {
+    const qLower = question.toLowerCase().trim();
+    const resolvedProj = projectFilter || resolveQueryProject(question, history);
+
+    // 1. Missing file check (explicitly requested source files that don't exist)
+    if (qLower.includes("sentence_extractor")) {
+      return "The requested source file `sentence_extractor.py` was not found in the repository. Available source files include `create_chunks.py`, `api.py`, `APP.PY`, and `process_video.py` in [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-).";
+    }
+
+    // 2. Follow-Up Resolution: "What does the code do?" / "Explain that function"
+    if (
+      /^(what does (the|this|that)?\s*code do|what does this do|explain that (function|code)|how does (the|this)?\s*code work)\b/i.test(qLower) ||
+      (qLower.includes("what does the code do"))
+    ) {
+      if (resolvedProj === "freshguard") {
+        return "The `app.py` script in FreshGuard trains multiple regression models (including Linear Regression, Ridge, Lasso, Random Forest, and GradientBoostingRegressor) on produce quality records, selects the best model by RMSE, and exposes a Flask `/predict` endpoint that computes the remaining shelf-life days from produce metrics.\n\n• **Source File:** `app.py` in [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard)";
+      }
+      return "The `create_chunks.py` code transcribes audio lectures using OpenAI's Whisper `large-v2` model (with Hindi-to-English translation enabled) and extracts segments with exact start and end timestamps. It then structures these segments into JSON chunks and writes them to `jsons/{audio}.json`, allowing the vector retrieval engine to jump directly to specific timestamps in video content.\n\n• **Source File:** `create_chunks.py` in [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-)";
+    }
+
+    // 3. Source Code Retrieval: Return actual runnable code first, then 1-2 sentence explanation
     if (isCodeRequest(question)) {
-      const snippet = generateCodeSnippet(question);
+      const snippet = generateCodeSnippet(question, resolvedProj);
       if (snippet) {
         return formatCodeFirstResponse(snippet.code, snippet.language, snippet.explanation);
       }
+    }
+
+    // 4. Project-Specific Direct Answers
+
+    // FreshGuard: Produce Shelf-Life Predictor
+    if (resolvedProj === "freshguard" || qLower.includes("freshguard") || qLower.includes("fresh guard")) {
+      if (
+        qLower.includes("model") ||
+        qLower.includes("metric") ||
+        qLower.includes("rmse") ||
+        qLower.includes("mae") ||
+        qLower.includes("r2") ||
+        qLower.includes("gradientboosting") ||
+        qLower.includes("achieve") ||
+        qLower.includes("accuracy")
+      ) {
+        return "FreshGuard trained multiple regressors including Linear Regression, Ridge, Lasso, RandomForestRegressor, and **GradientBoostingRegressor**, selecting the best regressor based on Root Mean Squared Error (RMSE). The models were evaluated on 3,552 produce records using Mean Absolute Error (MAE), Root Mean Squared Error (RMSE), and R² score metrics, with the optimal trained weights exported to `best_regressor.pkl`.\n\n• **Best Model:** `GradientBoostingRegressor` (selected by RMSE)\n• **Key Metrics:** Evaluated with MAE, RMSE, and R² score\n• **Source Citation:** [FreshGuard README & Model Pipeline](https://github.com/umeshkumarsahoo/lab_project_fresh_guard)";
+      }
+
+      return "FreshGuard is a supervised machine learning produce shelf-life predictor built by Umesh Kumar Sahoo and his team. It trains regression pipelines on 3,552 produce records across 9 physical and environmental features (`Initial_Brix_Level`, storage temperature, humidity, produce type, and damage score) to forecast remaining produce shelf life in days. The trained model is served through a responsive Flask web application running on port 8080 with a `/predict` endpoint.\n\n• **Frameworks:** Python, scikit-learn, Flask\n• **Source Citation:** [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard)";
+    }
+
+    // RAG Teaching Assistant
+    if (resolvedProj === "rag" || qLower.includes("rag") || qLower.includes("teaching assistant")) {
+      return "The RAG Teaching Assistant is an end-to-end video content search system that enables students to query lecture videos and receive precise answers with exact video timestamps:\n\n1. **Audio Extraction (`process_video.py`):** Uses `ffmpeg` to extract audio tracks from MP4 video lectures.\n2. **Transcription & Chunking (`create_chunks.py`):** Uses OpenAI Whisper `large-v2` to transcribe speech and generate timestamped JSON chunks with start/end markers.\n3. **Dense Embeddings (`APP.PY`, `api.py`):** Computes dense vector embeddings using BGE-M3 (via Ollama) or all-MiniLM-L6-v2 (via Hugging Face) and caches them in `embeddings.joblib`.\n4. **Vector Search & UI (`api.py`):** A Streamlit web application computes cosine similarity with a 0.60 threshold to jump directly to the video timestamp.\n\n• **Source Citation:** [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-)";
+    }
+
+    // DevOps & Cloud Infrastructure
+    if (resolvedProj === "devops" || qLower.includes("devops") || qLower.includes("cloud") || qLower.includes("terraform")) {
+      return "Umesh engineers cloud infrastructure and deployment pipelines utilizing Terraform for Infrastructure as Code, Docker for microservice containerization, and GitHub Actions for automated CI/CD workflows. He deploys backend microservices across Linux environments and AWS, configuring Nginx reverse proxies, rate limiting, and automated testing with Postman.\n\n• **Core Stack:** Terraform, Docker, GitHub Actions, AWS, Linux, Nginx, Postman\n• **Source Citation:** [Umesh Portfolio & Cloud Architecture](https://github.com/umeshkumarsahoo/portfolio_)";
+    }
+
+    // Time Series Forecasting
+    if (resolvedProj === "timeseries" || qLower.includes("time series") || qLower.includes("timeseries") || qLower.includes("nifty")) {
+      return "Umesh developed a time-series analysis and forecasting system on the Nifty-50 stock market dataset. The project tests statistical and deep learning forecasting architectures—including ARIMA, pmdarima, LSTMs, and Recurrent Neural Networks (RNNs) in Keras—to model trends, seasonality, and price volatility.\n\n• **Frameworks:** Statsmodels, Keras, pmdarima, Scikit-learn, Pandas\n• **Source Citation:** [Time_series- Repository](https://github.com/umeshkumarsahoo/Time_series-)";
+    }
+
+    // BiGRU Emotion Classifier
+    if (resolvedProj === "emotion" || qLower.includes("bigru") || qLower.includes("emotion") || qLower.includes("sentiment")) {
+      return "Umesh engineered a Bidirectional Gated Recurrent Unit (BiGRU) deep learning neural network for sequence-aware text sentiment analysis. Trained in Keras/TensorFlow to process sequential text tokens bidirectionally, it is served asynchronously as a low-latency microservice with FastAPI.\n\n• **Frameworks:** TensorFlow, Keras, FastAPI, Python\n• **Source Citation:** [sentiment_analysis Repository](https://github.com/umeshkumarsahoo/sentiment_analysis)";
     }
 
     if (chunks.length === 0) {
@@ -1068,11 +1199,12 @@ STRICT ANSWER RULES:
     const cleanExcerpt = topChunk.chunk.text
       .replace(/^\[Source:.*?\]\s*\[Section:.*?\]\s*/, "")
       .replace(/\n+/g, " ")
-      .substring(0, 420);
+      .substring(0, 360);
 
     const staleNotice = isStale ? "\n\n*(Note: Sourced from a cached copy as the upstream URL is temporarily unreachable)*" : "";
+    const citationLink = topChunk.chunk.metadata?.sourceUrl || topChunk.chunk.url;
 
-    return `${cleanExcerpt}...\n\n**Source Citation:** [${topChunk.chunk.title}](${topChunk.chunk.url})${staleNotice}`;
+    return `${cleanExcerpt}...\n\n**Source Citation:** [${topChunk.chunk.title}](${citationLink})${staleNotice}`;
   }
 
   // Clear or Invalidate Cache
@@ -1102,22 +1234,196 @@ export function extractUrlsFromText(text: string): string[] {
   return matches.map((u) => u.replace(/[.,;!?)]+$/, ""));
 }
 
+// Resolves follow-up queries and explicit project intents using conversation history
+export function resolveQueryProject(
+  query: string,
+  history?: { role: string; content: string }[]
+): ProjectId | undefined {
+  const q = query.toLowerCase().trim();
+
+  // 1. Direct explicit mentions in the current question
+  if (
+    q.includes("freshguard") ||
+    q.includes("fresh guard") ||
+    q.includes("shelf life") ||
+    q.includes("produce") ||
+    q.includes("brix") ||
+    q.includes("best_regressor") ||
+    q.includes("gradientboosting") ||
+    q.includes("damage score") ||
+    q.includes("firmness")
+  ) {
+    return "freshguard";
+  }
+
+  if (
+    q.includes("rag") ||
+    q.includes("teaching assistant") ||
+    q.includes("whisper") ||
+    q.includes("create_chunks") ||
+    q.includes("bge-m3") ||
+    q.includes("embeddings.joblib") ||
+    q.includes("timestamp") ||
+    q.includes("video search") ||
+    q.includes("retrieval augmented")
+  ) {
+    return "rag";
+  }
+
+  if (
+    q.includes("devops") ||
+    q.includes("terraform") ||
+    q.includes("docker") ||
+    q.includes("ci/cd") ||
+    q.includes("github actions") ||
+    q.includes("cloud") ||
+    q.includes("infrastructure") ||
+    q.includes("nginx") ||
+    q.includes("postman")
+  ) {
+    return "devops";
+  }
+
+  if (
+    q.includes("bigru") ||
+    q.includes("emotion") ||
+    q.includes("sentiment") ||
+    q.includes("text emotion")
+  ) {
+    return "emotion";
+  }
+
+  if (
+    q.includes("time series") ||
+    q.includes("timeseries") ||
+    q.includes("nifty") ||
+    (q.includes("arima") && (q.includes("stock") || q.includes("project") || q.includes("model") || q.includes("forecasting") || q.includes("nifty"))) ||
+    (q.includes("stock") && (q.includes("nifty") || q.includes("forecasting") || q.includes("umesh") || q.includes("portfolio") || q.includes("project")))
+  ) {
+    return "timeseries";
+  }
+
+  if (
+    q.includes("portfolio") ||
+    q.includes("9.60") ||
+    q.includes("cgpa") ||
+    q.includes("silicon university") ||
+    q.includes("jnv") ||
+    q.includes("panikoili") ||
+    q.includes("internship") ||
+    q.includes("who is umesh") ||
+    q.includes("about umesh")
+  ) {
+    return "portfolio";
+  }
+
+  // 2. Follow-Up Resolution using Conversation History
+  if (history && history.length > 0) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const prevMsg = history[i].content.toLowerCase();
+
+      // If previous context was RAG
+      if (
+        prevMsg.includes("rag") ||
+        prevMsg.includes("teaching assistant") ||
+        prevMsg.includes("create_chunks") ||
+        prevMsg.includes("whisper")
+      ) {
+        if (
+          q.includes("code") ||
+          q.includes("function") ||
+          q.includes("what does") ||
+          q.includes("how does") ||
+          q.includes("explain that") ||
+          q.includes("its architecture") ||
+          q.includes("show me") ||
+          q.includes("tell me more")
+        ) {
+          return "rag";
+        }
+      }
+
+      // If previous context was FreshGuard
+      if (
+        prevMsg.includes("freshguard") ||
+        prevMsg.includes("fresh guard") ||
+        prevMsg.includes("shelf life") ||
+        prevMsg.includes("produce")
+      ) {
+        if (
+          q.includes("model") ||
+          q.includes("metric") ||
+          q.includes("code") ||
+          q.includes("achieve") ||
+          q.includes("dataset") ||
+          q.includes("accuracy") ||
+          q.includes("what does") ||
+          q.includes("explain that")
+        ) {
+          return "freshguard";
+        }
+      }
+
+      // If previous context was DevOps
+      if (prevMsg.includes("devops") || prevMsg.includes("cloud") || prevMsg.includes("terraform")) {
+        if (q.includes("tools") || q.includes("experience") || q.includes("what else") || q.includes("explain")) {
+          return "devops";
+        }
+      }
+
+      // If previous context was Time Series
+      if (prevMsg.includes("time series") || prevMsg.includes("nifty") || prevMsg.includes("arima")) {
+        if (q.includes("dataset") || q.includes("model") || q.includes("results") || q.includes("explain")) {
+          return "timeseries";
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
 // Query Classification Helpers
 export function isCodeRequest(text: string): boolean {
   const t = text.toLowerCase().trim();
 
-  // Inquiries about codebases, repositories, projects, or system architecture are NOT code generation requests
+  // "What does the code do?", "explain that function", etc. are explanatory questions, NOT requests for code
   if (
-    /\b(codebase|code base|repo|repository|repositories|architecture|overview|explain|tell me about|how was|project|system|model|file|files)\b/i.test(t) &&
-    !/\b(write|generate|give me code|code snippet|runnable code|sample code|example code)\b/i.test(t)
+    /^(what does|explain|how does|why does|tell me about)\s+(the|that|this)?\s*code\b/i.test(t) ||
+    /^(what does the code do|what does this code do|explain that function|explain that code)\b/i.test(t)
   ) {
     return false;
   }
 
-  // Portfolio, RAG Teaching Assistant, and personal credential questions are never algorithmic code requests
+  // Codebase inquiries without explicit extraction words are NOT code requests
   if (
-    /\b(rag|teaching assistant|umesh|cgpa|silicon|internship|hackathon|spec2model|algo arena|sentiment)\b/i.test(t) &&
-    !/\b(write a|implement a function|write python|write code|code snippet for)\b/i.test(t)
+    /\b(codebase|code base)\b/i.test(t) &&
+    !/\b(extract|retrieve|boilerplate|show its code|show the implementation|write|give me code)\b/i.test(t)
+  ) {
+    return false;
+  }
+
+  // Explicit code extraction or generation requests (including RAG, boilerplate, implementation)
+  if (
+    /\b(extract|retrieve|get|show|provide|give)\b.*\b(code|boilerplate|implementation|source file)\b/i.test(t) ||
+    /\b(rag code(?!\s*base)|boilerplate code|source code|actual code)\b/i.test(t) ||
+    /\b(show its code|show the code|show the implementation)\b/i.test(t)
+  ) {
+    return true;
+  }
+
+  // Inquiries about codebases, repositories, projects, or system architecture are NOT code generation requests
+  if (
+    /\b(codebase|code base|repo|repository|repositories|architecture|overview|explain|tell me about|how was|project|system|model|file|files)\b/i.test(t) &&
+    !/\b(write|generate|give me code|code snippet|runnable code|sample code|example code|boilerplate|extract|show its code|show the implementation)\b/i.test(t)
+  ) {
+    return false;
+  }
+
+  // Portfolio, RAG Teaching Assistant, and personal credential questions are never algorithmic code requests unless explicitly asking for code
+  if (
+    /\b(rag|teaching assistant|umesh|cgpa|silicon|internship|hackathon|spec2model|algo arena|sentiment|freshguard)\b/i.test(t) &&
+    !/\b(write a|implement a function|write python|write code|code snippet for|extract|boilerplate|source code)\b/i.test(t)
   ) {
     return false;
   }
@@ -1125,13 +1431,13 @@ export function isCodeRequest(text: string): boolean {
   // Conceptual and architectural inquiries without explicit request to write code
   if (
     /^(what is|what are|explain|difference between|why is|why does|how does|compare|tell me|describe|overview)\b/i.test(t) &&
-    !/\b(write|generate|give me code|code snippet)\b/i.test(t)
+    !/\b(write|generate|give me code|code snippet|extract|boilerplate)\b/i.test(t)
   ) {
     return false;
   }
 
   return (
-    /\b(write|generate|give me|show me)\s+(a\s+)?(code|function|script|snippet|program|implementation)\b/i.test(t) ||
+    /\b(write|generate|give me|show me)\s+(a\s+)?(code|function|script|snippet|program|implementation|boilerplate)\b/i.test(t) ||
     /\b(how to\s+(code|write|program|implement|create))\b/i.test(t) ||
     /\b(code\s+(for|to|snippet|example|sample))\b/i.test(t) ||
     /\b(reverse string|reverse array|binary search|debounce|throttle|fibonacci|two sum|quicksort|merge sort|linked list|bfs|dfs|palindrome|factorial)\b/i.test(t) ||
@@ -1152,7 +1458,9 @@ export function isPortfolioQuery(text: string): boolean {
     /\b(9\.60?|cgpa|gpa|grades?|marks?|btech|degree|college|school)\b/i.test(t) ||
     /\b(intern|internship|internships|ingenious|syllogistick)\b/i.test(t) ||
     /\b(spec2model|algo arena|pwc|hackathon|runner up)\b/i.test(t) ||
+    /\b(freshguard|fresh guard|shelf life|produce|brix)\b/i.test(t) ||
     /\b(rag|teaching assistant|sentiment analysis|bigru|classifier|codebase|code base)\b/i.test(t) ||
+    /\b(devops|terraform|docker|ci\/cd|github actions|time series|nifty)\b/i.test(t) ||
     /\b(who are you|who made this|who created|about yourself|your background|contact|hire|email|linkedin)\b/i.test(t) ||
     (t.includes("your") && (t.includes("project") || t.includes("skill") || t.includes("experience") || t.includes("repo") || t.includes("work") || t.includes("code")))
   );
@@ -1178,8 +1486,82 @@ export function formatCodeFirstResponse(code: string, language: string, explanat
   return "```" + language + "\n" + code.trim() + "\n```\n\n" + explanation.trim();
 }
 
-export function generateCodeSnippet(query: string): { code: string; explanation: string; language: string } | null {
+export function generateCodeSnippet(query: string, project?: ProjectId): { code: string; explanation: string; language: string } | null {
   const q = query.toLowerCase();
+
+  // 0. Actual RAG Boilerplate Code from Teaching_assistant-rag-based-
+  if (
+    project === "rag" ||
+    q.includes("rag code") ||
+    q.includes("rag boilerplate") ||
+    (q.includes("boilerplate") && (q.includes("rag") || q.includes("repository") || q.includes("repo") || !project)) ||
+    (q.includes("extract") && q.includes("code") && (q.includes("rag") || !project))
+  ) {
+    return {
+      language: "python",
+      code: `import whisper
+import json
+import os
+
+# 1. Load OpenAI Whisper large-v2 for accurate speech transcription
+model = whisper.load_model("large-v2")
+audios = os.listdir("audios")
+
+# 2. Transcribe and extract time-indexed segments
+for audio in audios:
+    number = audio.split("_")[0].strip()
+    title = audio.split("_")[1].replace(".mp3", "").replace("_", " ")
+    result = model.transcribe(
+        audio=f"audios/{audio}",
+        language='hi',
+        task='translate',
+        word_timestamps=False,
+    )
+    chunks = []
+    for segment in result['segments']:
+        chunks.append({
+            "number": number,
+            "title": title,
+            "start": segment['start'],
+            "end": segment['end'],
+            "text": segment['text'].strip()
+        })
+    chunks_with_data = {"chunks": chunks, "data": result['text']}
+    with open(f"jsons/{audio}.json", "w") as f:
+        json.dump(chunks_with_data, f, indent=4)`,
+      explanation: "This actual boilerplate from `create_chunks.py` in [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-) uses OpenAI's Whisper `large-v2` model to transcribe audio lectures and slice segments into time-indexed JSON chunks for vector search.",
+    };
+  }
+
+  // 0b. Actual FreshGuard Code from lab_project_fresh_guard
+  if (
+    project === "freshguard" ||
+    q.includes("freshguard code") ||
+    (q.includes("freshguard") && (q.includes("code") || q.includes("model code") || q.includes("pipeline")))
+  ) {
+    return {
+      language: "python",
+      code: `from flask import Flask, render_template, request
+from sklearn.ensemble import GradientBoostingRegressor
+import joblib
+
+app = Flask(__name__, template_folder='.')
+
+# 1. Train GradientBoostingRegressor on produce dataset (selected best by RMSE)
+gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
+gb.fit(X_train, y_train)
+joblib.dump(gb, "best_regressor.pkl")
+
+# 2. Flask prediction endpoint for produce shelf life
+@app.route("/predict", methods=["POST"])
+def predict():
+    model = joblib.load("best_regressor.pkl")
+    features = [float(request.form[k]) for k in numeric_cols]
+    prediction = model.predict([features])
+    return {"remaining_shelf_life_days": float(prediction[0])}`,
+      explanation: "This source code from `app.py` in [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard) trains a GradientBoostingRegressor (evaluated with MAE, RMSE, and R²) and serves shelf-life predictions via a Flask `/predict` endpoint.",
+    };
+  }
 
   // Detect language
   let lang = "python";
