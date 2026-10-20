@@ -742,6 +742,26 @@ function generateDomainIntelligentBrief(story: HackerNewsStory): string {
     tldr = "Wine has officially been ported to OpenBSD, allowing developers and users to run Windows PE binaries natively on OpenBSD systems.";
     technicalAngle = "From an operating system design standpoint, this is a massive technical feat. OpenBSD enforces some of the strictest security invariants in computing — notably W^X (Write XOR Execute) memory protections and strict syscall sandboxing (`pledge` and `unveil`). Reconciling Windows API emulation and dynamically generated JIT code with OpenBSD's kernel memory layout required intricate work in mmap allocation, signal handling, and thread context switching.";
     communityTakeaway = "Engineers on Hacker News are celebrating the achievement as a testament to BSD portability and systems perseverance, with discussions focused on gaming on BSD and backwards compatibility with legacy engineering tools.";
+  } else if (titleLower.includes("openbsd 8.0") || (titleLower.includes("openbsd") && titleLower.includes("release"))) {
+    tldr = "Theo de Raadt and the OpenBSD project published OpenBSD 8.0, the latest major release of the security-first Unix-like operating system.";
+    technicalAngle = "OpenBSD 8.0 includes inteldrm/radeondrm/amdgpu graphics drivers synced from Linux 6.18, refined `pledge` and `unveil` kernel sandboxing, SMP network stack improvements, and strict memory protection policies like W^X. It also serves as the platform foundation for the newly ported Wine compatibility layer.";
+    communityTakeaway = "Systems and security engineers on Hacker News are praising OpenBSD's steadfast dedication to code correctness, clean architecture, and uncompromising security standards.";
+  } else if (titleLower.includes("minimax") || titleLower.includes("m3.1")) {
+    tldr = "MiniMax announced M3.1 Flash, a high-throughput frontier foundation model engineered for low-latency reasoning and fast token generation.";
+    technicalAngle = "The model optimizes the latency-quality Pareto frontier using aggressive KV-cache compression, dynamic precision quantization, and parallel decoding heads. This drastically reduces Time to First Token (TTFT) and token generation latency for multi-turn agentic workflows.";
+    communityTakeaway = "Developers building real-time voice, copilot, and agent applications are actively benchmarking M3.1 Flash against GPT-4o-mini and Claude 3.5 Haiku.";
+  } else if (titleLower.includes("whatsapp") && (titleLower.includes("llm") || titleLower.includes("regulator") || titleLower.includes("instructions"))) {
+    tldr = "Security researchers discovered hidden system instructions in WhatsApp's help and customer support pages instructing its embedded AI not to mention or recommend regulatory oversight agencies.";
+    technicalAngle = "This incident highlights vulnerabilities in client-side prompt leakage and AI alignment transparency. When prompt instructions are shipped to client applications without server-side validation or isolation, they can be reverse-engineered via standard network inspection, raising compliance challenges under emerging AI governance frameworks.";
+    communityTakeaway = "Hacker News commentators are discussing corporate liability, dark patterns in AI guardrails, and how developers should safely enforce business logic without hardcoded negative constraints in user-facing contexts.";
+  } else if (titleLower.includes("drone") && titleLower.includes("one motor")) {
+    tldr = "An impressive hardware engineering project showcasing a functional monocopter drone that achieves controlled flight using just a single rotating motor.";
+    technicalAngle = "Traditional multirotors rely on differential thrust across 4 electronic speed controllers (ESCs). A single-motor design instead exploits gyroscopic precession, cyclic aerodynamic torque, and high-frequency IMU feedback loops to achieve stable 3D trajectory control with minimal mechanical complexity.";
+    communityTakeaway = "Robotics and embedded systems engineers on Hacker News are fascinated by the mathematical control theory and elegant mechanical simplicity.";
+  } else if (titleLower.includes("glp-1") || (titleLower.includes("novo nordisk") && titleLower.includes("eli lilly"))) {
+    tldr = "Novo Nordisk and Eli Lilly presented clinical signals at the ARDD conference indicating GLP-1 receptor agonists may measurably decelerate markers of biological aging.";
+    technicalAngle = "Beyond glycemic control and weight management, researchers are examining systemic reductions in chronic low-grade neuroinflammation, cardiovascular oxidative stress, and metabolic dysregulation, measured via epigenetic methylation clocks and proteomic biomarkers.";
+    communityTakeaway = "Biotech and health-tech engineers on Hacker News are discussing clinical trial design, epigenetic age measurement validity, and longevity therapeutics.";
   } else if (titleLower.includes("mistral") && (titleLower.includes("cern") || titleLower.includes("science"))) {
     tldr = "CERN (the European Organization for Nuclear Research) has partnered with Mistral AI to integrate open and frontier AI foundation models into high-energy physics research.";
     technicalAngle = "The Large Hadron Collider generates exabytes of collision sensor telemetry. This collaboration explores deploying customized, energy-efficient foundation models to accelerate particle track reconstruction, detector simulation, and fast anomaly detection in massive multi-dimensional event data where traditional Monte Carlo simulations become compute bottlenecks.";
@@ -864,55 +884,7 @@ ${storySummaries}
 function generateSmartFallbackResponse(query: string, repos: RepoData[], news: HackerNewsStory[]): string {
   const q = query.toLowerCase().trim();
 
-  // 1. General Tech News / Newsletter Overview & Briefing
-  const isGeneralNewsQuery = 
-    q === "brief" ||
-    q === "news" ||
-    q === "top-news" ||
-    q === "tech news" ||
-    q === "news brief" ||
-    q === "brief news" ||
-    q.includes("brief me on the news") ||
-    q.includes("brief me on news") ||
-    q.includes("brief news") ||
-    q.includes("news brief") ||
-    q.includes("latest news") ||
-    q.includes("top news") ||
-    q.includes("trending tech") ||
-    q.includes("hacker news") ||
-    q.includes("what's happening in tech") ||
-    q.includes("trending stories") ||
-    q.includes("latest headlines");
-
-  if (isGeneralNewsQuery) {
-    return generateLiveTechPulseBriefing(news);
-  }
-
-  // 2. Specific matching against live Hacker News stories
-  if (news.length > 0) {
-    const cleanTopic = q
-      .replace(/^(give me a technical briefing on:?|brief me on:?|brief me on the|brief on:?|technical briefing on:?|tell me about:?|explain:?|what is:?|analyze:?|brief:?)\s*/i, "")
-      .replace(/^["']|["']$/g, "")
-      .trim();
-
-    if (cleanTopic.length > 1) {
-      for (const story of news) {
-        const titleLower = story.title.toLowerCase();
-        const stopWords = new Set(["with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after", "news"]);
-        const keywords = titleLower.split(/[^a-z0-9]+/).filter(w => w.length > 3 && !stopWords.has(w));
-        
-        const isMatch = (cleanTopic.length > 2 && titleLower.includes(cleanTopic)) ||
-                        keywords.some(k => cleanTopic === k || (cleanTopic.length > 3 && cleanTopic.includes(k))) ||
-                        (cleanTopic.length > 4 && q.includes(titleLower));
-
-        if (isMatch) {
-          return generateDomainIntelligentBrief(story);
-        }
-      }
-    }
-  }
-
-  // 3. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging, never robotic)
+  // 1. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging, never robotic)
   const isGreeting = 
     q === "hi" || 
     q === "hello" || 
@@ -936,6 +908,74 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
     ];
     const picked = greetingVariations[Math.abs(q.length + (news.length || 1)) % greetingVariations.length];
     return picked;
+  }
+
+  // 2. General Tech News / Newsletter Overview & Briefing
+  const isGeneralNewsQuery = 
+    q === "brief" ||
+    q === "news" ||
+    q === "top-news" ||
+    q === "tech news" ||
+    q === "news brief" ||
+    q === "brief news" ||
+    q.includes("brief me on the news") ||
+    q.includes("brief me on news") ||
+    q.includes("brief news") ||
+    q.includes("news brief") ||
+    q.includes("latest news") ||
+    q.includes("top news") ||
+    q.includes("trending tech") ||
+    q.includes("hacker news") ||
+    q.includes("what's happening in tech") ||
+    q.includes("trending stories") ||
+    q.includes("latest headlines");
+
+  if (isGeneralNewsQuery) {
+    return generateLiveTechPulseBriefing(news);
+  }
+
+  // 3. Specific matching against live Hacker News stories
+  if (news.length > 0) {
+    const cleanTopic = q
+      .replace(/^(give me a technical briefing on:?|brief me on:?|brief me on the|brief on:?|technical briefing on:?|tell me about:?|explain:?|what is:?|analyze:?|brief:?)\s*/i, "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
+
+    if (cleanTopic.length > 1) {
+      let bestMatch: HackerNewsStory | null = null;
+      let highestScore = 0;
+
+      const stopWords = new Set(["with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after", "news", "give", "brief", "technical", "briefing", "tell", "explain"]);
+      const queryWords = cleanTopic.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+
+      for (const story of news) {
+        const titleLower = story.title.toLowerCase();
+        
+        // Exact match or full title containment gets absolute priority
+        if (titleLower === cleanTopic || titleLower.includes(cleanTopic) || cleanTopic.includes(titleLower)) {
+          bestMatch = story;
+          highestScore = 100;
+          break;
+        }
+
+        const titleKeywords = titleLower.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+        let matchCount = 0;
+        for (const qw of queryWords) {
+          if (titleKeywords.includes(qw)) {
+            matchCount++;
+          }
+        }
+
+        if (matchCount > highestScore) {
+          highestScore = matchCount;
+          bestMatch = story;
+        }
+      }
+
+      if (bestMatch && highestScore > 0) {
+        return generateDomainIntelligentBrief(bestMatch);
+      }
+    }
   }
 
   // 4. Technical Concepts & Glossary with High Domain Intelligence
