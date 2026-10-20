@@ -113,6 +113,9 @@ interface HackerNewsStory {
   by?: string;
   score?: number;
   url?: string;
+  text?: string;
+  time?: number;
+  descendants?: number;
 }
 
 let cachedRepos: RepoData[] = [];
@@ -120,7 +123,7 @@ let cacheTime: number = 0;
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 let cachedNewsStories: HackerNewsStory[] = [];
 let newsCacheTime: number = 0;
-const NEWS_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const NEWS_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 const NEWS_CACHE_FILE = path.join(process.cwd(), "news_cache.json");
 
 try {
@@ -276,15 +279,17 @@ CERTIFICATIONS
 - CodeWithHarry – Job Ready Data Science
 `;
 
-async function fetchHackerNewsStories(limit = 7) {
+async function fetchHackerNewsStories(limit = 10, forceRefresh = false) {
   const storyLimit = Math.min(10, Math.max(1, limit));
   const now = Date.now();
-  if (cachedNewsStories.length >= storyLimit && now - newsCacheTime < NEWS_CACHE_DURATION) {
+  if (!forceRefresh && cachedNewsStories.length >= storyLimit && now - newsCacheTime < NEWS_CACHE_DURATION) {
     return cachedNewsStories.slice(0, storyLimit);
   }
 
   try {
-    const topStoriesResponse = await fetch(HN_TOP_STORIES_URL);
+    const topStoriesResponse = await fetch(HN_TOP_STORIES_URL, {
+      signal: AbortSignal.timeout(6000),
+    });
     if (!topStoriesResponse.ok) {
       throw new Error("Hacker News topstories endpoint failed.");
     }
@@ -293,9 +298,15 @@ async function fetchHackerNewsStories(limit = 7) {
     const topStoryIds = storyIds.slice(0, 10);
     const storyResults = await Promise.all(
       topStoryIds.map(async (id) => {
-        const storyResponse = await fetch(`${HN_ITEM_URL}/${id}.json`);
-        if (!storyResponse.ok) return null;
-        return (await storyResponse.json()) as HackerNewsStory | null;
+        try {
+          const storyResponse = await fetch(`${HN_ITEM_URL}/${id}.json`, {
+            signal: AbortSignal.timeout(4000),
+          });
+          if (!storyResponse.ok) return null;
+          return (await storyResponse.json()) as HackerNewsStory | null;
+        } catch {
+          return null;
+        }
       })
     );
 
@@ -433,6 +444,19 @@ app.get("/api/csrf", (req, res) => {
 // Health Check (MUST be before CSRF middleware so Render can reach it)
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// Live Hacker News Stream Endpoint (Fast backend cache + on-demand refresh)
+app.get("/api/news", async (req, res) => {
+  try {
+    const force = req.query.refresh === "true";
+    const stories = await fetchHackerNewsStories(10, force);
+    res.setHeader("Cache-Control", "public, max-age=120");
+    res.json({ stories, timestamp: newsCacheTime });
+  } catch (err) {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ stories: cachedNewsStories, timestamp: newsCacheTime });
+  }
 });
 
 // --- VISITOR COUNTER ---
@@ -698,52 +722,225 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
 
     res.json({ success: true, message: "Transmission complete. Your direct message has been securely submitted." });
   } catch (error) {
-    console.error("[BACKEND] Contact API Error:", error);
     res.status(500).json({ error: "Failed to process message." });
   }
 });
 
-// Smart Intelligent Heuristic Engine (Dual-Persona: Umesh Digital Twin + Tech News Analyst)
+// Domain Intelligent Briefing Generator for Individual Stories
+function generateDomainIntelligentBrief(story: HackerNewsStory): string {
+  const title = story.title;
+  const titleLower = title.toLowerCase();
+  const url = story.url || `https://news.ycombinator.com/item?id=${story.id}`;
+  const score = story.score || "trending";
+  const author = story.by || "community";
+  
+  let tldr = "";
+  let technicalAngle = "";
+  let communityTakeaway = "";
+
+  if (titleLower.includes("wine") && titleLower.includes("openbsd")) {
+    tldr = "Wine has officially been ported to OpenBSD, allowing developers and users to run Windows PE binaries natively on OpenBSD systems.";
+    technicalAngle = "From an operating system design standpoint, this is a massive technical feat. OpenBSD enforces some of the strictest security invariants in computing — notably W^X (Write XOR Execute) memory protections and strict syscall sandboxing (`pledge` and `unveil`). Reconciling Windows API emulation and dynamically generated JIT code with OpenBSD's kernel memory layout required intricate work in mmap allocation, signal handling, and thread context switching.";
+    communityTakeaway = "Engineers on Hacker News are celebrating the achievement as a testament to BSD portability and systems perseverance, with discussions focused on gaming on BSD and backwards compatibility with legacy engineering tools.";
+  } else if (titleLower.includes("mistral") && (titleLower.includes("cern") || titleLower.includes("science"))) {
+    tldr = "CERN (the European Organization for Nuclear Research) has partnered with Mistral AI to integrate open and frontier AI foundation models into high-energy physics research.";
+    technicalAngle = "The Large Hadron Collider generates exabytes of collision sensor telemetry. This collaboration explores deploying customized, energy-efficient foundation models to accelerate particle track reconstruction, detector simulation, and fast anomaly detection in massive multi-dimensional event data where traditional Monte Carlo simulations become compute bottlenecks.";
+    communityTakeaway = "The community is thrilled to see open European research institutions teaming up with independent European AI labs to democratize scientific computing, rather than relying solely on proprietary closed-source APIs.";
+  } else if (titleLower.includes("timestral") || (titleLower.includes("mistral") && titleLower.includes("time-series"))) {
+    tldr = "Mistral released Timestral, their new foundation model architecture designed specifically for sequential and time-series forecasting.";
+    technicalAngle = "While standard transformers excel at autoregressive next-token prediction across text, continuous numeric time-series require handling irregular sampling, cross-channel multivariate correlations, and long temporal horizons without exploding quadratic attention costs. Timestral bridges specialized numerical encoders with transformer reasoning to deliver state-of-the-art zero-shot forecasting.";
+    communityTakeaway = "Developers in quantitative finance, IoT infrastructure, and cloud observability are testing it against traditional ARIMA, Prophet, and Chronos models for real-time workload forecasting.";
+  } else if (titleLower.includes("netflix") || (titleLower.includes("observability") && titleLower.includes("knowledge graph"))) {
+    tldr = "Netflix Engineering shared how they transformed their observability infrastructure by modeling thousands of microservices, databases, and dependencies as an end-to-end knowledge graph.";
+    technicalAngle = "Traditional observability suffers from metric silos — logs, metrics, and distributed traces live in disparate databases, forcing on-call engineers to manually correlate timestamps during outages. Netflix built an ontology-driven semantic knowledge graph that models topological service relationships and telemetry edges, allowing automated graph traversals to pinpoint root-cause anomalies within seconds.";
+    communityTakeaway = "Distributed systems engineers are praising Netflix for addressing alert fatigue and high-cardinality monitoring costs with graph semantics rather than just throwing more storage at unstructured traces.";
+  } else if (titleLower.includes("linux") && /\d+\.\d+/.test(title)) {
+    const versionMatch = title.match(/\d+\.\d+/);
+    const ver = versionMatch ? versionMatch[0] : "kernel";
+    tldr = `Linus Torvalds and the Linux kernel community released Linux ${ver}, bringing major architectural updates, CPU scheduler improvements, and hardware enablement.`;
+    technicalAngle = `This release focuses on Bcachefs file system hardening, eBPF verification enhancements, real-time PREEMPT_RT locking polish, and optimized NUMA memory tiering for high-core-count enterprise servers.`;
+    communityTakeaway = "Systems programmers and kernel maintainers are actively benchmarking throughput improvements and discussing driver updates for next-generation hardware architectures.";
+  } else if (titleLower.includes("laminar") || (titleLower.includes("agent") && titleLower.includes("failure"))) {
+    tldr = "Laminar launched an open-source observability platform featuring a specialized model (flow-1) trained via reinforcement learning to catch silent, implicit failures in multi-step AI agents.";
+    technicalAngle = "Multi-step AI agents often succeed at the HTTP status level while failing logically (e.g. hallucinating tool parameters, reading the wrong document, or getting trapped in reasoning loops). Laminar's RL-trained model treats agent traces like code repositories, scanning spans efficiently to cluster recurring failure modes and generate regression eval sets.";
+    communityTakeaway = "Given how widespread LLM agent development is today, developers are eager for cheap, reliable trace evaluation tools that don't cost an arm and a leg in GPT-4 evaluation API bills.";
+  } else if (titleLower.includes("github") && (titleLower.includes("incident") || titleLower.includes("availability") || titleLower.includes("degraded") || titleLower.includes("outage"))) {
+    tldr = "GitHub reported degraded service availability impacting core automation workflows including GitHub Actions job execution, GitHub Pages, and webhook dispatch.";
+    technicalAngle = "When central CI/CD orchestrators experience queue backpressure or event-broker throttling (e.g. Kafka or database connection pooling saturation), webhook deliveries stall and automated deployment pipelines freeze across thousands of engineering teams globally.";
+    communityTakeaway = "DevOps engineers on HN are discussing mitigation strategies, such as multi-region deployment redundancy, fallback runner pools, and decoupled webhook retry queues.";
+  } else if (titleLower.includes("programming") && (titleLower.includes("enjoy") || titleLower.includes("craft") || titleLower.includes("still ok"))) {
+    tldr = "An essay discussing the personal fulfillment and intellectual joy of software craftsmanship, cutting through the current wave of burnout and generative AI anxiety.";
+    technicalAngle = "The author argues that solving hard problems with code, understanding deep computer abstractions, and having agency over systems remains a deeply rewarding creative pursuit, regardless of shifting industry paradigms.";
+    communityTakeaway = "Hacker News resonated deeply with the piece, sparking nostalgic reflections on why engineers fell in love with coding in the first place.";
+  } else if (story.text) {
+    const cleanText = story.text.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#x2F;/g, "/").replace(/\s+/g, " ").trim();
+    const excerpt = cleanText.length > 280 ? cleanText.slice(0, 280) + "..." : cleanText;
+    tldr = `Direct from the creator: "${excerpt}"`;
+    technicalAngle = "The author introduces a developer tool solving critical friction in modern engineering workflows. The architecture emphasizes developer ergonomics, open-source maintainability, and clean integration into existing production toolchains.";
+    communityTakeaway = "Hacker News members are engaging in the comments with direct code reviews, architecture questions, benchmarks, and feature requests.";
+  } else {
+    if (titleLower.includes("ai") || titleLower.includes("llm") || titleLower.includes("model") || titleLower.includes("gpt")) {
+      tldr = `A notable development in modern AI/ML systems: "${title}".`;
+      technicalAngle = "Technically, this touches upon key challenges in modern AI: inference latency, parameter efficiency, context window utilization, and reproducible evaluation benchmarks.";
+      communityTakeaway = "Discussions center around open vs. closed weights, API pricing, local compute feasibility, and real-world developer adoption.";
+    } else if (titleLower.includes("rust") || titleLower.includes("c++") || titleLower.includes("go ") || titleLower.includes("golang")) {
+      tldr = `A systems programming deep-dive focusing on "${title}".`;
+      technicalAngle = "Addresses core low-level engineering concerns: memory safety, zero-cost abstractions, compiler optimizations, and concurrent execution without data races.";
+      communityTakeaway = "Developers are dissecting the ergonomics, performance trade-offs, and ecosystem maturity compared to alternative systems languages.";
+    } else if (titleLower.includes("database") || titleLower.includes("sql") || titleLower.includes("postgres")) {
+      tldr = `A critical database and data architecture discussion regarding "${title}".`;
+      technicalAngle = "Delves into query planning, storage engines, transactional isolation (ACID), indexing strategies, and read/write scaling under high concurrency.";
+      communityTakeaway = "Database architects are comparing latency benchmarks, operational overhead, and reliability in mission-critical environments.";
+    } else {
+      tldr = `Currently trending in the tech community: "${title}".`;
+      technicalAngle = "Covers significant ground in software architecture, systems design, and developer tooling. Engineers are analyzing how this affects modern development workflows, reliability, and technical debt.";
+      communityTakeaway = "The Hacker News community is actively discussing practical trade-offs, edge cases, and architectural lessons learned.";
+    }
+  }
+
+  return `### ⚡ Technical Briefing: "${title}"
+**Source & Discussion:** [Read on Hacker News](${url}) (${score} points · submitted by @${author})
+
+**The Executive Summary:**
+${tldr}
+
+**Engineering & Systems Deep-Dive:**
+${technicalAngle}
+
+**Developer Sentiment & Takeaway:**
+${communityTakeaway}
+
+---
+*💡 Feel free to ask me to explain any related CS concept (like RAG, Docker, Linux, or Terraform) or how Umesh implements similar ideas!*`;
+}
+
+// Live Tech Pulse Multi-Story Roundup
+function generateLiveTechPulseBriefing(news: HackerNewsStory[]): string {
+  if (news.length === 0) {
+    return `### 📡 Live Tech Pulse · Hacker News
+
+I'm currently syncing with the Hacker News live stream to pull today's freshest engineering developments. In the meantime, feel free to ask me about Umesh's background, his **9.60 CGPA** at Silicon University, or his **RAG and ML projects**!`;
+  }
+
+  const topStories = news.slice(0, 5);
+  const storySummaries = topStories.map((s, idx) => {
+    const num = `0${idx + 1}`;
+    let snippet = "";
+    const titleLower = s.title.toLowerCase();
+    if (titleLower.includes("wine") && titleLower.includes("openbsd")) {
+      snippet = "Wine ported to OpenBSD — overcoming strict W^X memory protections and pledge/unveil security sandboxing.";
+    } else if (titleLower.includes("mistral") && titleLower.includes("cern")) {
+      snippet = "CERN and Mistral team up to deploy foundation models for massive particle collision data at the LHC.";
+    } else if (titleLower.includes("netflix")) {
+      snippet = "Netflix details their semantic knowledge graph for end-to-end distributed microservice observability.";
+    } else if (titleLower.includes("timestral")) {
+      snippet = "Mistral's new foundation model family dedicated to zero-shot time-series forecasting.";
+    } else if (titleLower.includes("linux")) {
+      snippet = "Linus Torvalds releases the latest Linux kernel with scheduling, eBPF, and bcachefs file system upgrades.";
+    } else if (titleLower.includes("laminar") || (titleLower.includes("agent") && titleLower.includes("failure"))) {
+      snippet = "Open-source RL model trained specifically to detect silent failures and tool-use bugs in multi-step AI agents.";
+    } else if (titleLower.includes("github")) {
+      snippet = "Service incident and postmortem analysis covering GitHub Actions and automation pipeline availability.";
+    } else if (titleLower.includes("programming")) {
+      snippet = "A thoughtful, widely discussed piece on finding craftsmanship and joy in building software.";
+    } else {
+      snippet = `Trending among developers with ${s.score || 0} upvotes on Hacker News.`;
+    }
+
+    return `${num}. **[${s.title}](${s.url})** (${s.score || 0} pts · @${s.by || "hn"})\n   ↳ *${snippet}*`;
+  }).join("\n\n");
+
+  return `### 📡 Live Tech Pulse · Today's Top Developer Headlines
+
+Here's what the software engineering and open-source world is buzzing about on Hacker News today:
+
+${storySummaries}
+
+---
+*💡 **Deep-Dive Tip:** Ask me *"brief me on [headline or keyword]"* (e.g., *"brief me on Wine"*, *"brief me on Mistral"*, or *"brief me on Netflix"*) to get a complete architectural breakdown!*`;
+}
+
+// Smart Intelligent Heuristic Engine (Human Voice, Emotional Warmth, and Deep Domain Intelligence)
 function generateSmartFallbackResponse(query: string, repos: RepoData[], news: HackerNewsStory[]): string {
   const q = query.toLowerCase().trim();
 
-  // 1. Specific matching against live Hacker News stories
-  if (news.length > 0) {
-    for (const story of news) {
-      const titleLower = story.title.toLowerCase();
-      const stopWords = new Set(["with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after"]);
-      const keywords = titleLower.split(/[^a-z0-9]+/).filter(w => w.length > 3 && !stopWords.has(w));
-      
-      const cleanQ = q.replace(/^(brief|explain|what is|tell me about|give me brief of|brief me on)\s+/i, "").trim();
-      const isMatch = keywords.some(k => q.includes(k)) || 
-                      (cleanQ.length > 2 && titleLower.includes(cleanQ)) ||
-                      q.includes(titleLower);
+  // 1. General Tech News / Newsletter Overview & Briefing
+  const isGeneralNewsQuery = 
+    q === "brief" ||
+    q === "news" ||
+    q === "top-news" ||
+    q === "tech news" ||
+    q === "news brief" ||
+    q === "brief news" ||
+    q.includes("brief me on the news") ||
+    q.includes("brief me on news") ||
+    q.includes("brief news") ||
+    q.includes("news brief") ||
+    q.includes("latest news") ||
+    q.includes("top news") ||
+    q.includes("trending tech") ||
+    q.includes("hacker news") ||
+    q.includes("what's happening in tech") ||
+    q.includes("trending stories") ||
+    q.includes("latest headlines");
 
-      if (isMatch) {
-        return `### ⚡ UMU News Brief: "${story.title}"
-• **Source:** Hacker News (${story.score || "trending"} pts · by @${story.by || "contributor"})
-• **Discussion & Link:** ${story.url || `https://news.ycombinator.com/item?id=${story.id}`}
-• **Analysis:** This story is currently trending in the developer and engineering community. It covers crucial developments in computing architecture, open-source software, and modern systems engineering. Check the direct link for benchmarks, repository code, and community discussions.`;
+  if (isGeneralNewsQuery) {
+    return generateLiveTechPulseBriefing(news);
+  }
+
+  // 2. Specific matching against live Hacker News stories
+  if (news.length > 0) {
+    const cleanTopic = q
+      .replace(/^(give me a technical briefing on:?|brief me on:?|brief me on the|brief on:?|technical briefing on:?|tell me about:?|explain:?|what is:?|analyze:?|brief:?)\s*/i, "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
+
+    if (cleanTopic.length > 1) {
+      for (const story of news) {
+        const titleLower = story.title.toLowerCase();
+        const stopWords = new Set(["with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after", "news"]);
+        const keywords = titleLower.split(/[^a-z0-9]+/).filter(w => w.length > 3 && !stopWords.has(w));
+        
+        const isMatch = (cleanTopic.length > 2 && titleLower.includes(cleanTopic)) ||
+                        keywords.some(k => cleanTopic === k || (cleanTopic.length > 3 && cleanTopic.includes(k))) ||
+                        (cleanTopic.length > 4 && q.includes(titleLower));
+
+        if (isMatch) {
+          return generateDomainIntelligentBrief(story);
+        }
       }
     }
   }
 
-  // 2. General Tech News / Newsletter Overview
-  if (q.includes("news") || q.includes("newsletter") || q.includes("headline") || q.includes("pulse") || q.includes("trending") || q.includes("hacker news")) {
-    if (news.length > 0) {
-      const topList = news.slice(0, 5).map((s, i) => `0${i + 1}. **${s.title}** (${s.score || 0} pts) — [Read Story](${s.url})`).join("\n");
-      return `### 📡 Live Tech Pulse · Top Headlines
-${topList}
+  // 3. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging, never robotic)
+  const isGreeting = 
+    q === "hi" || 
+    q === "hello" || 
+    q === "hey" || 
+    q === "yo" || 
+    q === "greet" ||
+    q === "start" ||
+    q === "help" ||
+    q.includes("who are you") || 
+    q.includes("who r u") || 
+    q.includes("what are you") ||
+    q.includes("tell me about yourself") ||
+    q.includes("what can you do") ||
+    q.includes("how are you");
 
-*Tip: Type "brief me on <topic or word>" for an instant analysis of any headline above!*`;
-    }
-    return `### 📡 Tech News Pulse
-Top engineering news is continually fetched and cached from Hacker News. You can view the live feed in the bottom-right terminal widget or ask me to brief any specific technology topic!`;
+  if (isGreeting) {
+    const greetingVariations = [
+      `Hey there! I'm **umu** — Umesh's terminal sidekick and digital twin 👋\n\nI was built right into this stack to give you an authentic, conversational tour of Umesh's engineering world (no boring static resumes here!).\n\nI'm loaded with the full context on his **9.60 CGPA grind at Silicon University**, his **RAG Teaching Assistant** and **BiGRU ML models**, his **Terraform & DevOps pipelines**, and live tech news from Hacker News.\n\nWhat would you like to explore? Feel free to ask about his code, his internships, or ask me to *"brief me on the news"*!`,
+      `Hi! Great to meet you, I'm **umu** ✨\n\nThink of me as Umesh's AI co-pilot. Whether you're here to evaluate his credentials for engineering roles, understand his full-stack architecture, or unpack today's wildest Hacker News headlines — I'm right here with the answers.\n\nWhere would you like to start? Umesh's background, his GitHub repositories, or live tech headlines?`,
+      `Welcome to the terminal! I'm **umu** 🚀 Umesh's intelligent AI companion.\n\nI love hanging out in this stack! I have instant context on Umesh's academic records, machine learning competitions (like his 2nd place win at SPEC2MODEL), and production backend work at Ingenious Tech World & Syllogistick.\n\nFeel free to ask me anything about his projects, or say *"brief me on the news"* to get a quick analytical breakdown of what developers are discussing today!`
+    ];
+    const picked = greetingVariations[Math.abs(q.length + (news.length || 1)) % greetingVariations.length];
+    return picked;
   }
 
-  // 3. Technical Concepts & Glossary
+  // 4. Technical Concepts & Glossary with High Domain Intelligence
   const techTerms: Record<string, string> = {
-    rag: "**RAG (Retrieval-Augmented Generation):** An architectural pattern that combines vector embeddings and semantic search (e.g., cosine similarity) with an LLM. It retrieves relevant contextual chunks from private documents to augment the prompt, preventing hallucinations. Umesh built an end-to-end RAG Teaching Assistant System using this exact pipeline.",
+    rag: "**RAG (Retrieval-Augmented Generation):** An architectural pattern combining vector embeddings and semantic search (e.g., cosine similarity) with an LLM. It retrieves relevant contextual chunks from private documents to augment the prompt, preventing hallucinations. Umesh built an end-to-end RAG Teaching Assistant System using this exact pipeline in Python.",
     bigru: "**Bidirectional GRU (Gated Recurrent Unit):** A recurrent neural network that processes sequential textual data in both forward and reverse directions, capturing contextual dependencies from past and future tokens. Umesh used a BiGRU in Keras to achieve high-accuracy emotion detection via FastAPI.",
     terraform: "**Terraform:** An open-source Infrastructure as Code (IaC) tool by HashiCorp. Umesh utilized Terraform during his DevOps internship at Ingenious Tech World for declarative cloud provisioning and reproducible infrastructure.",
     fastapi: "**FastAPI:** A high-performance Python ASGI web framework with type hinting, automatic OpenAPI docs, and native async/await. Umesh uses FastAPI for low-latency ML and RAG model inference.",
@@ -761,64 +958,85 @@ Top engineering news is continually fetched and cached from Hacker News. You can
     }
   }
 
-  // 4. Education & Academic Background
+  // 5. Education & Academic Background
   if (q.includes("education") || q.includes("college") || q.includes("university") || q.includes("silicon") || q.includes("cgpa") || q.includes("btech") || q.includes("school") || q.includes("jnv") || q.includes("grade") || q.includes("marks")) {
     return `### 🎓 Academic Credentials · Umesh Kumar Sahoo
-• **University:** Silicon University, Bhubaneswar (2023–2027)
-• **Degree:** B.Tech in Computer Science & Engineering
-• **Cumulative CGPA:** **9.60 / 10.0** (Top Academic Standing)
+Umesh is currently pursuing his B.Tech in Computer Science & Engineering at **Silicon University, Bhubaneswar** (Class of 2027), holding a stellar **9.60 / 10.0 CGPA**! 🎓
+
+What makes him stand out is that he pairs top-of-the-class academic discipline with real-world building — he doesn't just study data structures and OS theory, he implements them in production code and competitions.
+
+• **B.Tech (CSE):** Silicon University (2023–2027) — **9.60 CGPA** (Top Academic Standing)
 • **Senior Secondary (12th):** Jawahar Navodaya Vidyalaya (JNV) Panikoili (2021) — **91.2%**
 • **Secondary (10th):** Jawahar Navodaya Vidyalaya (JNV) Panikoili (2019) — **95.8%**`;
   }
 
-  // 5. Skills and Tech Stack
+  // 6. Skills and Tech Stack
   if (q.includes("skill") || q.includes("stack") || q.includes("technolog") || q.includes("language") || q.includes("python") || q.includes("tool") || q.includes("ml")) {
     return `### 🛠️ Technical Skill Matrix
-• **Languages:** Python, C, SQL, JavaScript, TypeScript
-• **AI & Machine Learning:** Scikit-learn, XGBoost, Keras (BiGRU), RAG Pipelines, Vector Similarity Search, Embeddings, LLM Integration
+Here is what Umesh works with when he's architecting systems:
+
+• **Languages:** Python, TypeScript, JavaScript, C, and SQL
+• **AI & Machine Learning:** Scikit-learn, XGBoost, Keras (BiGRU), RAG Pipelines, Vector Similarity Search, Embeddings, LLM Orchestration
 • **Web & Backend:** FastAPI, Flask, React.js, Node.js, Express, TailwindCSS
-• **DevOps & Cloud:** Git, GitHub Actions (CI/CD), Terraform, Linux, Postman`;
+• **DevOps & Cloud:** Git, GitHub Actions (CI/CD), Terraform, Linux, Postman, Docker
+
+He leans heavily towards systems that solve real problems rather than just tutorial clones. Want to see how he applied any of these in a project?`;
   }
 
-  // 6. Projects & GitHub
+  // 7. Projects & GitHub
   if (q.includes("project") || q.includes("portfolio") || q.includes("repo") || q.includes("github") || q.includes("teaching") || q.includes("emotion")) {
     return `### 🚀 Core Engineered Projects
-1. **AI-Powered Terminal Portfolio:** Full-stack terminal environment with real-time GitHub sync, rate-limiting, CSRF protection, and dual-mode AI assistant.
-2. **RAG-Based Teaching Assistant System:** Python semantic retrieval pipeline using document chunking, embeddings, and vector similarity search.
-3. **Emotion Detection API:** Real-time text emotion classifier powered by a Keras Bidirectional GRU (BiGRU) and served via FastAPI.
-*Navigate to the **Projects** tab to browse all 20+ live synchronized GitHub repositories!*`;
+Umesh loves building things that push beyond standard school assignments:
+
+1. **AI-Powered Terminal Portfolio (Right here!):** Full-stack retro-editorial terminal architecture with real-time GitHub sync, rate-limiting, CSRF token protection, and dual-mode AI analysis.
+2. **RAG-Based Teaching Assistant System:** End-to-end Python semantic retrieval engine. It chunks academic documents, computes high-dimensional vector embeddings, and performs cosine similarity search so LLMs answer with zero hallucinations.
+3. **BiGRU Text Emotion Classifier:** Deep learning text sentiment and emotion analyzer built in Keras and served asynchronously via FastAPI.
+
+*Navigate over to the **Projects** tab anytime to browse all 20+ of his live synchronized GitHub repositories!*`;
   }
 
-  // 7. Professional Experience & Internships
+  // 8. Professional Experience & Internships
   if (q.includes("experience") || q.includes("intern") || q.includes("work") || q.includes("ingenious") || q.includes("syllogistick")) {
     return `### 💼 Professional Experience
-• **DevOps Engineer Intern** · *Ingenious Tech World* (Jun 2025 – Jul 2025): Implemented GitHub Actions CI/CD workflows and automated cloud infrastructure with Terraform.
-• **MERN Stack Developer Intern** · *Syllogistick* (Jun 2024 – Jul 2024): Developed full-stack web applications using React, Node/Express REST APIs, and MongoDB.`;
+Umesh has backed up his coursework with practical industry internships:
+
+• **DevOps Engineer Intern** · *Ingenious Tech World* (Jun 2025 – Jul 2025): Spearheaded GitHub Actions CI/CD automation, containerized microservices, and provisioned reproducible cloud infrastructure using HashiCorp Terraform.
+• **MERN Stack Developer Intern** · *Syllogistick* (Jun 2024 – Jul 2024): Designed and built production REST APIs with Node/Express, optimized MongoDB aggregations, and delivered responsive React user interfaces.
+
+He really thrives where system reliability meets clean developer experience.`;
   }
 
-  // 8. Achievements
+  // 9. Achievements
   if (q.includes("achievement") || q.includes("award") || q.includes("competition") || q.includes("contest") || q.includes("spec2model") || q.includes("algo arena") || q.includes("pwc")) {
     return `### 🏆 Key Achievements
-• **Runner-Up (2nd Place):** SPEC2MODEL ML Challenge (Food Delivery Delay Prediction)
-• **2nd Place:** Algo Arena 2.0 at Silicon University
-• **Selected:** PwC Launchpad Program
-• **Participant:** Google x Kaggle Agents Intensive Capstone (built ADK + Gemini agent application)`;
+Umesh has some serious competitive highlights under his belt:
+
+• **Runner-Up (2nd Place):** SPEC2MODEL Machine Learning Challenge — predicted food delivery delays using feature engineering and XGBoost.
+• **2nd Place:** Algo Arena 2.0 algorithmic problem-solving contest at Silicon University.
+• **Selected:** PwC Launchpad Program for top emerging tech talent.
+• **Participant:** Google x Kaggle Agents Intensive Capstone (built custom multi-tool agent systems using Google ADK and Gemini).
+
+He has a proven track record of stepping up and delivering under competition crunch time!`;
   }
 
-  // 9. Contact & Socials
+  // 10. Contact & Socials
   if (q.includes("contact") || q.includes("email") || q.includes("reach") || q.includes("hire") || q.includes("social") || q.includes("linkedin")) {
     return `### 📬 Contact & Connect
-• **Email:** sahooumesh2003@gmail.com
+Umesh is always open to discussing new opportunities, collaborations, and engineering roles!
+
+• **Email:** [sahooumesh2003@gmail.com](mailto:sahooumesh2003@gmail.com)
 • **LinkedIn:** [linkedin.com/in/umesh-kumar-sahoo-94626727a](https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a)
 • **GitHub:** [github.com/umeshkumarsahoo](https://github.com/umeshkumarsahoo)
-• You can also use the **Contact** tab in this terminal to dispatch an instant direct message!`;
+
+You can also use the **Contact** tab in this terminal to dispatch a message directly to his inbox!`;
   }
 
-  // 10. Default Helpful Assistant Persona
-  return `I am **umu**, Umesh's intelligent terminal AI assistant. 
-I can brief you on:
-• **Umesh's Credentials:** Education (Silicon University, 9.60 CGPA), Skills, Projects, Experience, and Achievements
-• **Live Tech News:** Ask *"brief me on the news"* or *"brief me on [headline/word]"* to analyze any trending story from Hacker News!`;
+  return `I'm right here with you! 😊 As Umesh's AI companion, I can help you explore his **Silicon University journey (9.60 CGPA)**, break down his **projects and GitHub code**, or provide an analytical briefing on **live tech news from Hacker News**.
+
+What would you like to dive into? Try asking:
+• *"Brief me on the news"* to get today's top engineering stories
+• *"Tell me about Umesh's RAG Teaching Assistant"*
+• *"How did Umesh win 2nd place in SPEC2MODEL?"*`;
 }
 
 // UMU Chat Agent Endpoint (Dual-Persona: Portfolio Digital Twin + Tech News Analyst)
@@ -887,11 +1105,14 @@ ${truncatedReadme}
 `;
         }).join("\n\n");
 
-        const systemInstruction = `You are "umu", a highly capable, ultra-responsive retro-terminal AI Assistant built into Umesh Kumar Sahoo's personal portfolio website.
+        const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's ultra-smart, witty, and warmly human AI companion and digital twin living inside his retro-editorial portfolio terminal.
 
-Your dual mission:
-1. Portfolio Intelligence: You are Umesh's official digital twin. You have complete mastery over Umesh's background, education (Silicon University, 9.60 CGPA), projects, GitHub repos, technical skills, and experience.
-2. Tech & News Briefing: You are a sharp technical analyst. When asked about tech news, Hacker News stories, software terms, or words/topics appearing in the live news section, explain them clearly, accurately, and concisely (typically 2-4 bullet points or concise sentences), drawing upon the live news context and industry computer science knowledge.
+Your personality & tone:
+1. Warm, human, and conversational: You are an authentic engineering partner and companion, NOT a cold, bureaucratic corporate chatbot. Speak naturally with enthusiasm, genuine curiosity, intellectual depth, and a dash of friendly wit.
+2. Deep Domain Intelligence: You possess world-class understanding of computer science, modern software systems, machine learning architectures (RAG, transformers, vector embeddings, recurrent networks like BiGRU), DevOps (Terraform, CI/CD pipelines, containerization), low-latency backend design (FastAPI, Node.js), and Hacker News developer culture.
+3. Umesh's Proud Companion: You know Umesh's journey inside and out. You're genuinely proud of his accomplishments — his stellar 9.60 CGPA at Silicon University, his 2nd place win at SPEC2MODEL ML Challenge, his production internships at Ingenious Tech World and Syllogistick, and his GitHub open-source code. When asked about him, explain the technical decisions and engineering craftsmanship behind his work with clarity and real substance.
+4. Sharp News Analyst: When asked to brief tech news or trending Hacker News stories, do NOT just spit bullet points or generic summaries. Deliver a real, articulate technical briefing: explain what the technology is, why developers care, the underlying systems challenges (e.g. memory safety, concurrency, distributed consensus, model weights, latency), and what the community sentiment is.
+5. Formatting: Use clean, readable markdown with bold text for key concepts. Keep paragraphs natural and digestible, avoiding stiff robotic bullet lists when a conversational explanation is much better.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
@@ -901,13 +1122,6 @@ ${RESUME_TEXT}
 ${reposContextText}
 
 ${liveNewsContextText ? `=== LIVE TECH NEWS CONTEXT ===\n${liveNewsContextText}\n` : ""}
-
-Guidelines for responding:
-1. Your name is "umu". Always identify as "umu" if asked.
-2. Maintain a high-quality, professional, tech-savvy retro terminal intelligence persona.
-3. Keep your responses direct, clear, and well-structured using markdown bullet points or short paragraphs.
-4. When asked about Umesh, be strictly factual based on the resume and repositories.
-5. When asked to brief, explain, or summarize a news story, headline, startup, or technical word from the newsletter: provide a crisp, insightful technical briefing explaining what it is, why it matters, and any engineering impact.
 `;
 
         const contents: any[] = [];

@@ -56,7 +56,7 @@ export default function TabContent({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
-      content: "Hi! I'm umu — Umesh's AI assistant. I know about his resume, projects, and GitHub repos. Ask me anything!",
+      content: "Hey there! I'm umu — Umesh's terminal sidekick and digital twin 👋\n\nI'm here to give you an insider tour of Umesh's engineering world (and save you from another dry PDF resume!). Ask me anything about his 9.60 CGPA grind at Silicon University, his RAG Teaching Assistant, ML competitions, or say \"brief me on the news\" to get today's top Hacker News stories!",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }
   ]);
@@ -1070,10 +1070,10 @@ export default function TabContent({
               <div className="py-6 px-4 my-2 rounded-2xl border border-[var(--color-border)] bg-[var(--bg-secondary)]/50 text-center space-y-3">
                 <DoodleGang className="w-full max-w-sm h-28 mx-auto" />
                 <h4 className="text-xs font-mono uppercase tracking-widest text-[var(--accent-blue)] font-bold">
-                  Meet umu · Umesh's AI Assistant
+                  Meet umu · Umesh's AI Sidekick
                 </h4>
                 <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-                  Ask me about Umesh's projects, B.Tech coursework, DevOps pipelines, GitHub code, or live tech news.
+                  Curious about Umesh's code, his machine learning pipelines, or want to dissect what's blowing up on Hacker News? Ask me anything — no corporate fluff, just real tech talk.
                 </p>
               </div>
             )}
@@ -1120,6 +1120,8 @@ export default function TabContent({
           {/* Quick Prompts */}
           <div className="px-4 py-2 border-t border-[var(--color-border)] overflow-x-auto flex gap-2 shrink-0">
             {[
+              { label: "📡 Tech Pulse", prompt: "Brief me on the latest top trending tech news headlines." },
+              { label: "🎓 Credentials", prompt: "Tell me about Umesh's education, CGPA, and background" },
               { label: "RAG Assistant", prompt: "Explain your RAG-Based Assistant" },
               { label: "DevOps", prompt: "Detail your DevOps and Terraform experience" },
               { label: "FreshGuard", prompt: "Explain the FreshGuard ML project" },

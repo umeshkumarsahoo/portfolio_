@@ -30,6 +30,23 @@ export default function TechNewsFeed({ onBriefNews, className = "" }: TechNewsFe
     setError("");
 
     try {
+      // 1. Try local backend proxy/cache first (instant, rate-limit protected & adblocker-safe)
+      try {
+        const localRes = await fetch("/api/news");
+        if (localRes.ok) {
+          const data = await localRes.json();
+          if (Array.isArray(data.stories) && data.stories.length > 0) {
+            setStories(data.stories.slice(0, STORY_COUNT));
+            setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (localErr) {
+        // Fall through to direct Firebase stream
+      }
+
+      // 2. Direct Hacker News fallback
       const topStoriesResponse = await fetch(TOP_STORIES_URL);
       if (!topStoriesResponse.ok) throw new Error("Unable to reach Hacker News");
 
@@ -51,8 +68,10 @@ export default function TechNewsFeed({ onBriefNews, className = "" }: TechNewsFe
           url: story.url || `https://news.ycombinator.com/item?id=${story.id}`,
         }));
 
-      setStories(normalizedStories);
-      setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      if (normalizedStories.length > 0) {
+        setStories(normalizedStories);
+        setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      }
     } catch (err: any) {
       setError("Hacker News live stream temporarily unreachable.");
     } finally {
