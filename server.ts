@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { CachedLinkRAGEngine, extractUrlsFromText } from "./ragEngine";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -92,6 +93,26 @@ const ai = geminiApiKey
       },
     })
   : null;
+
+// Initialize Cached Link-Based RAG Engine (1-hour TTL, persistent multi-layer caching)
+const ragEngine = new CachedLinkRAGEngine({
+  cacheDir: path.join(process.cwd(), ".rag_cache"),
+  ttlMs: 60 * 60 * 1000,
+  aiClient: ai,
+});
+
+const DEFAULT_RAG_SOURCES: string[] = process.env.RAG_SOURCES
+  ? process.env.RAG_SOURCES.split(",").map((u) => u.trim()).filter(Boolean)
+  : [
+      "https://raw.githubusercontent.com/umeshkumarsahoo/portfolio_/main/README.md",
+    ];
+
+// Pre-warm configured RAG sources asynchronously without blocking startup
+for (const sourceUrl of DEFAULT_RAG_SOURCES) {
+  ragEngine.ingestUrl(sourceUrl).catch((err) => {
+    console.warn(`[BACKEND] Initial RAG source pre-warm notice for ${sourceUrl}: ${err.message}`);
+  });
+}
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN?.trim();
 const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "umeshkumarsahoo";
@@ -1216,6 +1237,54 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     }
 
     let reply = "";
+    const lowerMsg = trimmedMessage.toLowerCase();
+    const hasExplicitNewsIntent =
+      lowerMsg === "brief" ||
+      lowerMsg === "news" ||
+      lowerMsg.includes("news") ||
+      lowerMsg.includes("headline") ||
+      lowerMsg.includes("tech pulse") ||
+      lowerMsg.startsWith("brief me on") ||
+      lowerMsg.startsWith("brief on") ||
+      lowerMsg.includes("briefing");
+
+    // Check if query is targeting configured links, documentation, or explicit URLs
+    const detectedUrls = extractUrlsFromText(trimmedMessage);
+    const isExplicitUrlOrDocQuery =
+      detectedUrls.length > 0 ||
+      lowerMsg.includes("http") ||
+      lowerMsg.includes("url") ||
+      lowerMsg.includes("readme") ||
+      lowerMsg.includes("documentation") ||
+      lowerMsg.includes("configured link") ||
+      lowerMsg.startsWith("check ");
+
+    if (isExplicitUrlOrDocQuery) {
+      try {
+        const ragResult = await ragEngine.answerQuestion(
+          trimmedMessage,
+          Array.isArray(history) ? history : [],
+          DEFAULT_RAG_SOURCES
+        );
+        if (ragResult && ragResult.answer) {
+          res.json({
+            reply: ragResult.answer,
+            sources: ragResult.sources,
+            ragMetrics: ragResult.metrics,
+            reposScanned: repos.length,
+          });
+          return;
+        }
+      } catch (ragErr) {
+        console.warn("[BACKEND] Link RAG query warning:", ragErr);
+      }
+    }
+
+    // Retrieve any highly-relevant evidence from indexed URLs for LLM context augmentation
+    const urlEvidence = ragEngine.retrieve(trimmedMessage, 2, 0.22);
+    const sourceEvidenceSection = urlEvidence.results.length > 0
+      ? `\n=== VERIFIED EVIDENCE FROM CONFIGURED SOURCES ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 300)}`).join("\n\n")}\n`
+      : "";
 
     // If Gemini client is active, try primary and fallback models with strict token & context limits
     if (ai) {
@@ -1225,18 +1294,6 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
           const shortDesc = r.description ? r.description.substring(0, 80) : "Open-source repository.";
           return `#${i + 1} ${r.name} (${r.language || "Code"}): ${shortDesc}`;
         }).join("\n");
-
-        // Gated RAG context: Only inject tech news if the query explicitly has news intent!
-        const lowerMsg = trimmedMessage.toLowerCase();
-        const hasExplicitNewsIntent =
-          lowerMsg === "brief" ||
-          lowerMsg === "news" ||
-          lowerMsg.includes("news") ||
-          lowerMsg.includes("headline") ||
-          lowerMsg.includes("tech pulse") ||
-          lowerMsg.startsWith("brief me on") ||
-          lowerMsg.startsWith("brief on") ||
-          lowerMsg.includes("briefing");
 
         const newsContextSection = (hasExplicitNewsIntent && liveNewsContextText)
           ? `\n=== TOP TECH NEWS (Use ONLY because user asked about news) ===\n${liveNewsContextText}\n`
@@ -1259,7 +1316,7 @@ ${RESUME_TEXT}
 
 === FEATURED REPOSITORIES ===
 ${reposContextText}
-${newsContextSection}`;
+${sourceEvidenceSection}${newsContextSection}`;
 
         const contents: any[] = [];
         const safeHistory = Array.isArray(history) ? history.slice(-3) : [];
@@ -1314,12 +1371,65 @@ ${newsContextSection}`;
       reply = generateSmartFallbackResponse(trimmedMessage, repos, cachedNewsStories);
     }
 
-    res.json({ reply, reposScanned: repos.length });
+    res.json({
+      reply,
+      sources: urlEvidence.results.map((r) => ({ title: r.chunk.title, url: r.chunk.url })),
+      reposScanned: repos.length,
+    });
   } catch (error) {
     console.error("[BACKEND] Assistant Query Endpoint Error:", error);
     // Graceful response even on unexpected exceptions
     const fallback = generateSmartFallbackResponse("help", cachedRepos, cachedNewsStories);
     res.json({ reply: fallback, reposScanned: cachedRepos.length });
+  }
+});
+
+// Dedicated Link-Based RAG Query Endpoint
+app.post("/api/rag/query", agentLimiter, async (req, res) => {
+  try {
+    const { query, urls = [], history = [] } = req.body;
+    const trimmed = normalizeText(query, 1000, true);
+    if (!trimmed) {
+      res.status(400).json({ error: "Missing query parameter." });
+      return;
+    }
+    const sourcesToUse = Array.isArray(urls) && urls.length > 0 ? urls : DEFAULT_RAG_SOURCES;
+    const answerResult = await ragEngine.answerQuestion(trimmed, history, sourcesToUse);
+    res.json(answerResult);
+  } catch (err: any) {
+    console.error("[BACKEND] RAG Query Endpoint Error:", err);
+    res.status(500).json({ error: err.message || "RAG query failed." });
+  }
+});
+
+// RAG Telemetry & Cache Metrics Endpoint
+app.get("/api/rag/metrics", (req, res) => {
+  res.json({
+    stats: ragEngine.getStats(),
+    defaultSources: DEFAULT_RAG_SOURCES,
+  });
+});
+
+// On-Demand Source Ingestion / Re-index Endpoint
+app.post("/api/rag/ingest", agentLimiter, async (req, res) => {
+  try {
+    const { url, forceRefresh = false } = req.body;
+    if (!url || typeof url !== "string") {
+      res.status(400).json({ error: "Missing or invalid 'url' parameter." });
+      return;
+    }
+    const result = await ragEngine.ingestUrl(url, forceRefresh);
+    res.json({
+      success: true,
+      url: result.page.url,
+      title: result.page.title,
+      contentLength: result.page.content.length,
+      isCacheHit: result.isCacheHit,
+      fetchTimeMs: result.fetchTimeMs,
+      isStale: result.page.isStale,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "Failed to ingest URL." });
   }
 });
 

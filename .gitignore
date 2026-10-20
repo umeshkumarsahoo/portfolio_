@@ -24,6 +24,7 @@
 # local runtime data
 contacts.json
 visitor_stats.json
+.rag_cache
 
 # misc
 .DS_Store
