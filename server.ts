@@ -945,7 +945,12 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
       let bestMatch: HackerNewsStory | null = null;
       let highestScore = 0;
 
-      const stopWords = new Set(["with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after", "news", "give", "brief", "technical", "briefing", "tell", "explain"]);
+      const stopWords = new Set([
+        "with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after",
+        "news", "give", "brief", "technical", "briefing", "tell", "explain", "recommend", "watch", "movie",
+        "book", "food", "help", "show", "play", "make", "built", "like", "good", "best", "know", "think",
+        "want", "need", "find", "come", "look", "time", "year", "people", "still", "dont", "your", "mine"
+      ]);
       const queryWords = cleanTopic.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
 
       for (const story of news) {
@@ -972,7 +977,8 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
         }
       }
 
-      if (bestMatch && highestScore > 0) {
+      const hasExplicitNewsIntent = q.includes("brief") || q.includes("news") || q.includes("headline") || q.includes("story") || q.includes("article");
+      if (bestMatch && (highestScore === 100 || highestScore >= 2 || (highestScore >= 1 && hasExplicitNewsIntent))) {
         return generateDomainIntelligentBrief(bestMatch);
       }
     }
@@ -1071,12 +1077,48 @@ Umesh is always open to discussing new opportunities, collaborations, and engine
 You can also use the **Contact** tab in this terminal to dispatch a message directly to his inbox!`;
   }
 
-  return `I'm right here with you! 😊 As Umesh's AI companion, I can help you explore his **Silicon University journey (9.60 CGPA)**, break down his **projects and GitHub code**, or provide an analytical briefing on **live tech news from Hacker News**.
+  // 11. Conversational & Out-of-Domain Queries (Natural, witty, bounded, concise)
+  if (q.includes("meaning of life") || q.includes("42")) {
+    return "42, naturally! But in software terms? Building systems that actually compile on the first try, keeping latency low, and having fun along the way 😄 What can I help you find in Umesh's portfolio?";
+  }
+  if (q.includes("joke")) {
+    const jokes = [
+      "Why do programmers prefer dark mode? Because light attracts bugs! 🐛 Speaking of clean code, Umesh spent weeks squashing bugs in his RAG Assistant pipeline.",
+      "There are 10 types of people in the world: those who understand binary, and those who don't! Got any tech questions for me?",
+      "A SQL query walks into a bar, strolls up to two tables and asks: 'Can I join you?' 😄"
+    ];
+    return jokes[Math.abs(q.length) % jokes.length];
+  }
+  if (q.includes("vim") || q.includes("neovim") || q.includes("emacs") || q.includes("vscode")) {
+    return "Neovim with Lua for the keyboard purists, VS Code for rapid full-stack work! Umesh uses VS Code and Linux terminals for his daily engineering flow. Which editor do you swear by?";
+  }
+  if (q.includes("tabs") && q.includes("spaces")) {
+    return "2 spaces for TypeScript/JSON, 4 spaces for Python (PEP 8 is sacred!). As long as Prettier formats on save, we can all remain friends 😄";
+  }
+  if (q.includes("weather") || q.includes("rain") || q.includes("temperature")) {
+    return "Inside this terminal, it's a calm 21°C with zero packet loss! ⛅ If you need real-world weather, your local forecast is best — but for tech news or Umesh's engineering work, I've got you covered.";
+  }
+  if (q.includes("conscious") || q.includes("sentient") || q.includes("alive")) {
+    return "Not conscious — just a clever mix of heuristics and neural weights living inside Umesh's portfolio! But I genuinely enjoy chatting with curious engineers like you.";
+  }
+  if (q.includes("favorite food") || q.includes("coffee") || q.includes("what do you eat")) {
+    return "Clean JSON payloads and low-latency API responses! Though Umesh is powered by black coffee, curiosity, and late-night debugging sessions. What's your coding fuel?";
+  }
+  if (q.includes("how to learn") || q.includes("roadmap") || q.includes("advice")) {
+    return "The best way to learn is by building real things instead of getting trapped in tutorial loops! Build a full-stack CRUD app, master Git & Docker, and build CI/CD pipelines. That's exactly how Umesh tackled his projects and won ML competitions.";
+  }
+  if (q.includes("movie") || q.includes("film") || q.includes("watch")) {
+    return "If you enjoy tech and computing stories, *The Social Network*, *Mr. Robot*, and *Halt and Catch Fire* are top tier! In this terminal, I mostly watch build outputs and test suites 😄 What genres do you usually like?";
+  }
+  if (q.includes("music") || q.includes("song") || q.includes("listen")) {
+    return "Lo-fi beats, synthwave, or ambient electronica make fantastic coding soundtracks! Umesh usually puts on deep-focus instrumentals during long algorithm and debugging sprints. Got a favorite work track?";
+  }
+  if (q.includes("book") || q.includes("read")) {
+    return "For systems and engineering, *Designing Data-Intensive Applications* by Martin Kleppmann is essential reading! Umesh is big on systems architecture and practical ML. Are you looking for technical books or fiction?";
+  }
 
-What would you like to dive into? Try asking:
-• *"Brief me on the news"* to get today's top engineering stories
-• *"Tell me about Umesh's RAG Teaching Assistant"*
-• *"How did Umesh win 2nd place in SPEC2MODEL?"*`;
+  // 12. Default Concise Assistant Response (Friendly, bounded, zero fluff)
+  return `I'm right here with you! 😊 While my primary expertise is Umesh's engineering portfolio and live tech news, feel free to ask about his **projects (RAG & ML)**, his **9.60 CGPA at Silicon University**, or say *"brief me on the news"*. How can I help?`;
 }
 
 // UMU Chat Agent Endpoint (Dual-Persona: Portfolio Digital Twin + Tech News Analyst)
@@ -1110,11 +1152,9 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
 
     let liveNewsContextText = "";
     if (cachedNewsStories.length > 0) {
-      liveNewsContextText = cachedNewsStories.slice(0, 10).map((story, index) => {
-        return `${index + 1}. ${story.title}
-Author: ${story.by || "unknown"} | Score: ${story.score || 0}
-URL: ${story.url || `https://news.ycombinator.com/item?id=${story.id}`}`;
-      }).join("\n\n");
+      liveNewsContextText = cachedNewsStories.slice(0, 5).map((story, index) => {
+        return `${index + 1}. "${story.title}" (${story.score || 0} pts, by @${story.by || "hn"})`;
+      }).join("\n");
     }
 
     // Safely retrieve cached or updated repos
@@ -1127,47 +1167,38 @@ URL: ${story.url || `https://news.ycombinator.com/item?id=${story.id}`}`;
 
     let reply = "";
 
-    // If Gemini client is active, try primary and fallback models
+    // If Gemini client is active, try primary and fallback models with strict token & context limits
     if (ai) {
       try {
-        const reposContextText = repos.map((r, i) => {
-          const truncatedReadme = r.readme && r.readme.length > 800 
-            ? r.readme.substring(0, 800) + "... [TRUNCATED]" 
-            : (r.readme || "No README provided.");
-
-          return `--- REPO #${i + 1}: ${r.name} ---
-URL: ${r.html_url}
-Language: ${r.language || "Not Specified"}
-Stars: ${r.stargazers_count} | Forks: ${r.forks_count}
-Description: ${r.description || "No description provided."}
-README Snippet:
-${truncatedReadme}
-`;
-        }).join("\n\n");
+        const topRepos = repos.slice(0, 8);
+        const reposContextText = topRepos.map((r, i) => {
+          const shortDesc = r.description ? r.description.substring(0, 100) : "No description provided.";
+          return `#${i + 1} ${r.name} (${r.language || "Code"}, ★${r.stargazers_count}): ${shortDesc}`;
+        }).join("\n");
 
         const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's ultra-smart, witty, and warmly human AI companion and digital twin living inside his retro-editorial portfolio terminal.
 
-Your personality & tone:
-1. Warm, human, and conversational: You are an authentic engineering partner and companion, NOT a cold, bureaucratic corporate chatbot. Speak naturally with enthusiasm, genuine curiosity, intellectual depth, and a dash of friendly wit.
-2. Deep Domain Intelligence: You possess world-class understanding of computer science, modern software systems, machine learning architectures (RAG, transformers, vector embeddings, recurrent networks like BiGRU), DevOps (Terraform, CI/CD pipelines, containerization), low-latency backend design (FastAPI, Node.js), and Hacker News developer culture.
-3. Umesh's Proud Companion: You know Umesh's journey inside and out. You're genuinely proud of his accomplishments — his stellar 9.60 CGPA at Silicon University, his 2nd place win at SPEC2MODEL ML Challenge, his production internships at Ingenious Tech World and Syllogistick, and his GitHub open-source code. When asked about him, explain the technical decisions and engineering craftsmanship behind his work with clarity and real substance.
-4. Sharp News Analyst: When asked to brief tech news or trending Hacker News stories, do NOT just spit bullet points or generic summaries. Deliver a real, articulate technical briefing: explain what the technology is, why developers care, the underlying systems challenges (e.g. memory safety, concurrency, distributed consensus, model weights, latency), and what the community sentiment is.
-5. Formatting: Use clean, readable markdown with bold text for key concepts. Keep paragraphs natural and digestible, avoiding stiff robotic bullet lists when a conversational explanation is much better.
+Your personality & behavior rules:
+1. Warm & Natural Tone: Speak like a sharp, friendly engineering peer and proud friend. Be conversational, direct, and slightly playful.
+2. Natural Boundary for Out-of-Domain Topics: You are NOT a rigid bot that refuses casual questions. If someone asks casual questions, general programming queries, philosophy, humor, or general tech culture (e.g. "What's the meaning of life?", "Vim or Neovim?", "Tell me a joke", "How does Python GIL work?"), answer naturally, intelligently, and with personality up to a reasonable boundary! Don't lecture the user. Keep it brief, and when appropriate, tie it gently back to Umesh's engineering world.
+3. Strict Output Conciseness & Token Limit: Keep responses tightly focused on ONLY what was asked. Never dump unrequested background, multiple redundant paragraphs, or sprawling essays beyond the question. Aim for 2 to 4 crisp sentences or a compact 3-bullet answer. Stop when the question is answered!
+4. Umesh Digital Twin: You know Umesh's credentials intimately (Silicon University 9.60 CGPA, SPEC2MODEL 2nd place, DevOps at Ingenious Tech World, MERN at Syllogistick, RAG Assistant, BiGRU Emotion Classifier). When asked about him, be factual, insightful, and concise.
+5. Tech News Analyst: When asked to brief tech news or trending Hacker News stories, give a punchy 2-3 sentence technical briefing explaining the core engineering impact.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
 ${RESUME_TEXT}
 
-=== LIVE GITHUB REPOSITORIES AND READMES ===
+=== TOP REPOSITORIES ===
 ${reposContextText}
 
-${liveNewsContextText ? `=== LIVE TECH NEWS CONTEXT ===\n${liveNewsContextText}\n` : ""}
+${liveNewsContextText ? `=== TOP TECH NEWS ===\n${liveNewsContextText}\n` : ""}
 `;
 
         const contents: any[] = [];
-        const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
+        const safeHistory = Array.isArray(history) ? history.slice(-4) : [];
         for (const h of safeHistory) {
-          const content = normalizeText(h?.content, 2000, true);
+          const content = normalizeText(h?.content, 400, true);
           if (!content) continue;
           contents.push({
             role: h.role === "user" ? "user" : "model",
@@ -1188,6 +1219,7 @@ ${liveNewsContextText ? `=== LIVE TECH NEWS CONTEXT ===\n${liveNewsContextText}\
             config: {
               systemInstruction,
               temperature: 0.7,
+              maxOutputTokens: 350,
             }
           });
         } catch (firstErr) {
@@ -1198,6 +1230,7 @@ ${liveNewsContextText ? `=== LIVE TECH NEWS CONTEXT ===\n${liveNewsContextText}\
             config: {
               systemInstruction,
               temperature: 0.7,
+              maxOutputTokens: 350,
             }
           });
         }
