@@ -3,20 +3,25 @@ import { motion } from "motion/react";
 import { 
   Send, Terminal, Cpu, Bot, Star, ExternalLink, RefreshCw, Sparkles, BookOpen, 
   Calendar, User, MapPin, Mail, GraduationCap, TrendingUp, Cloud, Trophy, 
-  Brain, Leaf, Plane, Award, Code, Globe, Play, Github, Linkedin, Eye 
+  Brain, Leaf, Plane, Award, Code, Globe, Play, Github, Linkedin, Eye, ArrowRight,
+  GitFork, Check
 } from "lucide-react";
 import { secureFetch } from "../lib/api";
-import UmuDoodle, { DoodleGang } from "./UmuDoodle";
+import UmuDoodle from "./UmuDoodle";
 import type { DoodleState } from "./UmuDoodle";
 import {
-  AboutIllustration,
-  ExperienceIllustration,
-  SkillsIllustration,
-  AchievementsIllustration,
-} from "./SectionIllustrations";
+  DeskSceneIllustration,
+  BotanicalFlowerIllustration,
+  WindowGazerIllustration,
+  TrioFriendsIllustration,
+  TwilightSeaIllustration,
+  CoffeeAndPillsIllustration,
+  CurledSilhouetteIllustration,
+  GazingProfileIllustration,
+} from "./ZineIllustrations";
 import portraitImg from "../assets/images/umesh_portrait_1784052523060.png";
-
-const GitHubStats = lazy(() => import("./GitHubStats"));
+import MarkdownRenderer from "./MarkdownRenderer";
+import TechNewsFeed from "./TechNewsFeed";
 
 interface TabContentProps {
   activeTab: string;
@@ -56,15 +61,17 @@ export default function TabContent({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
-      content: "Hey there! I'm umu — Umesh's terminal sidekick and digital twin 👋\n\nI'm here to give you an insider tour of Umesh's engineering world (and save you from another dry PDF resume!). Ask me anything about his 9.60 CGPA grind at Silicon University, his RAG Teaching Assistant, ML competitions, or say \"brief me on the news\" to get today's top Hacker News stories!",
+      content: "Hey there! I'm umu — Umesh's terminal sidekick and digital twin 👋\n\nI'm here to give you an authentic tour of Umesh's engineering world. Feel free to ask about his **9.60 CGPA grind at Silicon University**, his **RAG Assistant**, his **BiGRU ML models**, or say *\"brief me on the news\"* for trending Hacker News stories!",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }
   ]);
   const [repos, setRepos] = useState<GithubRepo[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
   const [isQuerying, setIsQuerying] = useState(false);
   const [queryStatus, setQueryStatus] = useState("Thinking...");
   const [doodleState, setDoodleState] = useState<DoodleState>("idle");
+  const [isRefreshingRepos, setIsRefreshingRepos] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -75,12 +82,28 @@ export default function TabContent({
       const res = await fetch("/api/github/repos");
       if (res.ok) {
         const data = await res.json();
-        setRepos(data);
+        if (Array.isArray(data)) {
+          setRepos(data);
+        }
       }
     } catch (err) {
       console.error("Error loading repositories:", err);
     } finally {
       setIsLoadingRepos(false);
+    }
+  };
+
+  const handleRefreshRepos = async () => {
+    setIsRefreshingRepos(true);
+    try {
+      const res = await secureFetch("/api/github/repos/refresh", { method: "POST" });
+      if (res.ok) {
+        await loadRepos();
+      }
+    } catch (err) {
+      console.error("Failed to refresh repos:", err);
+    } finally {
+      setIsRefreshingRepos(false);
     }
   };
 
@@ -161,7 +184,7 @@ export default function TabContent({
       const chatHistory = messages.map(m => ({
         role: m.role,
         content: m.content
-      })).slice(-10);
+      })).slice(-8);
 
       const response = await secureFetch("/api/agent/query", {
         method: "POST",
@@ -238,10 +261,8 @@ export default function TabContent({
   const getCalibratedSkills = () => {
     let languages = 60;
     let aiMl = 50;
-    let dataEng = 50;
-    let cloudDevops = 45;
     let webBackend = 50;
-    let toolsPlatforms = 55;
+    let cloudDevops = 45;
 
     if (repos && repos.length > 0) {
       const pythonRepos = repos.filter(r => 
@@ -254,41 +275,33 @@ export default function TabContent({
         ["javascript", "typescript", "html", "css"].includes(r.language?.toLowerCase() || "") || 
         r.name.toLowerCase().includes("react") || 
         r.name.toLowerCase().includes("node") || 
-        r.name.toLowerCase().includes("express") || 
-        r.description?.toLowerCase().includes("web")
+        r.name.toLowerCase().includes("express")
       ).length;
 
       const mlRepos = repos.filter(r => 
         r.name.toLowerCase().includes("ml") || 
         r.name.toLowerCase().includes("learning") || 
-        r.name.toLowerCase().includes("prediction") || 
         r.name.toLowerCase().includes("rag") || 
-        r.name.toLowerCase().includes("model") || 
-        r.description?.toLowerCase().includes("ai") ||
-        r.description?.toLowerCase().includes("regression")
+        r.name.toLowerCase().includes("model")
       ).length;
 
       const devopsRepos = repos.filter(r => 
         r.name.toLowerCase().includes("actions") || 
         r.name.toLowerCase().includes("terraform") || 
-        r.name.toLowerCase().includes("deploy") || 
-        r.description?.toLowerCase().includes("ci") || 
         r.description?.toLowerCase().includes("devops")
       ).length;
 
-      languages = Math.min(95, 60 + (pythonRepos * 5) + (webRepos * 4));
-      aiMl = Math.min(90, 50 + (mlRepos * 10));
-      dataEng = Math.min(90, 50 + (pythonRepos * 8));
-      cloudDevops = Math.min(85, 45 + (devopsRepos * 12));
-      webBackend = Math.min(85, 50 + (webRepos * 8));
-      toolsPlatforms = Math.min(90, 55 + (repos.length * 3));
+      languages = Math.min(95, 65 + (pythonRepos * 5) + (webRepos * 4));
+      aiMl = Math.min(92, 55 + (mlRepos * 10));
+      cloudDevops = Math.min(88, 50 + (devopsRepos * 12));
+      webBackend = Math.min(88, 55 + (webRepos * 7));
     }
 
     return [
-      { id: "programming", title: "Programming", items: "Python, C, SQL", rating: languages },
-      { id: "aiml", title: "Machine Learning / AI", items: "Scikit-learn, XGBoost, Gradient Boosting, Random Forest, Keras, RAG Pipelines, LLM Integration, Embeddings, Vector Similarity Search, Feature Engineering, Model Evaluation", rating: aiMl },
-      { id: "frameworks", title: "Frameworks / Libraries", items: "FastAPI, Flask, React.js, Node.js, Pandas, NumPy, Matplotlib, Seaborn", rating: webBackend },
-      { id: "tools", title: "Tools / DevOps", items: "Git, GitHub, GitHub Actions, Terraform, Linux, Postman, Jupyter Notebook, VS Code", rating: cloudDevops },
+      { id: "programming", title: "Programming Languages", items: "Python, C, SQL, TypeScript, JavaScript", rating: languages },
+      { id: "aiml", title: "Machine Learning / AI", items: "Scikit-learn, XGBoost, Keras (BiGRU), RAG Pipelines, Vector Search, Embeddings, LLMs", rating: aiMl },
+      { id: "frameworks", title: "Frameworks & Backend", items: "FastAPI, Flask, React.js, Node.js, Express, MongoDB, TailwindCSS", rating: webBackend },
+      { id: "tools", title: "DevOps & Cloud Systems", items: "Git, GitHub Actions (CI/CD), Terraform, Linux, Postman, Docker", rating: cloudDevops },
     ];
   };
 
@@ -297,554 +310,559 @@ export default function TabContent({
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
   };
 
-  // ── ABOUT TAB ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 02: ABOUT (Light Paper Spread) ──
+  // ══════════════════════════════════════════════════════════════════════════════
   if (activeTab === "about") {
     return (
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        id="about-tab-content"
-        className="space-y-8"
+        className="w-full bg-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-[#E7E3D8] zine-spread-card p-6 sm:p-10 md:p-12"
       >
-        {/* Bio section with portrait */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          <div className="lg:col-span-2 space-y-5">
-            <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed">
-              Computer Science undergraduate with hands-on experience building web applications, ML APIs, and RAG-based AI systems. Skilled in Python, Basic JavaScript, SQL, REST APIs, machine learning, embeddings, vector search, and LLM integration, with a strong interest in software development and AI engineering.
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-6 mb-8 border-b border-[#EFECE4]">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--accent-blue)] font-bold">
+              Chapter 02 · Author Profile
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-hand font-bold text-[#181818] tracking-tight mt-1">
+              Author Profile · The Engineer from Bhubaneswar
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-[var(--text-faint)]">
+            p. 02 / 08
+          </span>
+        </div>
+
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Page (6 cols): Bio, Philosophy & Coordinates */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="flex items-start gap-5">
+              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border border-[#E7E3D8] shrink-0 shadow-xs">
+                <img
+                  src={portraitImg}
+                  alt="Umesh Kumar Sahoo"
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover portrait-editorial"
+                />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-[#181818]">Umesh Kumar Sahoo</h3>
+                <p className="text-xs font-mono text-[var(--accent-blue)] font-medium">B.Tech CSE (2023–2027) · 9.60 CGPA</p>
+                <p className="text-xs text-[var(--text-muted)]">Silicon University, Bhubaneswar, India</p>
+                <div className="inline-flex items-center gap-1.5 pt-1 text-[11px] text-emerald-700 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Available for 2026/2027 AI/ML Roles</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed font-literary italic">
+              "I believe computing systems should be built with quiet elegance: dependable, resilient, and grounded in solid mathematics. From tuning embedding vectors for RAG assistants to writing declarative Terraform configurations, I enjoy bridging machine intelligence with real-world developer workflows."
             </p>
 
-            {/* Profile Info */}
-            <div className="space-y-3 pt-2">
+            <div className="pt-4 border-t border-[#EFECE4] space-y-2.5">
               {[
-                { icon: <User className="w-4 h-4" />, label: "Name", value: "Umesh Kumar Sahoo" },
-                { icon: <MapPin className="w-4 h-4" />, label: "Location", value: "Bhubaneswar, Odisha, India" },
-                { icon: <Mail className="w-4 h-4" />, label: "Email", value: "sahooumesh2003@gmail.com" },
-                { icon: <GraduationCap className="w-4 h-4" />, label: "Degree", value: "B.Tech in Computer Science & Engineering (CGPA: 9.60 / 10.0)" },
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-start gap-3 group">
-                  <span className="text-[var(--text-faint)] mt-0.5 group-hover:text-[var(--accent-blue)] transition-colors">{item.icon}</span>
-                  <div className="flex-1">
-                    <span className="text-[11px] font-mono text-[var(--text-faint)] uppercase tracking-wider">{item.label}</span>
-                    <p className="text-sm text-[var(--text-primary)] select-all">{item.value}</p>
-                  </div>
+                { icon: <Mail className="w-3.5 h-3.5" />, label: "Email", val: "sahooumesh2003@gmail.com", href: "mailto:sahooumesh2003@gmail.com" },
+                { icon: <Github className="w-3.5 h-3.5" />, label: "GitHub", val: "github.com/umeshkumarsahoo", href: "https://github.com/umeshkumarsahoo" },
+                { icon: <Linkedin className="w-3.5 h-3.5" />, label: "LinkedIn", val: "linkedin.com/in/umesh-kumar-sahoo-94626727a", href: "https://linkedin.com/in/umesh-kumar-sahoo-94626727a" },
+                { icon: <MapPin className="w-3.5 h-3.5" />, label: "Location", val: "Bhubaneswar, Odisha, India", href: null },
+              ].map((c, i) => (
+                <div key={i} className="flex items-center gap-2.5 text-xs">
+                  <span className="text-[var(--accent-blue)] shrink-0">{c.icon}</span>
+                  <span className="font-mono text-[var(--text-faint)] w-16 uppercase text-[10px]">{c.label}</span>
+                  {c.href ? (
+                    <a href={c.href} target="_blank" rel="noopener noreferrer" className="text-[#181818] hover:text-[var(--accent-blue)] underline underline-offset-2 transition-colors truncate">
+                      {c.val}
+                    </a>
+                  ) : (
+                    <span className="text-[#181818] truncate">{c.val}</span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Portrait + Illustration */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden border border-[var(--color-border)]">
-              <img
-                src={portraitImg}
-                alt="Umesh Kumar Sahoo"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover portrait-editorial"
-              />
-            </div>
-            <AboutIllustration className="w-24 h-24 opacity-30" />
-          </div>
-        </div>
-
-        {/* Education Timeline */}
-        <div className="pt-6 border-t border-[var(--color-border)]">
-          <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase mb-5">
-            Education
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                degree: "B.Tech in Computer Science & Engineering",
-                institution: "Silicon University, Bhubaneswar",
-                period: "2023 – 2027",
-                grade: "CGPA: 9.60 / 10.0",
-                badge: "Current · 9.60 CGPA",
-              },
-              {
-                degree: "Senior Secondary (Class XII)",
-                institution: "JNV Panikoili",
-                period: "2021",
-                grade: "Percentage: 91.2%",
-                badge: "91.2%",
-              },
-              {
-                degree: "Secondary (Class X)",
-                institution: "JNV Panikoili",
-                period: "2019",
-                grade: "Percentage: 95.8%",
-                badge: "95.8%",
-              },
-            ].map((edu, idx) => (
-              <div key={idx} className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--bg-primary)] space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono text-[var(--accent-blue)]">{edu.period}</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--color-border)] text-[var(--text-primary)] font-medium">
-                    {edu.badge}
-                  </span>
-                </div>
-                <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-snug">
-                  {edu.degree}
+          {/* Right Page (6 cols): Botanical Flower (Panel 2), Window Gazer (Panel 3), Academic Milestones */}
+          <div className="lg:col-span-6 space-y-6 lg:border-l lg:border-[#EFECE4] lg:pl-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                  Academic Milestones
+                </span>
+                <h4 className="text-xl font-hand font-bold text-[#181818]">
+                  Academic Foundations & Milestones
                 </h4>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {edu.institution}
-                </p>
-                <p className="text-xs font-mono text-[var(--text-secondary)] font-medium pt-1">
-                  {edu.grade}
-                </p>
               </div>
-            ))}
-          </div>
-        </div>
+              <WindowGazerIllustration className="w-16 h-16 shrink-0 opacity-80" />
+            </div>
 
-        {/* At a Glance */}
-        <div className="pt-4 border-t border-[var(--color-border)]">
-          <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase mb-4">At a Glance</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-            {[
-              { val: "9.60", label: "CGPA" },
-              { val: "2", label: "Internships" },
-              { val: "3", label: "Core Projects" },
-              { val: "4", label: "Awards & Honors" },
-              { val: "3", label: "Certifications" },
-            ].map((stat, idx) => (
-              <div key={idx} className="text-center py-3 rounded-lg bg-[var(--color-border)] bg-opacity-30">
-                <p className="text-xl font-bold text-[var(--text-primary)]">{stat.val}</p>
-                <p className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider mt-1">{stat.label}</p>
-              </div>
-            ))}
+            {/* Education Cards */}
+            <div className="space-y-3">
+              {[
+                {
+                  deg: "B.Tech in Computer Science & Engineering",
+                  school: "Silicon University, Bhubaneswar",
+                  time: "2023 – 2027",
+                  score: "CGPA: 9.60 / 10.0",
+                  tag: "Top Academic Standing",
+                },
+                {
+                  deg: "Senior Secondary (Class XII)",
+                  school: "Jawahar Navodaya Vidyalaya (JNV) Panikoili",
+                  time: "2021",
+                  score: "Percentage: 91.2%",
+                  tag: "Distinction",
+                },
+                {
+                  deg: "Secondary (Class X)",
+                  school: "Jawahar Navodaya Vidyalaya (JNV) Panikoili",
+                  time: "2019",
+                  score: "Percentage: 95.8%",
+                  tag: "High Honors",
+                },
+              ].map((e, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-[var(--accent-blue)] text-[11px] font-semibold">{e.time}</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#FFFFFF] border border-[#E7E3D8] text-[#181818] font-bold">
+                      {e.tag}
+                    </span>
+                  </div>
+                  <h5 className="text-sm font-bold text-[#181818] mt-1">{e.deg}</h5>
+                  <p className="text-xs text-[var(--text-muted)]">{e.school}</p>
+                  <p className="text-xs font-mono font-semibold text-[var(--accent-blue)] mt-1">{e.score}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Botanical Illustration accent */}
+            <div className="pt-4 border-t border-[#EFECE4] flex items-center justify-between text-xs text-[var(--text-faint)]">
+              <span className="font-literary italic">"Growth blooms slowly through deliberate daily practice."</span>
+              <BotanicalFlowerIllustration className="w-12 h-16 shrink-0" />
+            </div>
           </div>
         </div>
       </motion.div>
     );
   }
 
-  // ── EXPERIENCE TAB ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 03: EXPERIENCE (SIGNATURE SOLID SLATE BLUE SPREAD, Panel 4) ──
+  // ══════════════════════════════════════════════════════════════════════════════
   if (activeTab === "experience") {
-    const experiences = [
-      {
-        year: "June 2025 – July 2025",
-        role: "DevOps Engineer Intern",
-        company: "Ingenious Tech World",
-        details: [
-          "Worked with GitHub Actions and Terraform on CI/CD and Infrastructure-as-Code workflows."
-        ]
-      },
-      {
-        year: "June 2024 – July 2024",
-        role: "MERN Stack Developer Intern",
-        company: "Syllogistick",
-        details: [
-          "Worked on a MERN-based application involving React, REST APIs, authentication, and MongoDB."
-        ]
-      }
-    ];
-
     return (
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        id="experience-tab-content"
-        className="space-y-8"
+        className="w-full bg-[#375C73] text-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-white/20 zine-spread-blue p-6 sm:p-10 md:p-12 shadow-2xl"
       >
-        <div className="flex items-start gap-8">
-          <div className="flex-1 space-y-8">
-            {experiences.map((exp, idx) => (
-              <div key={idx} className="relative pl-6 border-l-2 border-[var(--color-border)] group">
-                {/* Timeline dot */}
-                <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-[var(--accent-blue)] bg-[var(--bg-primary)]" />
-                
-                <div className="space-y-2">
-                  <span className="text-[11px] font-mono text-[var(--accent-blue)] tracking-wider">
-                    {exp.year}
-                  </span>
-                  <h4 className="text-lg font-semibold text-[var(--text-primary)]">
-                    {exp.role}
-                  </h4>
-                  <p className="text-sm text-[var(--text-muted)] font-medium">
-                    {exp.company}
-                  </p>
-                  <ul className="space-y-2 pt-2">
-                    {exp.details.map((detail, dIdx) => (
-                      <li key={dIdx} className="text-sm text-[var(--text-secondary)] leading-relaxed pl-4 relative before:content-[''] before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:rounded-full before:bg-[var(--color-border-strong)]">
-                        {detail}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ))}
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-6 mb-8 border-b border-white/20">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-white/70 font-bold">
+              Chapter 03 · Industry Milestones
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-hand font-bold text-white tracking-tight mt-1">
+              The Working Landscape · Production Systems
+            </h2>
           </div>
-          
-          <ExperienceIllustration className="hidden lg:block w-32 h-32 opacity-20 shrink-0" />
+          <span className="text-xs font-mono text-white/60">
+            p. 03 / 08
+          </span>
+        </div>
+
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Page (7 cols): Internship Chronicles */}
+          <div className="lg:col-span-7 space-y-6">
+            <p className="text-sm text-white/85 leading-relaxed font-literary italic">
+              Real systems aren't built in sterile vacuums. Here is where coursework was forged into production pipelines, automated infrastructure, and full-stack APIs.
+            </p>
+
+            <div className="space-y-4">
+              {/* Internship 1: Ingenious Tech World */}
+              <div className="p-5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-white/80 font-bold">Jun 2025 – Jul 2025</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white text-[#375C73] font-bold">
+                    DevOps & Cloud
+                  </span>
+                </div>
+                <h4 className="text-base font-bold text-white">DevOps Engineer Intern</h4>
+                <p className="text-xs font-mono text-white/75 font-medium">Ingenious Tech World · Remote / Hybrid</p>
+                <ul className="space-y-1.5 pt-2 text-xs text-white/90 leading-relaxed list-disc list-inside">
+                  <li>Automated end-to-end CI/CD delivery pipelines using GitHub Actions for continuous build verification and test runs.</li>
+                  <li>Drafted declarative Infrastructure-as-Code modules using HashiCorp Terraform for reproducible cloud provisioning.</li>
+                  <li>Containerized microservices with Docker to eliminate environment drift across development and staging clusters.</li>
+                </ul>
+              </div>
+
+              {/* Internship 2: Syllogistick */}
+              <div className="p-5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-white/80 font-bold">Jun 2024 – Jul 2024</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white text-[#375C73] font-bold">
+                    Full-Stack MERN
+                  </span>
+                </div>
+                <h4 className="text-base font-bold text-white">MERN Stack Developer Intern</h4>
+                <p className="text-xs font-mono text-white/75 font-medium">Syllogistick · Software Solutions</p>
+                <ul className="space-y-1.5 pt-2 text-xs text-white/90 leading-relaxed list-disc list-inside">
+                  <li>Engineered production REST APIs in Node.js and Express with secure authentication flows and validation.</li>
+                  <li>Modeled and optimized MongoDB document schemas for rapid data aggregation and query latency reduction.</li>
+                  <li>Delivered accessible, modular React interfaces aligned with clean UI design specifications.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Page (5 cols): The Trio of Comic Friends (Panel 4) + Engineering Creed */}
+          <div className="lg:col-span-5 space-y-6 lg:border-l lg:border-white/20 lg:pl-10 flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider">
+                Engineering In Good Spirits
+              </span>
+              <h4 className="text-lg font-hand font-bold text-white mt-1 mb-4">
+                Teamwork, Systems & Craft
+              </h4>
+              <div className="bg-white/5 border border-white/15 rounded-2xl p-4 flex items-center justify-center">
+                <TrioFriendsIllustration className="w-full max-w-[260px] h-auto" inverted={true} />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white/10 border border-white/15 space-y-2">
+              <p className="text-xs font-literary italic text-white/90 leading-relaxed">
+                "Software engineering is inherently collaborative. The best code is built with empathy, tested with rigour, and deployed without drama."
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {["GitHub Actions", "Terraform", "Docker", "Node.js", "Express", "MongoDB", "React", "Linux"].map((t, i) => (
+                  <span key={i} className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </motion.div>
     );
   }
 
-  // ── PROJECTS TAB ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 04: PROJECTS (Light Paper Spread) ──
+  // ══════════════════════════════════════════════════════════════════════════════
   if (activeTab === "projects") {
-    const getImpactScore = (repo: GithubRepo) => {
-      let score = (repo.stargazers_count * 100) + (repo.forks_count * 50);
-      
-      const name = repo.name.toLowerCase();
-      const desc = (repo.description || "").toLowerCase();
-      const combined = name + " " + desc;
-
-      if (
-        name.includes("assingment") || 
-        name.includes("assignment") || 
-        name === "small-projects" || 
-        name === "python" ||
-        name.includes("leet-code") || 
-        name.includes("mern-stack") ||
-        name.includes("bday") || 
-        name.includes("hlo-resh") ||
-        name.includes("git1") ||
-        name.includes("first-web") ||
-        name.includes("calculator") ||
-        name.includes("awesome-github") ||
-        name.includes("docs") ||
-        name.includes("portfolio") ||
-        name === "tata" ||
-        name === "aws" ||
-        name === "water-borne"
-      ) {
-        return -9999;
-      }
-
-      if (name.includes("rag") || name.includes("teaching")) score += 500;
-      if (name.includes("fresh_guard") || name.includes("freshguard")) score += 500;
-      if (name.includes("time_series") || name.includes("nifty")) score += 500;
-      if (name.includes("ml-projects") || name.includes("classifier")) score += 400;
-      if (name.includes("spec2model")) score += 300;
-
-      if (combined.includes("prediction") || combined.includes("system") || combined.includes("classifier") || combined.includes("forecasting") || combined.includes("pipeline") || combined.includes("model")) {
-        score += 50;
-      }
-
-      if (desc.length > 20) score += 20;
-
-      return score;
-    };
-
-    const rankedRepos = [...repos]
-      .filter(repo => getImpactScore(repo) > -100)
-      .sort((a, b) => getImpactScore(b) - getImpactScore(a));
-
-    const topRepos = rankedRepos.slice(0, 4);
-
-    const getLanguageColor = (lang: string | null) => {
-      const colors: Record<string, string> = {
-        python: "#3572A5",
-        javascript: "#F1E05A",
-        typescript: "#3178C6",
-        html: "#E34C26",
-        java: "#B07219",
-      };
-      return colors[(lang || "").toLowerCase()] || "#6B6B6B";
-    };
-
-    const resumeProjects = [
+    const featuredProjects = [
       {
         title: "AI-Powered Terminal Portfolio",
-        tags: ["React", "FastAPI", "Gemini", "REST APIs", "Security"],
-        highlights: [
-          "Built a React + FastAPI terminal-style portfolio with a backend, integrating GitHub and Hacker News APIs with server-side caching for dynamic content.",
-          "Developed a Gemini-powered assistant using resume and public repository context to answer questions about projects, skills, and experience.",
-          "Implemented API security controls including Helmet security headers, rate limiting, CSRF protection, input validation, and server-side secret management."
-        ],
-        github: "https://github.com/umeshkumarsahoo/portfolio_",
-        live: "https://umesh-portfolio-4r6o.onrender.com/",
+        tech: "React, Vite, Express, Gemini 2.0, Rate-limiting, CSRF Security",
+        desc: "Full-stack editorial web portfolio featuring an integrated Gemini digital twin, live Hacker News caching, real-time GitHub sync, and custom Markdown rendering.",
+        link: "https://github.com/umeshkumarsahoo/portfolio_",
+        badge: "Production Stack"
       },
       {
         title: "RAG-Based Teaching Assistant System",
-        tags: ["Python", "RAG", "Embeddings", "Vector Search", "LLM Integration"],
-        highlights: [
-          "Built an end-to-end RAG pipeline covering document ingestion, chunking, embedding generation, vector similarity search, retrieval, and LLM-based response generation.",
-          "Used semantic retrieval to provide relevant source context to the language model for context-aware question answering over educational content."
-        ],
-        github: "https://github.com/umeshkumarsahoo/RAG-Based-Teaching-Assistant-System",
-        live: null,
+        tech: "Python, Vector Embeddings, Cosine Similarity, LLM Orchestration",
+        desc: "Semantic retrieval pipeline chunking high-dimensional academic corpora and querying vector spaces to provide verifiable, hallucination-free student answers.",
+        link: "https://github.com/umeshkumarsahoo",
+        badge: "AI Retrieval"
       },
       {
-        title: "Emotion Detection API",
-        tags: ["Python", "Keras", "BiGRU", "FastAPI", "NLP"],
-        highlights: [
-          "Built a Keras Bidirectional GRU model for text emotion classification and exposed inference through a FastAPI REST service.",
-          "Implemented inference preprocessing, tokenizer-based sequence conversion, padding, and prediction with emotion probabilities and confidence scores.",
-          "Added health and prediction endpoints with validation and error handling for unavailable model or tokenizer artifacts."
-        ],
-        github: "https://github.com/umeshkumarsahoo/Emotion_detection_api",
-        live: null,
+        title: "BiGRU Text Emotion Classifier",
+        tech: "Python, Keras, TensorFlow, FastAPI, NLP Tokenization",
+        desc: "Bidirectional Recurrent Neural Network (GRU) analyzing nuanced textual sentiments, deployed as an asynchronous FastAPI inference service.",
+        link: "https://github.com/umeshkumarsahoo",
+        badge: "Deep Learning"
       }
     ];
 
-    return (
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        id="projects-tab-content"
-        className="space-y-10"
-      >
-        {/* Core Resume Featured Projects */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
-              Featured Resume Projects
-            </h3>
-            <span className="text-xs font-mono text-[var(--accent-blue)]">
-              Production & Research
-            </span>
-          </div>
-
-          <div className="space-y-5">
-            {resumeProjects.map((project, idx) => (
-              <div
-                key={idx}
-                className="p-6 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] bg-[var(--bg-primary)] transition-all duration-200 space-y-4"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h4 className="text-base md:text-lg font-semibold text-[var(--text-primary)]">
-                    {project.title}
-                  </h4>
-                  <div className="flex items-center gap-3">
-                    {project.github && (
-                      <a
-                        href={project.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--accent-blue)] flex items-center gap-1 transition-colors"
-                      >
-                        <Github className="w-3.5 h-3.5" />
-                        Code
-                      </a>
-                    )}
-                    {project.live && (
-                      <a
-                        href={project.live}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-[var(--accent-blue)] hover:underline flex items-center gap-1"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Live Demo
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {project.tags.map((tag, tidx) => (
-                    <span
-                      key={tidx}
-                      className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[var(--color-border)] text-[var(--text-primary)] font-medium"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <ul className="space-y-2 pt-1">
-                  {project.highlights.map((bullet, bidx) => (
-                    <li
-                      key={bidx}
-                      className="text-sm text-[var(--text-secondary)] leading-relaxed pl-4 relative before:content-[''] before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:rounded-full before:bg-[var(--accent-blue)]"
-                    >
-                      {bullet}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* GitHub Stats & Repositories */}
-        <div className="space-y-6 pt-6 border-t border-[var(--color-border)]">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
-              Live GitHub Repositories
-            </h3>
-            <span className="text-xs font-mono text-[var(--text-faint)]">
-              Real-time Sync
-            </span>
-          </div>
-
-          <Suspense
-            fallback={
-              <div className="py-8 text-center text-sm text-[var(--text-faint)]">
-                Loading GitHub data...
-              </div>
-            }
-          >
-            <GitHubStats repos={repos} isLoading={isLoadingRepos} />
-          </Suspense>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            {topRepos.length > 0 ? (
-              topRepos.map((repo, idx) => (
-                <a
-                  key={idx}
-                  href={repo.html_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group block p-4 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] bg-[var(--bg-primary)] hover:shadow-sm transition-all"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <h5 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors">
-                      {repo.name}
-                    </h5>
-                    <ExternalLink className="w-3.5 h-3.5 text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] shrink-0 transition-colors" />
-                  </div>
-                  <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-3 line-clamp-2">
-                    {repo.description || "No description provided."}
-                  </p>
-                  <div className="flex items-center gap-3 text-xs text-[var(--text-faint)]">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full" style={{ background: getLanguageColor(repo.language) }} />
-                      {repo.language || "Mixed"}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3 h-3" />
-                      {repo.stargazers_count}
-                    </span>
-                  </div>
-                </a>
-              ))
-            ) : (
-              <div className="col-span-2 text-center py-6 text-sm text-[var(--text-faint)]">
-                Loading synced repositories...
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <a 
-              href="https://github.com/umeshkumarsahoo" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="text-xs text-[var(--accent-blue)] font-medium hover:underline flex items-center gap-1.5"
-            >
-              <Github className="w-3.5 h-3.5" />
-              View all {repos.length || 15}+ repositories on GitHub →
-            </a>
-            <span className="text-[11px] font-mono text-[var(--text-faint)]">
-              github.com/umeshkumarsahoo
-            </span>
-          </div>
-        </div>
-      </motion.div>
+    const filteredRepos = repos.filter(r => 
+      r.name.toLowerCase().includes(repoSearch.toLowerCase()) ||
+      (r.description && r.description.toLowerCase().includes(repoSearch.toLowerCase()))
     );
-  }
-
-  // ── SKILLS TAB ──
-  if (activeTab === "skills") {
-    const skillsList = getCalibratedSkills();
 
     return (
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        id="skills-tab-content"
-        className="space-y-8"
+        className="w-full bg-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-[#E7E3D8] zine-spread-card p-6 sm:p-10 md:p-12"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            {repos.length > 0 && (
-              <p className="text-xs text-[var(--accent-blue)] font-mono mb-6">
-                Auto-calibrated from {repos.length} synced repositories
-              </p>
-            )}
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-6 mb-8 border-b border-[#EFECE4]">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--accent-blue)] font-bold">
+              Chapter 04 · Featured Chronicles
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-hand font-bold text-[#181818] tracking-tight mt-1">
+              Selected Works · Core Systems & Repositories
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-[var(--text-faint)]">
+            p. 04 / 08
+          </span>
+        </div>
 
-            <div className="space-y-6">
-              {skillsList.map((skill) => (
-                <div key={skill.id} className="space-y-2 group">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-[var(--text-primary)]">
-                      {skill.title}
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Page (6 cols): 3 Core Featured Projects */}
+          <div className="lg:col-span-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                Flagship Implementations
+              </span>
+              <TwilightSeaIllustration className="w-20 h-14 shrink-0 rounded-lg overflow-hidden border border-[#E7E3D8]" />
+            </div>
+
+            <div className="space-y-4">
+              {featuredProjects.map((p, idx) => (
+                <div key={idx} className="p-4 rounded-2xl border border-[#E7E3D8] bg-[#FAF9F5] hover:border-[var(--accent-blue)] transition-all flex flex-col justify-between group">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-mono text-[10px] font-bold text-[var(--accent-blue)]">0{idx + 1} · {p.badge}</span>
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                    <h4 className="text-base font-bold text-[#181818] group-hover:text-[var(--accent-blue)] transition-colors">
+                      {p.title}
                     </h4>
-                    <span className="text-xs font-mono text-[var(--accent-blue)] tabular-nums font-medium">
-                      {skill.rating}%
-                    </span>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+                      {p.desc}
+                    </p>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                    {skill.items}
-                  </p>
-                  {/* Progress bar */}
-                  <div className="h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[var(--accent-blue)] skill-bar-fill"
-                      style={{ width: `${skill.rating}%` }}
-                    />
+                  <div className="pt-3 mt-3 border-t border-[#E7E3D8]/60 flex items-center justify-between text-[11px] font-mono text-[var(--text-faint)]">
+                    <span className="truncate pr-2">{p.tech}</span>
+                    <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-blue)] font-semibold shrink-0 flex items-center gap-1 hover:underline">
+                      Code <ArrowRight className="w-3 h-3" />
+                    </a>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          <SkillsIllustration className="hidden lg:block w-32 h-32 opacity-20 shrink-0 mt-8" />
-        </div>
 
-        <div className="text-center pt-4 border-t border-[var(--color-border)]">
-          <p className="text-sm text-[var(--text-muted)] italic">
-            Always learning. Always building.
-          </p>
+          {/* Right Page (6 cols): Live Synchronized GitHub Repositories */}
+          <div className="lg:col-span-6 space-y-4 lg:border-l lg:border-[#EFECE4] lg:pl-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                  Live GitHub Index
+                </span>
+                <h4 className="text-lg font-hand font-bold text-[#181818]">
+                  Real-time Public Repositories
+                </h4>
+              </div>
+              <button
+                onClick={handleRefreshRepos}
+                disabled={isRefreshingRepos}
+                className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 px-2.5 py-1 rounded-md hover:bg-[var(--accent-blue)] hover:text-white transition-all cursor-pointer"
+                title="Sync with GitHub API"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshingRepos ? "animate-spin" : ""}`} />
+                <span>Sync</span>
+              </button>
+            </div>
+
+            {/* Filter Input */}
+            <input
+              type="text"
+              placeholder="Search repositories by name or tech..."
+              value={repoSearch}
+              onChange={(e) => setRepoSearch(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-[#E7E3D8] bg-[#FAF9F5] focus:outline-none focus:border-[var(--accent-blue)]"
+            />
+
+            {/* Repos List */}
+            <div className="max-h-[380px] overflow-y-auto space-y-2.5 pr-1">
+              {isLoadingRepos ? (
+                <div className="py-12 text-center text-xs font-mono text-[var(--text-faint)]">
+                  Connecting to GitHub API...
+                </div>
+              ) : filteredRepos.length > 0 ? (
+                filteredRepos.slice(0, 10).map((r, i) => (
+                  <a
+                    key={i}
+                    href={r.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-3 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] hover:bg-white hover:border-[var(--accent-blue)] transition-all group"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-mono font-bold text-[#181818] group-hover:text-[var(--accent-blue)] transition-colors truncate pr-2">
+                        {r.name}
+                      </span>
+                      <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-faint)] shrink-0">
+                        <span className="flex items-center gap-0.5">
+                          <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                          {r.stargazers_count}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <GitFork className="w-2.5 h-2.5" />
+                          {r.forks_count}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 mt-1">
+                      {r.description || "Open source repository by Umesh Kumar Sahoo"}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-[var(--text-faint)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)]" />
+                      <span>{r.language || "Code"}</span>
+                    </div>
+                  </a>
+                ))
+              ) : (
+                <div className="py-8 text-center text-xs text-[var(--text-faint)]">
+                  No repositories matched your filter.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </motion.div>
     );
   }
 
-  // ── ACHIEVEMENTS TAB ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 05: SKILLS (Light Paper Spread, Panel 6) ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  if (activeTab === "skills") {
+    const calibrated = getCalibratedSkills();
+
+    return (
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full bg-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-[#E7E3D8] zine-spread-card p-6 sm:p-10 md:p-12"
+      >
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-6 mb-8 border-b border-[#EFECE4]">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--accent-blue)] font-bold">
+              Chapter 05 · Tools & Craft
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-hand font-bold text-[#181818] tracking-tight mt-1">
+              Tools of the Craft · Daily Engineering Stack
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-[var(--text-faint)]">
+            p. 05 / 08
+          </span>
+        </div>
+
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Page (6 cols): Daily Objects Illustration (Panel 6) + ML & Core Disciplines */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                  The Morning Routine
+                </span>
+                <h4 className="text-base font-hand font-bold text-[#181818]">
+                  Coffee, Focus & Daily Practice
+                </h4>
+              </div>
+              <CoffeeAndPillsIllustration className="w-36 h-20 shrink-0" />
+            </div>
+
+            <p className="text-sm text-[var(--text-secondary)] font-literary italic leading-relaxed">
+              "A good engineer cultivates their craft through daily repetition: writing tests, validating shapes in tensor arrays, refactoring messy branches, and drinking hot coffee."
+            </p>
+
+            <div className="space-y-4 pt-2">
+              <div className="p-4 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-2">
+                <span className="text-[10px] font-mono text-[var(--accent-blue)] uppercase font-bold">Domain 01</span>
+                <h5 className="text-sm font-bold text-[#181818]">Machine Learning & AI Engineering</h5>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  Scikit-learn, XGBoost, Gradient Boosting, Random Forest, Keras, RAG Pipelines, LLM Orchestration, Embeddings, Vector Similarity Search, Feature Engineering, Model Calibration.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-2">
+                <span className="text-[10px] font-mono text-[var(--accent-blue)] uppercase font-bold">Domain 02</span>
+                <h5 className="text-sm font-bold text-[#181818]">Programming Languages</h5>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  Python (Advanced/Production), TypeScript, JavaScript (ES6+), C (Systems/Data Structures), SQL (PostgreSQL, SQLite).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Page (6 cols): Calibrated Proficiency Meters & Cloud Systems */}
+          <div className="lg:col-span-6 space-y-5 lg:border-l lg:border-[#EFECE4] lg:pl-10">
+            <div>
+              <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                Automated Metric Calibration
+              </span>
+              <h4 className="text-lg font-hand font-bold text-[#181818]">
+                Calibrated Competency Matrix
+              </h4>
+            </div>
+
+            <div className="space-y-4">
+              {calibrated.map((skill) => (
+                <div key={skill.id} className="space-y-1.5 p-3 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#181818]">{skill.title}</span>
+                    <span className="font-mono text-[11px] font-bold text-[var(--accent-blue)]">{skill.rating}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-[#EFECE4] overflow-hidden">
+                    <div
+                      className="h-full bg-[var(--accent-blue)] rounded-full skill-bar-fill"
+                      style={{ width: `${skill.rating}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 pt-0.5">
+                    {skill.items}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-1.5">
+              <span className="text-[10px] font-mono text-[var(--accent-blue)] uppercase font-bold">Domain 03 · Cloud & Infrastructure</span>
+              <p className="text-xs text-[var(--text-secondary)]">
+                HashiCorp Terraform, GitHub Actions (CI/CD), Docker, Linux administration, RESTful API architecture, Postman, Vite.
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 06: ACHIEVEMENTS (SIGNATURE SOLID SLATE BLUE SPREAD, Panel 8) ──
+  // ══════════════════════════════════════════════════════════════════════════════
   if (activeTab === "achievements") {
     const achievements = [
       {
-        title: "Runner-Up – SPEC2MODEL ML Challenge",
-        desc: "Secured 2nd place in the Food Delivery Delay Prediction competition. Developed predictive regression models with feature engineering under strict competition criteria.",
-        year: "2024",
-        category: "ML Competition",
-        color: "var(--accent-orange)",
+        title: "Runner-Up (2nd Place) · SPEC2MODEL ML Challenge",
+        badge: "Silver / 2nd Place",
+        desc: "Forecasted food delivery delays under strict competition evaluation using advanced tabular feature engineering and tuned XGBoost ensembles."
       },
       {
-        title: "Algo Arena 2.0 – 2nd Place",
-        desc: "Secured 2nd Place at Silicon University. Demonstrated algorithmic problem-solving and rapid data structure implementation in competitive programming.",
-        year: "2024",
-        category: "Silicon University",
-        color: "var(--accent-blue)",
+        title: "2nd Place · Algo Arena 2.0 Contest",
+        badge: "2nd Place Podium",
+        desc: "Algorithmic problem solving and data structures sprint against top engineering peers at Silicon University."
       },
       {
-        title: "PwC Launchpad Program",
-        desc: "Selected for the PwC Launchpad program. Engaging in intensive corporate learning, power skills workshops, and consulting case simulations.",
-        year: "Ongoing",
-        category: "Program",
-        color: "var(--accent-blue)",
+        title: "Selected Candidate · PwC Launchpad Program",
+        badge: "Corporate Selection",
+        desc: "Rigorous technical vetting recognizing emerging software talent and domain competence in enterprise software."
       },
       {
-        title: "Kaggle Agents Intensive Capstone",
-        desc: "Participated in the Google x Kaggle Agents Intensive program and built an agent-based AI application using Google ADK and Gemini.",
-        year: "2025",
-        category: "Google x Kaggle",
-        color: "var(--accent-orange)",
-      }
-    ];
-
-    const certifications = [
-      {
-        title: "Generative AI Introduction",
-        issuer: "Google",
-        desc: "Foundational concepts of large language models, prompt engineering, generative architectures, and AI ethics.",
-      },
-      {
-        title: "Introduction to Artificial Intelligence",
-        issuer: "IBM",
-        desc: "Comprehensive foundation in AI concepts, machine learning workflows, and practical applications.",
-      },
-      {
-        title: "Job Ready Data Science",
-        issuer: "CodeWithHarry",
-        desc: "Extensive hands-on data science training covering Python, data analysis, feature engineering, and predictive modeling.",
+        title: "Google x Kaggle Agents Intensive Capstone",
+        badge: "AI Agent Capstone",
+        desc: "Built custom multi-tool agent systems using the Google ADK and Gemini API, solving real-world agent orchestration problems."
       }
     ];
 
@@ -853,185 +871,205 @@ export default function TabContent({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        id="achievements-tab-content"
-        className="space-y-10"
+        className="w-full bg-[#375C73] text-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-white/20 zine-spread-blue p-6 sm:p-10 md:p-12 shadow-2xl"
       >
-        <div className="flex items-start gap-8">
-          <div className="flex-1 space-y-10">
-            {/* Honors & Achievements */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
-                Honors & Achievements
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {achievements.map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    className="p-5 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] bg-[var(--bg-primary)] transition-all group space-y-2"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span 
-                          className="w-2 h-2 rounded-full" 
-                          style={{ background: item.color }}
-                        />
-                        <span className="font-mono text-[var(--text-faint)]">{item.category}</span>
-                      </div>
-                      <span className="font-mono text-[var(--accent-blue)] font-medium">{item.year}</span>
-                    </div>
-                    <h4 className="text-sm md:text-base font-semibold text-[var(--text-primary)]">
-                      {item.title}
-                    </h4>
-                    <p className="text-xs md:text-sm text-[var(--text-muted)] leading-relaxed">
-                      {item.desc}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-6 mb-8 border-b border-white/20">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-white/70 font-bold">
+              Chapter 06 · Honors & Honors
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-hand font-bold text-white tracking-tight mt-1">
+              Towards the Light · Honors & Competitions
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-white/60">
+            p. 06 / 08
+          </span>
+        </div>
 
-            {/* Certifications */}
-            <div className="space-y-4 pt-6 border-t border-[var(--color-border)]">
-              <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
-                Certifications
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {certifications.map((cert, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--bg-primary)] space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--color-border)] text-[var(--text-primary)] font-medium">
-                        {cert.issuer}
-                      </span>
-                      <Award className="w-3.5 h-3.5 text-[var(--accent-blue)]" />
-                    </div>
-                    <h4 className="text-sm font-semibold text-[var(--text-primary)]">
-                      {cert.title}
-                    </h4>
-                    <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                      {cert.desc}
-                    </p>
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Page (7 cols): 4 Competitive Honors */}
+          <div className="lg:col-span-7 space-y-4">
+            <p className="text-sm text-white/85 font-literary italic leading-relaxed">
+              "Under competitive crunch time, real engineering skill is proven. Simple, robust models beat brittle, over-engineered architectures."
+            </p>
+
+            <div className="space-y-3.5">
+              {achievements.map((ach, idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/20 space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white text-[#375C73] font-bold">
+                      {ach.badge}
+                    </span>
+                    <span className="font-mono text-white/60 text-[10px]">#0{idx + 1}</span>
                   </div>
-                ))}
-              </div>
+                  <h4 className="text-sm sm:text-base font-bold text-white pt-1">
+                    {ach.title}
+                  </h4>
+                  <p className="text-xs text-white/85 leading-relaxed">
+                    {ach.desc}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
 
-          <AchievementsIllustration className="hidden lg:block w-28 h-28 opacity-20 shrink-0" />
+          {/* Right Page (5 cols): The Gazing Profile Illustration (Panel 8) + Reflection */}
+          <div className="lg:col-span-5 space-y-6 lg:border-l lg:border-white/20 lg:pl-10 flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider">
+                Aspiring Upward
+              </span>
+              <h4 className="text-lg font-hand font-bold text-white mt-1 mb-4">
+                Looking Beyond the Horizon
+              </h4>
+              <div className="bg-white/5 border border-white/15 rounded-2xl p-4 flex items-center justify-center">
+                <GazingProfileIllustration className="w-full max-w-[220px] h-auto" inverted={true} />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white/10 border border-white/15 space-y-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-white/75 font-bold">Academic Distinction</span>
+              <p className="text-xs text-white/90 leading-relaxed font-literary italic">
+                Ranked in top academic standing at Silicon University with a 9.60 CGPA, balancing algorithmic rigour with real-world machine learning systems.
+              </p>
+            </div>
+          </div>
         </div>
       </motion.div>
     );
   }
 
-  // ── CONTACT TAB ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 07: CONTACT (Light Paper Spread, Panel 7) ──
+  // ══════════════════════════════════════════════════════════════════════════════
   if (activeTab === "contact") {
     return (
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        id="contact-tab-content"
-        className="space-y-8"
+        className="w-full bg-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-[#E7E3D8] zine-spread-card p-6 sm:p-10 md:p-12"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Contact Form */}
-          <form onSubmit={handleContactSubmit} className="space-y-5">
-            <p className="text-base text-[var(--text-secondary)] leading-relaxed">
-              Have a project idea, question, or just want to say hello? I'd love to hear from you.
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-6 mb-8 border-b border-[#EFECE4]">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--accent-blue)] font-bold">
+              Chapter 07 · Dispatching a Note
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-hand font-bold text-[#181818] tracking-tight mt-1">
+              Dispatching a Note · Send a Direct Inquiry
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-[var(--text-faint)]">
+            p. 07 / 08
+          </span>
+        </div>
+
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Page (7 cols): Direct Inquiry Form */}
+          <div className="lg:col-span-7 space-y-4">
+            <p className="text-sm text-[var(--text-secondary)] font-literary italic leading-relaxed">
+              "Whether you want to discuss full-time AI/ML engineering roles, discuss a project, or just talk tech news over a virtual coffee, my inbox is open."
             </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <form onSubmit={handleContactSubmit} className="space-y-3.5">
               <div>
-                <label className="text-xs font-mono text-[var(--text-faint)] block mb-1.5 tracking-wider uppercase">
-                  Name
+                <label className="block text-[11px] font-mono uppercase text-[var(--text-faint)] mb-1">
+                  Your Name
                 </label>
                 <input
                   type="text"
-                  placeholder="Your name"
+                  required
+                  placeholder="e.g. Sarah Connor"
                   value={formState.name}
                   onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                  className="w-full bg-transparent border border-[var(--color-border-strong)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-faint)] transition-colors"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] focus:outline-none focus:border-[var(--accent-blue)] text-[#181818]"
                 />
               </div>
+
               <div>
-                <label className="text-xs font-mono text-[var(--text-faint)] block mb-1.5 tracking-wider uppercase">
-                  Email
+                <label className="block text-[11px] font-mono uppercase text-[var(--text-faint)] mb-1">
+                  Email Address
                 </label>
                 <input
                   type="email"
-                  placeholder="your@email.com"
+                  required
+                  placeholder="sarah@example.com"
                   value={formState.email}
                   onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                  className="w-full bg-transparent border border-[var(--color-border-strong)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-faint)] transition-colors"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] focus:outline-none focus:border-[var(--accent-blue)] text-[#181818]"
                 />
               </div>
-            </div>
-            <div>
-              <label className="text-xs font-mono text-[var(--text-faint)] block mb-1.5 tracking-wider uppercase">
-                Message
-              </label>
-              <textarea
-                placeholder="Tell me about your project or idea..."
-                rows={4}
-                value={formState.msg}
-                onChange={(e) => setFormState({ ...formState, msg: e.target.value })}
-                className="w-full bg-transparent border border-[var(--color-border-strong)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-faint)] resize-none transition-colors"
-              />
-            </div>
-            
-            <div className="flex items-center justify-between gap-4">
-              {formStatus && (
-                <p className={`text-xs ${formStatus.includes("success") ? "text-[var(--color-success)]" : formStatus.includes("Failed") || formStatus.includes("error") ? "text-[var(--color-error)]" : "text-[var(--accent-blue)]"}`}>
-                  {formStatus}
-                </p>
-              )}
-              <button
-                type="submit"
-                className="ml-auto text-sm font-medium bg-[var(--text-primary)] text-[var(--bg-primary)] px-6 py-2.5 rounded-lg hover:bg-[var(--accent-blue)] transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                Send Message
-              </button>
-            </div>
-          </form>
 
-          {/* Social Links */}
-          <div className="space-y-5">
-            <h3 className="text-xs font-mono text-[var(--text-faint)] tracking-wider uppercase">
-              Connect
-            </h3>
-            <div className="space-y-3">
-              {[
-                { href: "https://github.com/umeshkumarsahoo", icon: <Github className="w-5 h-5" />, name: "GitHub", handle: "umeshkumarsahoo" },
-                { href: "https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a", icon: <Linkedin className="w-5 h-5" />, name: "LinkedIn", handle: "umesh-kumar-sahoo" },
-                { href: "https://leetcode.com/u/phribbi39", icon: <Code className="w-5 h-5" />, name: "LeetCode", handle: "phribbi39" },
-              ].map((social, idx) => (
-                <a
-                  key={idx}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-4 p-4 rounded-xl border border-[var(--color-border)] hover:border-[var(--accent-blue)] transition-all group"
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-[var(--text-faint)] mb-1">
+                  Message
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Share your thoughts, engineering roles, or collaboration ideas..."
+                  value={formState.msg}
+                  onChange={(e) => setFormState({ ...formState, msg: e.target.value })}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] focus:outline-none focus:border-[var(--accent-blue)] text-[#181818] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 text-xs font-medium px-5 py-2.5 rounded-xl bg-[var(--accent-blue)] text-white hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                 >
-                  <span className="text-[var(--text-muted)] group-hover:text-[var(--accent-blue)] transition-colors">
-                    {social.icon}
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Dispatch Letter</span>
+                </button>
+                {formStatus && (
+                  <span className="text-xs font-mono text-[var(--accent-blue)] font-medium">
+                    {formStatus}
                   </span>
-                  <div>
-                    <span className="text-sm font-medium text-[var(--text-primary)] block">{social.name}</span>
-                    <span className="text-xs text-[var(--text-faint)] font-mono">{social.handle}</span>
-                  </div>
-                  <ExternalLink className="w-4 h-4 ml-auto text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors" />
-                </a>
-              ))}
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Right Page (5 cols): Curled Silhouette Illustration (Panel 7) + Direct Channels */}
+          <div className="lg:col-span-5 space-y-6 lg:border-l lg:border-[#EFECE4] lg:pl-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                  Quiet Workspace
+                </span>
+                <h4 className="text-lg font-hand font-bold text-[#181818]">
+                  Quiet Workspace · Direct Lines
+                </h4>
+              </div>
+              <CurledSilhouetteIllustration className="w-24 h-28 shrink-0" />
             </div>
 
-            <div className="pt-4 border-t border-[var(--color-border)]">
-              <p className="text-sm text-[var(--text-muted)]">
-                <Mail className="w-4 h-4 inline mr-2" />
-                sahooumesh2003@gmail.com
-              </p>
+            <div className="space-y-3 pt-2">
+              <div className="p-3.5 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-1">
+                <span className="text-[10px] font-mono text-[var(--accent-blue)] uppercase font-bold">Email Inbox</span>
+                <p className="text-xs font-mono text-[#181818]">sahooumesh2003@gmail.com</p>
+                <p className="text-[10px] text-[var(--text-faint)]">Responds within 24 hours</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-1">
+                <span className="text-[10px] font-mono text-[var(--accent-blue)] uppercase font-bold">LinkedIn Connection</span>
+                <a href="https://linkedin.com/in/umesh-kumar-sahoo-94626727a" target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-[#181818] hover:text-[var(--accent-blue)] underline block truncate">
+                  linkedin.com/in/umesh-kumar-sahoo-94626727a
+                </a>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-1">
+                <span className="text-[10px] font-mono text-[var(--accent-blue)] uppercase font-bold">GitHub Profile</span>
+                <a href="https://github.com/umeshkumarsahoo" target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-[#181818] hover:text-[var(--accent-blue)] underline block truncate">
+                  github.com/umeshkumarsahoo
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -1039,125 +1077,162 @@ export default function TabContent({
     );
   }
 
-  // ── AI AGENT TAB ──
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ── CHAPTER 08: UMU AI & TECH PULSE (Light Paper Spread) ──
+  // ══════════════════════════════════════════════════════════════════════════════
   if (activeTab === "agent") {
     return (
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        id="agent-tab-content"
-        className="h-full flex flex-col overflow-hidden"
+        className="w-full bg-[#FFFFFF] rounded-2xl sm:rounded-3xl border border-[#E7E3D8] zine-spread-card p-4 sm:p-8 md:p-10 flex flex-col h-[calc(100vh-140px)] min-h-[550px]"
       >
-        <div className="flex-1 flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--bg-primary)] overflow-hidden">
-          {/* Chat Header with Doodle */}
-          <div className="shrink-0 px-4 py-3 border-b border-[var(--color-border)] flex items-center gap-3">
-            <UmuDoodle state={doodleState} className="" />
-            <div>
-              <span className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                umu
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)] inline-block" />
-              </span>
-              <span className="text-[10px] text-[var(--text-faint)] font-mono">
-                {isQuerying ? queryStatus : "Online · Ready to help"}
-              </span>
-            </div>
+        {/* Spread Header */}
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#EFECE4] shrink-0">
+          <div>
+            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--accent-blue)] font-bold">
+              Chapter 08 · Cognitive Companion
+            </span>
+            <h2 className="text-xl sm:text-3xl font-hand font-bold text-[#181818] tracking-tight">
+              Digital Twin · UMU AI & Live Tech Pulse
+            </h2>
           </div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-mono font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Gemini 2.0 Active
+            </span>
+            <span className="text-xs font-mono text-[var(--text-faint)] hidden sm:inline">
+              p. 08 / 08
+            </span>
+          </div>
+        </div>
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-            {messages.length <= 1 && (
-              <div className="py-6 px-4 my-2 rounded-2xl border border-[var(--color-border)] bg-[var(--bg-secondary)]/50 text-center space-y-3">
-                <DoodleGang className="w-full max-w-sm h-28 mx-auto" />
-                <h4 className="text-xs font-mono uppercase tracking-widest text-[var(--accent-blue)] font-bold">
-                  Meet umu · Umesh's AI Sidekick
-                </h4>
-                <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-                  Curious about Umesh's code, his machine learning pipelines, or want to dissect what's blowing up on Hacker News? Ask me anything — no corporate fluff, just real tech talk.
-                </p>
-              </div>
-            )}
-            {messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex flex-col ${
-                  m.role === "user" ? "items-end" : "items-start"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[var(--text-faint)]">
-                  <span>{m.role === "user" ? "You" : "umu"}</span>
-                  <span>·</span>
-                  <span className="font-mono">{m.timestamp}</span>
-                </div>
+        {/* Two-Page Spread Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
+          {/* Left Page (7 cols): Interactive Chat Console */}
+          <div className="lg:col-span-7 flex flex-col h-full min-h-0 rounded-2xl border border-[#E7E3D8] bg-[#FAF9F5] overflow-hidden">
+            {/* Conversation Log */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 min-h-0">
+              {messages.map((m, idx) => (
                 <div
-                  className={`px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap select-text ${
-                    m.role === "user"
-                      ? "chat-bubble-user"
-                      : "chat-bubble-agent"
+                  key={idx}
+                  className={`flex flex-col ${
+                    m.role === "user" ? "items-end" : "items-start"
                   }`}
                 >
-                  {m.content}
+                  <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[var(--text-faint)]">
+                    <span className="font-semibold">{m.role === "user" ? "You" : "umu"}</span>
+                    <span>·</span>
+                    <span className="font-mono">{m.timestamp}</span>
+                  </div>
+                  <div
+                    className={`px-4 py-2.5 max-w-[85%] text-xs sm:text-sm leading-relaxed select-text shadow-2xs ${
+                      m.role === "user"
+                        ? "chat-bubble-user"
+                        : "chat-bubble-agent"
+                    }`}
+                  >
+                    <MarkdownRenderer content={m.content} role={m.role} />
+                  </div>
                 </div>
-              </div>
-            ))}
-            
-            {isQuerying && (
-              <div className="flex flex-col items-start">
-                <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[var(--text-faint)]">
-                  <span>umu</span>
-                  <span>·</span>
-                  <span className="font-mono">thinking</span>
-                </div>
-                <div className="chat-bubble-agent px-4 py-3 flex items-center gap-2 text-sm text-[var(--accent-blue)]">
-                  <span className="inline-block animate-spin border-t-2 border-r-2 border-[var(--accent-blue)] rounded-full w-3.5 h-3.5 shrink-0" />
-                  {queryStatus}
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+              ))}
 
-          {/* Quick Prompts */}
-          <div className="px-4 py-2 border-t border-[var(--color-border)] overflow-x-auto flex gap-2 shrink-0">
-            {[
-              { label: "📡 Tech Pulse", prompt: "Brief me on the latest top trending tech news headlines." },
-              { label: "🎓 Credentials", prompt: "Tell me about Umesh's education, CGPA, and background" },
-              { label: "RAG Assistant", prompt: "Explain your RAG-Based Assistant" },
-              { label: "DevOps", prompt: "Detail your DevOps and Terraform experience" },
-              { label: "FreshGuard", prompt: "Explain the FreshGuard ML project" },
-              { label: "MongoDB", prompt: "How did you optimize e-commerce queries?" },
-            ].map((item, idx) => (
+              {isQuerying && (
+                <div className="flex flex-col items-start">
+                  <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[var(--text-faint)]">
+                    <span>umu</span>
+                    <span>·</span>
+                    <span className="font-mono">thinking</span>
+                  </div>
+                  <div className="chat-bubble-agent px-4 py-2.5 flex items-center gap-2 text-xs sm:text-sm text-[var(--accent-blue)]">
+                    <span className="inline-block animate-spin border-t-2 border-r-2 border-[var(--accent-blue)] rounded-full w-3.5 h-3.5 shrink-0" />
+                    <span>{queryStatus}</span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Quick Prompts Bar */}
+            <div className="px-3 py-2 border-t border-[#E7E3D8] overflow-x-auto flex gap-1.5 shrink-0 bg-white/70">
+              {[
+                { label: "📡 Tech Pulse", prompt: "Brief me on the latest top trending tech news headlines." },
+                { label: "🎓 Credentials", prompt: "Tell me about Umesh's education, CGPA, and background" },
+                { label: "RAG Assistant", prompt: "Explain your RAG-Based Assistant" },
+                { label: "DevOps", prompt: "What DevOps and cloud experience does Umesh have?" },
+                { label: "FreshGuard", prompt: "Tell me about FreshGuard and your ML competitions" },
+              ].map((qp, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleQuerySubmit(undefined, qp.prompt)}
+                  className="px-2.5 py-1 text-[11px] font-mono rounded-lg border border-[#E7E3D8] bg-white hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)] whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                >
+                  {qp.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Input Form */}
+            <form onSubmit={handleQuerySubmit} className="p-2.5 border-t border-[#E7E3D8] bg-white flex items-center gap-2 shrink-0">
+              <input
+                type="text"
+                placeholder="Ask umu about Umesh's background, projects, or say 'brief me on the news'..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                disabled={isQuerying}
+                className="flex-1 px-3 py-2 text-xs sm:text-sm rounded-lg border border-[#E7E3D8] focus:outline-none focus:border-[var(--accent-blue)]"
+              />
               <button
-                key={idx}
-                onClick={(e) => handleQuerySubmit(e, item.prompt)}
-                className="shrink-0 text-xs text-[var(--text-muted)] hover:text-[var(--accent-blue)] border border-[var(--color-border)] hover:border-[var(--accent-blue)] px-3 py-1 rounded-full transition-colors cursor-pointer"
+                type="submit"
+                disabled={!query.trim() || isQuerying}
+                className="p-2 rounded-lg bg-[var(--accent-blue)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer shrink-0"
               >
-                {item.label}
+                <Send className="w-4 h-4" />
               </button>
-            ))}
+            </form>
           </div>
 
-          {/* Input Form */}
-          <form
-            onSubmit={handleQuerySubmit}
-            className="border-t border-[var(--color-border)] flex items-center shrink-0"
-          >
-            <input
-              type="text"
-              placeholder="Ask umu about Umesh's background, projects, or repos..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] border-none focus:outline-none focus:ring-0 px-4 py-3 placeholder:text-[var(--text-faint)] select-text"
-              disabled={isQuerying}
-            />
-            <button
-              type="submit"
-              disabled={isQuerying || !query.trim()}
-              className="h-full px-4 text-[var(--accent-blue)] hover:bg-[var(--accent-blue)] hover:text-white transition-colors cursor-pointer flex items-center justify-center disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--accent-blue)] rounded-r-xl"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+          {/* Right Page (5 cols): Animated Doodle + Tech News Feed */}
+          <div className="lg:col-span-5 flex flex-col h-full min-h-0 space-y-4 lg:border-l lg:border-[#EFECE4] lg:pl-6 overflow-hidden">
+            {/* Doodle Status Card */}
+            <div className="p-3.5 rounded-2xl border border-[#E7E3D8] bg-[#FAF9F5] flex items-center gap-4 shrink-0">
+              <div className="w-16 h-16 shrink-0 flex items-center justify-center">
+                <UmuDoodle state={doodleState} className="w-16 h-16" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-[#181818]">umu · Companion</h4>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                  {isQuerying ? queryStatus : "Listening attentively · Ready to brief you"}
+                </p>
+              </div>
+            </div>
+
+            {/* Hacker News Live Intelligence Feed */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between pb-2 shrink-0">
+                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                  Trending Hacker News
+                </span>
+                <span className="text-[10px] font-mono text-[var(--accent-blue)] font-bold">
+                  Live Stream
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <TechNewsFeed onBriefNews={(topic) => {
+                  const prompt = topic && topic !== "top-news"
+                    ? `Give me a technical briefing on: "${topic}"`
+                    : "Brief me on the latest top trending tech news headlines.";
+                  handleQuerySubmit(undefined, prompt);
+                }} />
+              </div>
+            </div>
+          </div>
         </div>
       </motion.div>
     );

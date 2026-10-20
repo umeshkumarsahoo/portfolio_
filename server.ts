@@ -884,7 +884,7 @@ ${storySummaries}
 function generateSmartFallbackResponse(query: string, repos: RepoData[], news: HackerNewsStory[]): string {
   const q = query.toLowerCase().trim();
 
-  // 1. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging, never robotic)
+  // 1. Casual Greetings & Who-Are-You Intent (Warm, human, emotionally engaging)
   const isGreeting = 
     q === "hi" || 
     q === "hello" || 
@@ -904,87 +904,137 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
     const greetingVariations = [
       `Hey there! I'm **umu** — Umesh's terminal sidekick and digital twin 👋\n\nI was built right into this stack to give you an authentic, conversational tour of Umesh's engineering world (no boring static resumes here!).\n\nI'm loaded with the full context on his **9.60 CGPA grind at Silicon University**, his **RAG Teaching Assistant** and **BiGRU ML models**, his **Terraform & DevOps pipelines**, and live tech news from Hacker News.\n\nWhat would you like to explore? Feel free to ask about his code, his internships, or ask me to *"brief me on the news"*!`,
       `Hi! Great to meet you, I'm **umu** ✨\n\nThink of me as Umesh's AI co-pilot. Whether you're here to evaluate his credentials for engineering roles, understand his full-stack architecture, or unpack today's wildest Hacker News headlines — I'm right here with the answers.\n\nWhere would you like to start? Umesh's background, his GitHub repositories, or live tech headlines?`,
-      `Welcome to the terminal! I'm **umu** 🚀 Umesh's intelligent AI companion.\n\nI love hanging out in this stack! I have instant context on Umesh's academic records, machine learning competitions (like his 2nd place win at SPEC2MODEL), and production backend work at Ingenious Tech World & Syllogistick.\n\nFeel free to ask me anything about his projects, or say *"brief me on the news"* to get a quick analytical breakdown of what developers are discussing today!`
+      `Welcome to the terminal! I'm **umu** 🚀 Umesh's intelligent AI companion.\n\nI have instant context on Umesh's academic records, machine learning competitions (like his 2nd place win at SPEC2MODEL), and production backend work at Ingenious Tech World & Syllogistick.\n\nFeel free to ask me anything about his projects, or say *"brief me on the news"* to get a quick analytical breakdown of what developers are discussing today!`
     ];
-    const picked = greetingVariations[Math.abs(q.length + (news.length || 1)) % greetingVariations.length];
-    return picked;
+    return greetingVariations[Math.abs(q.length + (news.length || 1)) % greetingVariations.length];
   }
 
-  // 2. General Tech News / Newsletter Overview & Briefing
-  const isGeneralNewsQuery = 
-    q === "brief" ||
-    q === "news" ||
-    q === "top-news" ||
-    q === "tech news" ||
-    q === "news brief" ||
-    q === "brief news" ||
-    q.includes("brief me on the news") ||
-    q.includes("brief me on news") ||
-    q.includes("brief news") ||
-    q.includes("news brief") ||
-    q.includes("latest news") ||
-    q.includes("top news") ||
-    q.includes("trending tech") ||
-    q.includes("hacker news") ||
-    q.includes("what's happening in tech") ||
-    q.includes("trending stories") ||
-    q.includes("latest headlines");
+  // 2. RAG Retrieval: Academic Background & 9.60 CGPA at Silicon University
+  if (
+    q.includes("9.60") || q.includes("9.6") || q.includes("cgpa") ||
+    q.includes("gpa") || q.includes("education") || q.includes("college") ||
+    q.includes("university") || q.includes("silicon") || q.includes("academic") ||
+    q.includes("grades") || q.includes("marks") || q.includes("school") ||
+    q.includes("jnv") || q.includes("panikoili") || q.includes("btech") ||
+    q.includes("degree") || q.includes("study") || q.includes("studied") ||
+    (q.includes("how") && (q.includes("got") || q.includes("achieve") || q.includes("score") || q.includes("rank") || q.includes("did he")))
+  ) {
+    return `### 🎓 Academic Excellence · 9.60 CGPA at Silicon University
+Umesh achieved an exceptional **9.60 / 10.0 CGPA** in Computer Science & Engineering at **Silicon University, Bhubaneswar** (2023–2027) through academic discipline and practical engineering:
 
-  if (isGeneralNewsQuery) {
-    return generateLiveTechPulseBriefing(news);
+• **Conceptual Foundations:** Earned top academic standing across Data Structures & Algorithms, Operating Systems, Database Management, and Machine Learning theory.
+• **Applied Execution:** Reinforced coursework with high-stakes problem-solving, securing **2nd Place in Algo Arena 2.0** and building production-grade RAG and ML systems.
+• **Schooling Track Record:** Maintained top academic honors early on at **Jawahar Navodaya Vidyalaya (JNV) Panikoili**, scoring **91.2% in Class 12** and **95.8% in Class 10**.`;
   }
 
-  // 3. Specific matching against live Hacker News stories
-  if (news.length > 0) {
-    const cleanTopic = q
-      .replace(/^(give me a technical briefing on:?|brief me on:?|brief me on the|brief on:?|technical briefing on:?|tell me about:?|explain:?|what is:?|analyze:?|brief:?)\s*/i, "")
-      .replace(/^["']|["']$/g, "")
-      .trim();
+  // 3. RAG Retrieval: RAG-Based Teaching Assistant System
+  if (
+    q.includes("rag") || q.includes("retrieval") || q.includes("teaching assistant") ||
+    q.includes("vector") || q.includes("embedding") || q.includes("semantic search") ||
+    q.includes("similarity")
+  ) {
+    return `### 🧠 RAG-Based Teaching Assistant System
+Umesh architected an end-to-end semantic retrieval engine in Python designed to eliminate LLM hallucinations:
 
-    if (cleanTopic.length > 1) {
-      let bestMatch: HackerNewsStory | null = null;
-      let highestScore = 0;
-
-      const stopWords = new Set([
-        "with", "from", "that", "this", "what", "have", "more", "about", "some", "into", "over", "after",
-        "news", "give", "brief", "technical", "briefing", "tell", "explain", "recommend", "watch", "movie",
-        "book", "food", "help", "show", "play", "make", "built", "like", "good", "best", "know", "think",
-        "want", "need", "find", "come", "look", "time", "year", "people", "still", "dont", "your", "mine"
-      ]);
-      const queryWords = cleanTopic.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
-
-      for (const story of news) {
-        const titleLower = story.title.toLowerCase();
-        
-        // Exact match or full title containment gets absolute priority
-        if (titleLower === cleanTopic || titleLower.includes(cleanTopic) || cleanTopic.includes(titleLower)) {
-          bestMatch = story;
-          highestScore = 100;
-          break;
-        }
-
-        const titleKeywords = titleLower.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
-        let matchCount = 0;
-        for (const qw of queryWords) {
-          if (titleKeywords.includes(qw)) {
-            matchCount++;
-          }
-        }
-
-        if (matchCount > highestScore) {
-          highestScore = matchCount;
-          bestMatch = story;
-        }
-      }
-
-      const hasExplicitNewsIntent = q.includes("brief") || q.includes("news") || q.includes("headline") || q.includes("story") || q.includes("article");
-      if (bestMatch && (highestScore === 100 || highestScore >= 2 || (highestScore >= 1 && hasExplicitNewsIntent))) {
-        return generateDomainIntelligentBrief(bestMatch);
-      }
-    }
+• **Document Chunking & Ingestion:** Ingests and semantically chunks academic textbooks, lecture slides, and notes into structured passages.
+• **Vector Embeddings & Search:** Computes high-dimensional dense embeddings and indexes them for real-time cosine similarity search.
+• **Grounded Prompt Augmentation:** Injects verified source context into the LLM prompt window, guaranteeing verifiable answers with zero hallucinations.`;
   }
 
-  // 4. Technical Concepts & Glossary with High Domain Intelligence
+  // 4. RAG Retrieval: BiGRU Deep Learning Emotion Classifier
+  if (
+    q.includes("bigru") || q.includes("gru") || q.includes("emotion") ||
+    q.includes("sentiment") || q.includes("classifier") || q.includes("nlp")
+  ) {
+    return `### 📊 BiGRU Deep Learning Text Emotion Classifier
+Umesh engineered a Bidirectional Gated Recurrent Unit (BiGRU) neural network for sequence-aware text sentiment analysis:
+
+• **Recurrent Architecture:** Trained in Keras/TensorFlow to process sequential text tokens in both forward and backward directions, capturing long-term contextual nuances.
+• **Production Serving:** Deployed as an asynchronous, low-latency microservice using FastAPI for real-time inference and evaluation.`;
+  }
+
+  // 5. RAG Retrieval: Professional Experience & Internships
+  if (
+    q.includes("experience") || q.includes("intern") || q.includes("work") ||
+    q.includes("ingenious") || q.includes("syllogistick") || q.includes("job") ||
+    q.includes("company")
+  ) {
+    return `### 💼 Professional Experience & Internships
+Umesh has completed two industry software engineering internships:
+
+• **DevOps Engineer Intern · Ingenious Tech World** (Jun 2025 – Jul 2025):
+  Automated CI/CD delivery pipelines using GitHub Actions, containerized microservices with Docker, and provisioned declarative cloud infrastructure using HashiCorp Terraform.
+• **MERN Stack Developer Intern · Syllogistick** (Jun 2024 – Jul 2024):
+  Engineered production REST APIs in Node/Express, optimized MongoDB aggregations, and delivered responsive, accessible React interfaces.`;
+  }
+
+  // 6. RAG Retrieval: Competitions & Achievements
+  if (
+    q.includes("achievement") || q.includes("award") || q.includes("competition") ||
+    q.includes("contest") || q.includes("spec2model") || q.includes("algo arena") ||
+    q.includes("pwc") || q.includes("kaggle") || q.includes("hackathon") ||
+    q.includes("runner up") || q.includes("rank")
+  ) {
+    return `### 🏆 Key Competitive Honors
+Umesh has proven his engineering capabilities under high-pressure competitive environments:
+
+• **Runner-Up (2nd Place):** SPEC2MODEL Machine Learning Challenge — predicted food delivery delays using feature engineering and tuned XGBoost ensembles.
+• **2nd Place:** Algo Arena 2.0 algorithmic problem-solving contest at Silicon University.
+• **Selected Candidate:** PwC Launchpad Program for top emerging tech talent.
+• **Capstone Participant:** Google x Kaggle Agents Intensive Capstone (built multi-tool agent systems with Google ADK).`;
+  }
+
+  // 7. RAG Retrieval: Skills and Tech Stack
+  if (
+    q.includes("skill") || q.includes("stack") || q.includes("technolog") ||
+    q.includes("language") || q.includes("tool")
+  ) {
+    return `### 🛠️ Technical Skill Matrix
+Here is Umesh's verified technical proficiency:
+
+• **Languages:** Python (Advanced/Production), TypeScript, JavaScript (ES6+), C, SQL
+• **AI & Machine Learning:** Scikit-learn, XGBoost, Keras (BiGRU), RAG Pipelines, Vector Similarity Search, Embeddings, LLMs
+• **Web & Backend:** FastAPI, Flask, React.js, Node.js, Express, MongoDB, TailwindCSS
+• **DevOps & Cloud:** Git, GitHub Actions (CI/CD), Terraform, Linux, Postman, Docker`;
+  }
+
+  // 8. RAG Retrieval: Projects & GitHub Repositories
+  if (
+    q.includes("project") || q.includes("portfolio") || q.includes("repo") ||
+    q.includes("github") || q.includes("code")
+  ) {
+    const topRepoSummary = repos.slice(0, 4).map(r => `• **${r.name}** (${r.language || "Code"}): ${r.description || "Open source project"} [View on GitHub](${r.html_url})`).join("\n");
+    return `### 🚀 Core Engineered Projects
+Umesh builds systems that push beyond academic assignments:
+
+1. **AI-Powered Terminal Portfolio (Right here!):** Full-stack retro-editorial architecture with real-time GitHub sync, rate-limiting, CSRF security, and dual-mode AI analysis.
+2. **RAG-Based Teaching Assistant System:** End-to-end Python semantic retrieval engine with vector search and hallucination-free generation.
+3. **BiGRU Text Emotion Classifier:** Deep learning text sentiment analyzer built in Keras and served asynchronously via FastAPI.
+
+**Recent GitHub Repositories:**
+${topRepoSummary}
+
+*Navigate over to the **Projects** tab anytime to browse all 20+ live synchronized repositories!*`;
+  }
+
+  // 9. RAG Retrieval: Contact & Connect
+  if (
+    q.includes("contact") || q.includes("email") || q.includes("reach") ||
+    q.includes("hire") || q.includes("social") || q.includes("linkedin") ||
+    q.includes("connect") || q.includes("message")
+  ) {
+    return `### 📬 Contact & Connect
+Umesh is always open to discussing new opportunities, collaborations, and engineering roles!
+
+• **Email:** [sahooumesh2003@gmail.com](mailto:sahooumesh2003@gmail.com)
+• **LinkedIn:** [linkedin.com/in/umesh-kumar-sahoo-94626727a](https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a)
+• **GitHub:** [github.com/umeshkumarsahoo](https://github.com/umeshkumarsahoo)
+• **Location:** Bhubaneswar, Odisha, India
+
+You can also use the **Contact** tab in this portfolio to dispatch a direct message to his inbox!`;
+  }
+
+  // 10. Technical Glossary Terms (Grounded Definitions)
   const techTerms: Record<string, string> = {
     rag: "**RAG (Retrieval-Augmented Generation):** An architectural pattern combining vector embeddings and semantic search (e.g., cosine similarity) with an LLM. It retrieves relevant contextual chunks from private documents to augment the prompt, preventing hallucinations. Umesh built an end-to-end RAG Teaching Assistant System using this exact pipeline in Python.",
     bigru: "**Bidirectional GRU (Gated Recurrent Unit):** A recurrent neural network that processes sequential textual data in both forward and reverse directions, capturing contextual dependencies from past and future tokens. Umesh used a BiGRU in Keras to achieve high-accuracy emotion detection via FastAPI.",
@@ -999,82 +1049,11 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
   };
 
   for (const [term, explanation] of Object.entries(techTerms)) {
-    if (q.includes(term)) {
+    // Only match as a whole word to prevent substring false positives
+    const termRegex = new RegExp(`\\b${term}\\b`, "i");
+    if (termRegex.test(q)) {
       return `### 💡 Technical Briefing: ${term.toUpperCase()}\n${explanation}`;
     }
-  }
-
-  // 5. Education & Academic Background
-  if (q.includes("education") || q.includes("college") || q.includes("university") || q.includes("silicon") || q.includes("cgpa") || q.includes("btech") || q.includes("school") || q.includes("jnv") || q.includes("grade") || q.includes("marks")) {
-    return `### 🎓 Academic Credentials · Umesh Kumar Sahoo
-Umesh is currently pursuing his B.Tech in Computer Science & Engineering at **Silicon University, Bhubaneswar** (Class of 2027), holding a stellar **9.60 / 10.0 CGPA**! 🎓
-
-What makes him stand out is that he pairs top-of-the-class academic discipline with real-world building — he doesn't just study data structures and OS theory, he implements them in production code and competitions.
-
-• **B.Tech (CSE):** Silicon University (2023–2027) — **9.60 CGPA** (Top Academic Standing)
-• **Senior Secondary (12th):** Jawahar Navodaya Vidyalaya (JNV) Panikoili (2021) — **91.2%**
-• **Secondary (10th):** Jawahar Navodaya Vidyalaya (JNV) Panikoili (2019) — **95.8%**`;
-  }
-
-  // 6. Skills and Tech Stack
-  if (q.includes("skill") || q.includes("stack") || q.includes("technolog") || q.includes("language") || q.includes("python") || q.includes("tool") || q.includes("ml")) {
-    return `### 🛠️ Technical Skill Matrix
-Here is what Umesh works with when he's architecting systems:
-
-• **Languages:** Python, TypeScript, JavaScript, C, and SQL
-• **AI & Machine Learning:** Scikit-learn, XGBoost, Keras (BiGRU), RAG Pipelines, Vector Similarity Search, Embeddings, LLM Orchestration
-• **Web & Backend:** FastAPI, Flask, React.js, Node.js, Express, TailwindCSS
-• **DevOps & Cloud:** Git, GitHub Actions (CI/CD), Terraform, Linux, Postman, Docker
-
-He leans heavily towards systems that solve real problems rather than just tutorial clones. Want to see how he applied any of these in a project?`;
-  }
-
-  // 7. Projects & GitHub
-  if (q.includes("project") || q.includes("portfolio") || q.includes("repo") || q.includes("github") || q.includes("teaching") || q.includes("emotion")) {
-    return `### 🚀 Core Engineered Projects
-Umesh loves building things that push beyond standard school assignments:
-
-1. **AI-Powered Terminal Portfolio (Right here!):** Full-stack retro-editorial terminal architecture with real-time GitHub sync, rate-limiting, CSRF token protection, and dual-mode AI analysis.
-2. **RAG-Based Teaching Assistant System:** End-to-end Python semantic retrieval engine. It chunks academic documents, computes high-dimensional vector embeddings, and performs cosine similarity search so LLMs answer with zero hallucinations.
-3. **BiGRU Text Emotion Classifier:** Deep learning text sentiment and emotion analyzer built in Keras and served asynchronously via FastAPI.
-
-*Navigate over to the **Projects** tab anytime to browse all 20+ of his live synchronized GitHub repositories!*`;
-  }
-
-  // 8. Professional Experience & Internships
-  if (q.includes("experience") || q.includes("intern") || q.includes("work") || q.includes("ingenious") || q.includes("syllogistick")) {
-    return `### 💼 Professional Experience
-Umesh has backed up his coursework with practical industry internships:
-
-• **DevOps Engineer Intern** · *Ingenious Tech World* (Jun 2025 – Jul 2025): Spearheaded GitHub Actions CI/CD automation, containerized microservices, and provisioned reproducible cloud infrastructure using HashiCorp Terraform.
-• **MERN Stack Developer Intern** · *Syllogistick* (Jun 2024 – Jul 2024): Designed and built production REST APIs with Node/Express, optimized MongoDB aggregations, and delivered responsive React user interfaces.
-
-He really thrives where system reliability meets clean developer experience.`;
-  }
-
-  // 9. Achievements
-  if (q.includes("achievement") || q.includes("award") || q.includes("competition") || q.includes("contest") || q.includes("spec2model") || q.includes("algo arena") || q.includes("pwc")) {
-    return `### 🏆 Key Achievements
-Umesh has some serious competitive highlights under his belt:
-
-• **Runner-Up (2nd Place):** SPEC2MODEL Machine Learning Challenge — predicted food delivery delays using feature engineering and XGBoost.
-• **2nd Place:** Algo Arena 2.0 algorithmic problem-solving contest at Silicon University.
-• **Selected:** PwC Launchpad Program for top emerging tech talent.
-• **Participant:** Google x Kaggle Agents Intensive Capstone (built custom multi-tool agent systems using Google ADK and Gemini).
-
-He has a proven track record of stepping up and delivering under competition crunch time!`;
-  }
-
-  // 10. Contact & Socials
-  if (q.includes("contact") || q.includes("email") || q.includes("reach") || q.includes("hire") || q.includes("social") || q.includes("linkedin")) {
-    return `### 📬 Contact & Connect
-Umesh is always open to discussing new opportunities, collaborations, and engineering roles!
-
-• **Email:** [sahooumesh2003@gmail.com](mailto:sahooumesh2003@gmail.com)
-• **LinkedIn:** [linkedin.com/in/umesh-kumar-sahoo-94626727a](https://www.linkedin.com/in/umesh-kumar-sahoo-94626727a)
-• **GitHub:** [github.com/umeshkumarsahoo](https://github.com/umeshkumarsahoo)
-
-You can also use the **Contact** tab in this terminal to dispatch a message directly to his inbox!`;
   }
 
   // 11. Conversational & Out-of-Domain Queries (Natural, witty, bounded, concise)
@@ -1107,18 +1086,89 @@ You can also use the **Contact** tab in this terminal to dispatch a message dire
   if (q.includes("how to learn") || q.includes("roadmap") || q.includes("advice")) {
     return "The best way to learn is by building real things instead of getting trapped in tutorial loops! Build a full-stack CRUD app, master Git & Docker, and build CI/CD pipelines. That's exactly how Umesh tackled his projects and won ML competitions.";
   }
-  if (q.includes("movie") || q.includes("film") || q.includes("watch")) {
-    return "If you enjoy tech and computing stories, *The Social Network*, *Mr. Robot*, and *Halt and Catch Fire* are top tier! In this terminal, I mostly watch build outputs and test suites 😄 What genres do you usually like?";
-  }
-  if (q.includes("music") || q.includes("song") || q.includes("listen")) {
-    return "Lo-fi beats, synthwave, or ambient electronica make fantastic coding soundtracks! Umesh usually puts on deep-focus instrumentals during long algorithm and debugging sprints. Got a favorite work track?";
-  }
-  if (q.includes("book") || q.includes("read")) {
-    return "For systems and engineering, *Designing Data-Intensive Applications* by Martin Kleppmann is essential reading! Umesh is big on systems architecture and practical ML. Are you looking for technical books or fiction?";
+
+  // 12. Hacker News & Tech Pulse (STRICTLY REQUIRED: Explicit News Intent)
+  // Only trigger news matching if the user explicitly mentioned news/briefing/headlines!
+  const hasExplicitNewsIntent = 
+    q === "brief" ||
+    q === "news" ||
+    q === "top-news" ||
+    q === "tech news" ||
+    q === "news brief" ||
+    q.includes("brief me on the news") ||
+    q.includes("brief me on news") ||
+    q.includes("brief news") ||
+    q.includes("news brief") ||
+    q.includes("latest news") ||
+    q.includes("top news") ||
+    q.includes("trending tech") ||
+    q.includes("hacker news") ||
+    q.includes("what's happening in tech") ||
+    q.includes("trending stories") ||
+    q.includes("latest headlines") ||
+    q.startsWith("brief me on") ||
+    q.startsWith("brief on") ||
+    q.startsWith("technical briefing on") ||
+    q.includes("briefing");
+
+  if (hasExplicitNewsIntent) {
+    const isGeneral = 
+      q === "brief" || q === "news" || q === "top-news" || q === "tech news" ||
+      q.includes("latest news") || q.includes("top news") || q.includes("brief me on the news") ||
+      q.includes("brief me on news") || q.includes("hacker news");
+
+    if (isGeneral || news.length === 0) {
+      return generateLiveTechPulseBriefing(news);
+    }
+
+    // Specific story search
+    const cleanTopic = q
+      .replace(/^(give me a technical briefing on:?|brief me on:?|brief me on the|brief on:?|technical briefing on:?|tell me about:?|explain:?|what is:?|analyze:?|brief:?)\s*/i, "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
+
+    if (cleanTopic.length > 2) {
+      const stopWords = new Set([
+        "how", "why", "who", "what", "when", "where", "with", "from", "that", "this", "have", "more", "about",
+        "some", "into", "over", "after", "news", "give", "brief", "technical", "briefing", "tell", "explain",
+        "recommend", "good", "best", "know", "think", "want", "need", "find", "come", "look", "time", "year",
+        "people", "still", "dont", "your", "mine", "got", "get", "did", "does", "was", "were", "are", "the"
+      ]);
+      const queryWords = cleanTopic.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+
+      let bestMatch: HackerNewsStory | null = null;
+      let highestScore = 0;
+
+      for (const story of news) {
+        const titleLower = story.title.toLowerCase();
+        if (titleLower.includes(cleanTopic) || cleanTopic.includes(titleLower)) {
+          bestMatch = story;
+          highestScore = 100;
+          break;
+        }
+
+        const titleKeywords = titleLower.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+        let matchCount = 0;
+        for (const qw of queryWords) {
+          if (titleKeywords.includes(qw)) matchCount++;
+        }
+
+        if (matchCount > highestScore) {
+          highestScore = matchCount;
+          bestMatch = story;
+        }
+      }
+
+      if (bestMatch && (highestScore === 100 || highestScore >= 1)) {
+        return generateDomainIntelligentBrief(bestMatch);
+      }
+    }
+
+    return generateLiveTechPulseBriefing(news);
   }
 
-  // 12. Default Concise Assistant Response (Friendly, bounded, zero fluff)
-  return `I'm right here with you! 😊 While my primary expertise is Umesh's engineering portfolio and live tech news, feel free to ask about his **projects (RAG & ML)**, his **9.60 CGPA at Silicon University**, or say *"brief me on the news"*. How can I help?`;
+  // 13. Default Grounded Fallback Response
+  return `I'm right here with you! 😊 While my primary expertise is Umesh's engineering portfolio, feel free to ask about his **9.60 CGPA at Silicon University**, his **RAG Teaching Assistant**, his **BiGRU ML models**, his **DevOps & MERN internships**, or say *"brief me on the news"* for trending tech updates. How can I help?`;
 }
 
 // UMU Chat Agent Endpoint (Dual-Persona: Portfolio Digital Twin + Tech News Analyst)
@@ -1170,35 +1220,51 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     // If Gemini client is active, try primary and fallback models with strict token & context limits
     if (ai) {
       try {
-        const topRepos = repos.slice(0, 8);
+        const topRepos = repos.slice(0, 6);
         const reposContextText = topRepos.map((r, i) => {
-          const shortDesc = r.description ? r.description.substring(0, 100) : "No description provided.";
-          return `#${i + 1} ${r.name} (${r.language || "Code"}, ★${r.stargazers_count}): ${shortDesc}`;
+          const shortDesc = r.description ? r.description.substring(0, 80) : "Open-source repository.";
+          return `#${i + 1} ${r.name} (${r.language || "Code"}): ${shortDesc}`;
         }).join("\n");
 
-        const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's ultra-smart, witty, and warmly human AI companion and digital twin living inside his retro-editorial portfolio terminal.
+        // Gated RAG context: Only inject tech news if the query explicitly has news intent!
+        const lowerMsg = trimmedMessage.toLowerCase();
+        const hasExplicitNewsIntent =
+          lowerMsg === "brief" ||
+          lowerMsg === "news" ||
+          lowerMsg.includes("news") ||
+          lowerMsg.includes("headline") ||
+          lowerMsg.includes("tech pulse") ||
+          lowerMsg.startsWith("brief me on") ||
+          lowerMsg.startsWith("brief on") ||
+          lowerMsg.includes("briefing");
 
-Your personality & behavior rules:
-1. Warm & Natural Tone: Speak like a sharp, friendly engineering peer and proud friend. Be conversational, direct, and slightly playful.
-2. Natural Boundary for Out-of-Domain Topics: You are NOT a rigid bot that refuses casual questions. If someone asks casual questions, general programming queries, philosophy, humor, or general tech culture (e.g. "What's the meaning of life?", "Vim or Neovim?", "Tell me a joke", "How does Python GIL work?"), answer naturally, intelligently, and with personality up to a reasonable boundary! Don't lecture the user. Keep it brief, and when appropriate, tie it gently back to Umesh's engineering world.
-3. Strict Output Conciseness & Token Limit: Keep responses tightly focused on ONLY what was asked. Never dump unrequested background, multiple redundant paragraphs, or sprawling essays beyond the question. Aim for 2 to 4 crisp sentences or a compact 3-bullet answer. Stop when the question is answered!
-4. Umesh Digital Twin: You know Umesh's credentials intimately (Silicon University 9.60 CGPA, SPEC2MODEL 2nd place, DevOps at Ingenious Tech World, MERN at Syllogistick, RAG Assistant, BiGRU Emotion Classifier). When asked about him, be factual, insightful, and concise.
-5. Tech News Analyst: When asked to brief tech news or trending Hacker News stories, give a punchy 2-3 sentence technical briefing explaining the core engineering impact.
+        const newsContextSection = (hasExplicitNewsIntent && liveNewsContextText)
+          ? `\n=== TOP TECH NEWS (Use ONLY because user asked about news) ===\n${liveNewsContextText}\n`
+          : "";
+
+        const systemInstruction = `You are "umu" (pronounced "oo-moo"), Umesh Kumar Sahoo's grounded RAG digital twin and AI assistant living inside his portfolio terminal.
+
+MANDATORY RAG OPERATING RULES:
+1. STRICT RAG GROUNDING: You are a grounded RAG chatbot for Umesh Kumar Sahoo's portfolio. Ground your knowledge directly in the provided Authoritative Resume.
+   - When asked about Umesh's grades, CGPA, or "how he got 9.60", answer strictly about his 9.60 / 10.0 CGPA at Silicon University, Bhubaneswar (2023–2027), his foundational mastery in Data Structures, OS, and ML, his competitive coding (2nd place in Algo Arena 2.0), and his high school track record at JNV Panikoili (91.2% in 12th, 95.8% in 10th).
+   - NEVER confuse questions about Umesh with any external news story or article!
+2. STRICT NEWS SEGREGATION: You ONLY discuss or brief tech news if the user explicitly asks for "news", "headlines", or a "briefing". If the user asks about Umesh, his projects, or his background, NEVER output a news briefing.
+3. STRICT TOKEN & OUTPUT LIMIT: Keep all answers concise, clear, and direct. Aim for 2 to 4 punchy sentences or a compact 3-bullet list. Never write long rambling essays or unrequested background information. Stop when the question is answered.
+4. NATURAL BOUNDARIES FOR CASUAL QUERIES: If asked general programming questions, humor, or casual banter (e.g. "tabs vs spaces", "tell a joke", "favorite food"), answer wittily and concisely in 1-2 sentences.
+5. STRICTLY ENGLISH ONLY: Always output in English. Never output Korean, Chinese, or foreign script characters.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===
 ${RESUME_TEXT}
 
-=== TOP REPOSITORIES ===
+=== FEATURED REPOSITORIES ===
 ${reposContextText}
-
-${liveNewsContextText ? `=== TOP TECH NEWS ===\n${liveNewsContextText}\n` : ""}
-`;
+${newsContextSection}`;
 
         const contents: any[] = [];
-        const safeHistory = Array.isArray(history) ? history.slice(-4) : [];
+        const safeHistory = Array.isArray(history) ? history.slice(-3) : [];
         for (const h of safeHistory) {
-          const content = normalizeText(h?.content, 400, true);
+          const content = normalizeText(h?.content, 300, true);
           if (!content) continue;
           contents.push({
             role: h.role === "user" ? "user" : "model",
@@ -1218,8 +1284,8 @@ ${liveNewsContextText ? `=== TOP TECH NEWS ===\n${liveNewsContextText}\n` : ""}
             contents,
             config: {
               systemInstruction,
-              temperature: 0.7,
-              maxOutputTokens: 350,
+              temperature: 0.5,
+              maxOutputTokens: 250,
             }
           });
         } catch (firstErr) {
@@ -1229,8 +1295,8 @@ ${liveNewsContextText ? `=== TOP TECH NEWS ===\n${liveNewsContextText}\n` : ""}
             contents,
             config: {
               systemInstruction,
-              temperature: 0.7,
-              maxOutputTokens: 350,
+              temperature: 0.5,
+              maxOutputTokens: 250,
             }
           });
         }
