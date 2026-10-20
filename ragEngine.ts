@@ -209,8 +209,10 @@ export async function safeFetch(
     };
 
     const githubToken = process.env.GITHUB_TOKEN?.trim();
-    if (githubToken && (parsed.hostname.includes("github.com") || parsed.hostname.includes("githubusercontent.com"))) {
-      headers["Authorization"] = `token ${githubToken}`;
+    if (githubToken && parsed.hostname === "api.github.com") {
+      headers["Authorization"] = githubToken.startsWith("Bearer ") || githubToken.startsWith("token ")
+        ? githubToken
+        : `Bearer ${githubToken}`;
     }
 
     if (options.etag) headers["If-None-Match"] = options.etag;
@@ -1046,7 +1048,7 @@ STRICT ANSWER RULES:
   }
 
   // Deterministic Synthesizer with Clear Citations
-  private synthesizeDeterministicAnswer(
+  public synthesizeDeterministicAnswer(
     question: string,
     chunks: RetrievalResult[],
     isStale: boolean
@@ -1066,7 +1068,7 @@ STRICT ANSWER RULES:
     const cleanExcerpt = topChunk.chunk.text
       .replace(/^\[Source:.*?\]\s*\[Section:.*?\]\s*/, "")
       .replace(/\n+/g, " ")
-      .substring(0, 320);
+      .substring(0, 420);
 
     const staleNotice = isStale ? "\n\n*(Note: Sourced from a cached copy as the upstream URL is temporarily unreachable)*" : "";
 
@@ -1104,18 +1106,35 @@ export function extractUrlsFromText(text: string): string[] {
 export function isCodeRequest(text: string): boolean {
   const t = text.toLowerCase().trim();
 
-  // If asking a conceptual question without explicitly asking for code/syntax, it's not a code request
+  // Inquiries about codebases, repositories, projects, or system architecture are NOT code generation requests
   if (
-    /^(what is|what are|explain|difference between|why is|why does|how does|compare)\b/i.test(t) &&
-    !/\b(code|syntax|snippet|implementation|example)\b/i.test(t)
+    /\b(codebase|code base|repo|repository|repositories|architecture|overview|explain|tell me about|how was|project|system|model|file|files)\b/i.test(t) &&
+    !/\b(write|generate|give me code|code snippet|runnable code|sample code|example code)\b/i.test(t)
+  ) {
+    return false;
+  }
+
+  // Portfolio, RAG Teaching Assistant, and personal credential questions are never algorithmic code requests
+  if (
+    /\b(rag|teaching assistant|umesh|cgpa|silicon|internship|hackathon|spec2model|algo arena|sentiment)\b/i.test(t) &&
+    !/\b(write a|implement a function|write python|write code|code snippet for)\b/i.test(t)
+  ) {
+    return false;
+  }
+
+  // Conceptual and architectural inquiries without explicit request to write code
+  if (
+    /^(what is|what are|explain|difference between|why is|why does|how does|compare|tell me|describe|overview)\b/i.test(t) &&
+    !/\b(write|generate|give me code|code snippet)\b/i.test(t)
   ) {
     return false;
   }
 
   return (
-    /\b(code|function|implement|write|script|algorithm|method|snippet|syntax|program)\b/i.test(t) ||
+    /\b(write|generate|give me|show me)\s+(a\s+)?(code|function|script|snippet|program|implementation)\b/i.test(t) ||
     /\b(how to\s+(code|write|program|implement|create))\b/i.test(t) ||
-    /\b(reverse|sort|binary search|debounce|throttle|fibonacci|two sum|quicksort|merge sort|linked list|bfs|dfs|palindrome|factorial)\b/i.test(t) ||
+    /\b(code\s+(for|to|snippet|example|sample))\b/i.test(t) ||
+    /\b(reverse string|reverse array|binary search|debounce|throttle|fibonacci|two sum|quicksort|merge sort|linked list|bfs|dfs|palindrome|factorial)\b/i.test(t) ||
     t.startsWith("how to write") ||
     t.startsWith("write a") ||
     t.startsWith("how to implement") ||
@@ -1133,8 +1152,9 @@ export function isPortfolioQuery(text: string): boolean {
     /\b(9\.60?|cgpa|gpa|grades?|marks?|btech|degree|college|school)\b/i.test(t) ||
     /\b(intern|internship|internships|ingenious|syllogistick)\b/i.test(t) ||
     /\b(spec2model|algo arena|pwc|hackathon|runner up)\b/i.test(t) ||
+    /\b(rag|teaching assistant|sentiment analysis|bigru|classifier|codebase|code base)\b/i.test(t) ||
     /\b(who are you|who made this|who created|about yourself|your background|contact|hire|email|linkedin)\b/i.test(t) ||
-    (t.includes("your") && (t.includes("project") || t.includes("skill") || t.includes("experience") || t.includes("repo") || t.includes("work")))
+    (t.includes("your") && (t.includes("project") || t.includes("skill") || t.includes("experience") || t.includes("repo") || t.includes("work") || t.includes("code")))
   );
 }
 
@@ -1278,6 +1298,24 @@ export function generateCodeSnippet(query: string): { code: string; explanation:
       language: "typescript",
       code: `async function fetchData<T>(url: string): Promise<T> {\n  const response = await fetch(url, {\n    headers: { "Accept": "application/json" },\n  });\n  if (!response.ok) {\n    throw new Error(\`HTTP error! status: \${response.status}\`);\n  }\n  return (await response.json()) as T;\n}`,
       explanation: "Fetches JSON data asynchronously with HTTP status validation and TypeScript generic typing.",
+    };
+  }
+
+  // 10. RAG Audio Chunking & Transcription (From Teaching_assistant-rag-based- codebase)
+  if (q.includes("chunk") || q.includes("whisper") || q.includes("transcribe")) {
+    return {
+      language: "python",
+      code: `import whisper\nimport json\nimport os\n\n# Load OpenAI Whisper large-v2 for accurate speech transcription\nmodel = whisper.load_model("large-v2")\n\ndef transcribe_and_chunk(audio_path: str, output_json: str):\n    """Transcribes audio and produces timestamped JSON chunks."""\n    result = model.transcribe(audio_path, language="hi", task="translate")\n    chunks = []\n    for segment in result["segments"]:\n        chunks.append({\n            "start": segment["start"],\n            "end": segment["end"],\n            "text": segment["text"].strip()\n        })\n    with open(output_json, "w") as f:\n        json.dump({"chunks": chunks, "full_text": result["text"]}, f, indent=4)\n    return chunks`,
+      explanation: "Transcribes audio files using OpenAI's Whisper large-v2 model and generates structured time-indexed segments for semantic vector retrieval.",
+    };
+  }
+
+  // 11. Cosine Similarity Vector Retrieval (From Teaching_assistant-rag-based- codebase)
+  if (q.includes("cosine") || q.includes("vector search") || q.includes("similarity")) {
+    return {
+      language: "python",
+      code: `import numpy as np\nfrom sklearn.metrics.pairwise import cosine_similarity\n\ndef retrieve_best_chunk(query_embedding: np.ndarray, doc_embeddings: np.ndarray, chunks: list[dict], threshold: float = 0.60):\n    """Performs cosine similarity search against indexed document chunks."""\n    query_vec = query_embedding.reshape(1, -1)\n    scores = cosine_similarity(query_vec, doc_embeddings)[0]\n    best_idx = int(np.argmax(scores))\n    \n    if scores[best_idx] >= threshold:\n        return {"chunk": chunks[best_idx], "score": float(scores[best_idx])}\n    return None`,
+      explanation: "Computes cosine similarity between a dense query embedding and pre-indexed chunk vectors, returning the top match exceeding the similarity threshold.",
     };
   }
 

@@ -128,7 +128,6 @@ for (const sourceUrl of DEFAULT_RAG_SOURCES) {
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN?.trim();
 const GITHUB_USERNAME = process.env.GITHUB_USERNAME || "umeshkumarsahoo";
 
-// In-memory cache for GitHub repos and README content
 interface RepoData {
   name: string;
   description: string | null;
@@ -137,7 +136,25 @@ interface RepoData {
   forks_count: number;
   language: string | null;
   readme: string;
+  files?: string[];
 }
+
+// Index flagship RAG project documentation into RAG engine for verified retrieval grounding
+ragEngine.indexDirectDocument(
+  "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
+  "GitHub: Teaching_assistant-rag-based- (Video RAG Teaching Assistant)",
+  `Repository: Teaching_assistant-rag-based-
+Author: Umesh Kumar Sahoo
+GitHub URL: https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-
+Primary Language: Python
+Description: A video-to-text Retrieval-Augmented Generation (RAG) teaching assistant that lets students search video lectures by concept and jump to exact timestamps.
+Files in Repository: APP.PY, api.py, create_chunks.py, process_video.py, requirements.txt, prompt.txt, After_chunking.ipynb, process_incoming.ipynb
+Pipeline Architecture:
+1. Video to Audio (process_video.py): Uses ffmpeg to convert video to mp3.
+2. Transcription & Timestamped Chunking (create_chunks.py): Uses OpenAI Whisper large-v2 to transcribe audio and output structured JSON segments with start and end timestamps.
+3. Vector Embeddings & Storage (APP.PY, api.py): Generates dense vector representations with BGE-M3 (via Ollama) or all-MiniLM-L6-v2 (via Hugging Face) and caches in embeddings.joblib.
+4. Cosine Similarity Search & UI (api.py): Computes cosine similarity with threshold 0.60 in Streamlit to deliver zero-hallucination grounded answers with direct timestamp navigation.`
+).catch(() => {});
 
 interface HackerNewsStory {
   id: number;
@@ -370,7 +387,7 @@ async function fetchHackerNewsStories(limit = 10, forceRefresh = false) {
   return cachedNewsStories.slice(0, storyLimit);
 }
 
-// Helper function to fetch user's public repositories and scan readmes
+// Helper function to fetch user's public repositories and scan readmes and file trees
 async function fetchGithubData(forceRefresh = false) {
   const now = Date.now();
   if (!forceRefresh && cachedRepos.length > 0 && now - cacheTime < CACHE_DURATION) {
@@ -385,13 +402,23 @@ async function fetchGithubData(forceRefresh = false) {
     };
 
     if (GITHUB_TOKEN) {
-      headers["Authorization"] = `token ${GITHUB_TOKEN}`;
+      const trimmedToken = GITHUB_TOKEN.trim();
+      headers["Authorization"] = trimmedToken.startsWith("Bearer ") || trimmedToken.startsWith("token ")
+        ? trimmedToken
+        : `Bearer ${trimmedToken}`;
     }
 
-    const reposResponse = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=30`, { headers });
+    let reposResponse = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=30`, { headers });
     
+    // If authenticated request returned 401 or 403 (bad/expired token or scope restriction), retry unauthenticated
+    if (!reposResponse.ok && (reposResponse.status === 401 || reposResponse.status === 403) && headers["Authorization"]) {
+      console.warn(`[BACKEND] GitHub token returned HTTP ${reposResponse.status}. Retrying unauthenticated for public repositories...`);
+      delete headers["Authorization"];
+      reposResponse = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=30`, { headers });
+    }
+
     if (!reposResponse.ok) {
-      throw new Error(`Failed to fetch repos: ${reposResponse.statusText}`);
+      throw new Error(`Failed to fetch repos: ${reposResponse.statusText} (${reposResponse.status})`);
     }
 
     const reposList = await reposResponse.json();
@@ -401,11 +428,13 @@ async function fetchGithubData(forceRefresh = false) {
 
     const compiledRepos: RepoData[] = [];
 
-    // Fetch readmes sequentially or with limit to avoid rate issues
+    // Fetch readmes and file listings
     for (const repo of reposList) {
       if (repo.fork) continue; // skip forks to focus on original projects
 
       let readmeText = "No README file found or content unavailable.";
+      let files: string[] = [];
+
       try {
         const readmeUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${repo.name}/readme`;
         const readmeRes = await fetch(readmeUrl, {
@@ -417,16 +446,29 @@ async function fetchGithubData(forceRefresh = false) {
 
         if (readmeRes.ok) {
           readmeText = await readmeRes.text();
-          // Truncate README text if extremely long to save prompt tokens
-          if (readmeText.length > 3000) {
-            readmeText = readmeText.substring(0, 3000) + "\n\n[README TRUNCATED FOR LENGTH]";
+          if (readmeText.length > 3500) {
+            readmeText = readmeText.substring(0, 3500) + "\n\n[README TRUNCATED FOR LENGTH]";
           }
         }
       } catch (err) {
         console.warn(`[BACKEND] Could not fetch README for ${repo.name}:`, err);
       }
 
-      compiledRepos.push({
+      // Fetch file listings for key repositories
+      try {
+        const contentsUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${repo.name}/contents`;
+        const contentsRes = await fetch(contentsUrl, { headers });
+        if (contentsRes.ok) {
+          const contentsJson = await contentsRes.json();
+          if (Array.isArray(contentsJson)) {
+            files = contentsJson.map((item: any) => item.name).filter(Boolean);
+          }
+        }
+      } catch (err) {
+        console.warn(`[BACKEND] Could not fetch contents for ${repo.name}:`, err);
+      }
+
+      const repoData: RepoData = {
         name: repo.name,
         description: repo.description,
         html_url: repo.html_url,
@@ -434,12 +476,31 @@ async function fetchGithubData(forceRefresh = false) {
         forks_count: repo.forks_count,
         language: repo.language,
         readme: readmeText,
-      });
+        files: files.length > 0 ? files : undefined,
+      };
+
+      compiledRepos.push(repoData);
+
+      // Deeply index repository documentation and file structure into RAG engine
+      const ragDoc = `Repository: ${repo.name}
+Language: ${repo.language || "Code"}
+URL: ${repo.html_url}
+Description: ${repo.description || "Open-source repository by Umesh Kumar Sahoo."}
+${files.length > 0 ? `Files in Repository: ${files.join(", ")}` : ""}
+
+=== README & DOCUMENTATION ===
+${readmeText}`;
+
+      ragEngine.indexDirectDocument(
+        repo.html_url,
+        `GitHub: ${repo.name} (${repo.language || "Code"})`,
+        ragDoc
+      ).catch(() => {});
     }
 
     cachedRepos = compiledRepos;
     cacheTime = now;
-    console.log(`[BACKEND] Successfully scanned & cached ${cachedRepos.length} original GitHub repositories.`);
+    console.log(`[BACKEND] Successfully scanned, cached & indexed ${cachedRepos.length} original GitHub repositories into RAG.`);
     return cachedRepos;
   } catch (error) {
     console.error("[BACKEND] Error fetching GitHub data:", error);
@@ -572,11 +633,37 @@ app.post("/api/github/repos/refresh", async (req, res) => {
       stargazers_count: r.stargazers_count,
       forks_count: r.forks_count,
       language: r.language,
+      files: r.files,
     }));
     res.json(summaryList);
   } catch (error) {
     console.error("[BACKEND] GitHub refresh endpoint error:", error);
     res.status(500).json({ error: "Failed to refresh repositories." });
+  }
+});
+
+// Inspect file tree / file contents from public repository
+app.get("/api/github/repos/:repo/contents", async (req, res) => {
+  try {
+    const repoName = req.params.repo.replace(/[^a-zA-Z0-9_.-]/g, "");
+    const repos = await fetchGithubData(false);
+    const targetRepo = repos.find(r => r.name.toLowerCase() === repoName.toLowerCase());
+
+    if (!targetRepo) {
+      res.status(404).json({ error: "Repository not found in Umesh's projects." });
+      return;
+    }
+
+    res.json({
+      name: targetRepo.name,
+      html_url: targetRepo.html_url,
+      language: targetRepo.language,
+      files: targetRepo.files || [],
+      readmeExcerpt: targetRepo.readme ? targetRepo.readme.substring(0, 500) : "",
+    });
+  } catch (err) {
+    console.error("[BACKEND] Repo contents lookup error:", err);
+    res.status(500).json({ error: "Failed to read repository contents." });
   }
 });
 
@@ -922,20 +1009,7 @@ function generateSmartFallbackResponse(query: string, repos: RepoData[], news: H
     if (snippet) {
       return formatCodeFirstResponse(snippet.code, snippet.language, snippet.explanation);
     }
-
-    // Generic code request fallback
-    return `\`\`\`python
-def solution(*args, **kwargs):
-    """Clean, runnable implementation template."""
-    # Process inputs directly
-    result = [x for x in args if x is not None]
-    return result
-
-# Example:
-# print(solution(1, 2, 3))
-\`\`\`
-
-Here is a standard runnable template. Could you specify the exact input/output constraints or target language so I can provide the optimized algorithm?`;
+    return `Could you specify the exact algorithm, input/output constraints, or target language you'd like me to write runnable code for?`;
   }
 
   // 2. Direct General Programming Concepts (Concise 2–5 sentences or bullet points)
@@ -1016,12 +1090,16 @@ Umesh achieved an exceptional **9.60 / 10.0 CGPA** in Computer Science & Enginee
     q.includes("vector") || q.includes("embedding") || q.includes("semantic search") ||
     q.includes("similarity")
   ) {
-    return `### 🧠 RAG-Based Teaching Assistant System
-Umesh architected an end-to-end semantic retrieval engine in Python designed to eliminate LLM hallucinations:
+    return `### 🎥 RAG-Based Teaching Assistant System (GitHub: \`Teaching_assistant-rag-based-\`)
+Umesh developed a video content search system using an end-to-end RAG pipeline that enables users to query video lecture content and receive precise answers with exact video timestamps:
 
-• **Document Chunking & Ingestion:** Ingests and semantically chunks academic textbooks, lecture slides, and notes into structured passages.
-• **Vector Embeddings & Search:** Computes high-dimensional dense embeddings and indexes them for real-time cosine similarity search.
-• **Grounded Prompt Augmentation:** Injects verified source context into the LLM prompt window, guaranteeing verifiable answers with zero hallucinations.`;
+• **Audio Extraction & Transcription (\`process_video.py\`, \`create_chunks.py\`):** Uses \`ffmpeg\` to extract audio, then OpenAI Whisper (\`large-v2\`) to transcribe Hindi/English speech with word-level timestamps.
+• **Time-Based Chunking (\`create_chunks.py\`):** Segments transcripts into timestamped JSON chunks containing start/end markers and text passages.
+• **Dense Vector Embeddings (\`APP.PY\`, \`api.py\`):** Converts chunks into high-dimensional embeddings using BGE-M3 (via Ollama) or \`sentence-transformers/all-MiniLM-L6-v2\` (via HuggingFace Router).
+• **Cosine Similarity Retrieval & UI (\`api.py\`):** Computes cosine similarity against stored vectors with a 0.6 similarity threshold, served through a Streamlit UI with direct timestamp navigation.
+
+• **Repository Files:** \`APP.PY\`, \`api.py\`, \`create_chunks.py\`, \`process_video.py\`, \`requirements.txt\`, \`prompt.txt\`
+• **GitHub Link:** [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-)`;
   }
 
   // 6. RAG Retrieval: BiGRU Deep Learning Emotion Classifier
@@ -1085,7 +1163,10 @@ Here is Umesh's verified technical proficiency:
   if (repos && repos.length > 0) {
     const matchedRepo = repos.find(r => q.includes(r.name.toLowerCase()));
     if (matchedRepo) {
-      return `### 📦 Repository: ${matchedRepo.name} (${matchedRepo.language || "Code"})\n${matchedRepo.description || "Open-source repository."}\n\n• **GitHub Link:** [${matchedRepo.html_url}](${matchedRepo.html_url})\n• **Stars:** ${matchedRepo.stargazers_count} · **Forks:** ${matchedRepo.forks_count}`;
+      const filesInfo = matchedRepo.files && matchedRepo.files.length > 0
+        ? `\n• **Files in Repository:** ${matchedRepo.files.join(", ")}`
+        : "";
+      return `### 📦 Repository: ${matchedRepo.name} (${matchedRepo.language || "Code"})\n${matchedRepo.description || "Open-source repository."}\n\n• **GitHub Link:** [${matchedRepo.html_url}](${matchedRepo.html_url})\n• **Stars:** ${matchedRepo.stargazers_count} · **Forks:** ${matchedRepo.forks_count}${filesInfo}`;
     }
   }
 
@@ -1094,18 +1175,21 @@ Here is Umesh's verified technical proficiency:
     q.includes("project") || q.includes("portfolio") || q.includes("repo") ||
     q.includes("github") || q.includes("repository") || q.includes("repositories")
   ) {
-    const topRepoSummary = repos.slice(0, 4).map(r => `• **${r.name}** (${r.language || "Code"}): ${r.description || "Open source project"} [View on GitHub](${r.html_url})`).join("\n");
-    return `### 🚀 Core Engineered Projects
+    const topRepoSummary = repos.slice(0, 5).map(r => {
+      const filesPart = r.files && r.files.length > 0 ? ` · Files: ${r.files.slice(0, 4).join(", ")}` : "";
+      return `• **${r.name}** (${r.language || "Code"}${filesPart}): ${r.description || "Open source project"} [View on GitHub](${r.html_url})`;
+    }).join("\n");
+    return `### 🚀 Core Engineered Projects & Repositories
 Umesh builds systems that push beyond academic assignments:
 
 1. **AI-Powered Terminal Portfolio (Right here!):** Full-stack retro-editorial architecture with real-time GitHub sync, rate-limiting, CSRF security, and dual-mode AI analysis.
-2. **RAG-Based Teaching Assistant System:** End-to-end Python semantic retrieval engine with vector search and hallucination-free generation.
+2. **RAG-Based Teaching Assistant System:** End-to-end Python semantic retrieval engine with Whisper large-v2, BGE-M3 vector search, and timestamp navigation.
 3. **BiGRU Text Emotion Classifier:** Deep learning text sentiment analyzer built in Keras and served asynchronously via FastAPI.
 
-**Recent GitHub Repositories:**
+**Live Synchronized GitHub Repositories:**
 ${topRepoSummary}
 
-*Navigate over to the **Projects** tab anytime to browse all 20+ live synchronized repositories!*`;
+*Navigate over to the **Projects** tab anytime to browse all live synchronized repositories!*`;
   }
 
   // 11. RAG Retrieval: Contact & Connect
@@ -1334,10 +1418,11 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     if (ai) {
       try {
         const isCode = isCodeRequest(trimmedMessage);
-        const topRepos = repos.slice(0, 8);
+        const topRepos = repos.slice(0, 10);
         const reposContextText = topRepos.map((r, i) => {
           const shortDesc = r.description ? r.description.substring(0, 100) : "Open-source repository.";
-          return `#${i + 1} ${r.name} (${r.language || "Code"}, ★${r.stargazers_count}): ${shortDesc}`;
+          const filesSummary = r.files && r.files.length > 0 ? ` [Files: ${r.files.slice(0, 6).join(", ")}]` : "";
+          return `#${i + 1} ${r.name} (${r.language || "Code"}, ★${r.stargazers_count}): ${shortDesc}${filesSummary}`;
         }).join("\n");
 
         const newsContextSection = (hasExplicitNewsIntent && liveNewsContextText)
@@ -1348,12 +1433,14 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
 
 MANDATORY RESPONSE POLICIES:
 1. ANSWER THE EXACT QUESTION FIRST: Provide a direct, relevant answer immediately without unsolicited architecture essays or verbose disclaimers.
-2. CODE-FIRST POLICY: If the user requests code or implementation, provide complete, clean, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write long essays before the code.
+2. CODE-FIRST POLICY: ONLY when the user explicitly requests code or algorithm implementation (e.g. "write code for...", "implement a function to..."), provide complete, clean, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write dummy placeholder functions.
+   - For questions about Umesh's projects or codebases (like "rag code base", "how does your teaching assistant work", "what files are in your repo"), explain his actual architecture and cite his real repository files (e.g., Teaching_assistant-rag-based- with create_chunks.py, api.py, APP.PY). If they ask for code from his project, provide the actual code from his repository!
 3. CONCISENESS & CLARITY: For simple questions, answer directly in 2 to 5 sentences. For technical explanations or lists, use clear, concise bullet points. Expand only when explicitly requested.
 4. AUTHORITATIVE GROUNDING:
    - Ground all answers about Umesh, his projects, and his background in the Authoritative Resume and GitHub Repositories below.
+   - For his RAG codebase or Teaching Assistant, discuss his real GitHub repository "Teaching_assistant-rag-based-", which transcribes lecture videos using Whisper large-v2, chunks transcriptions with timestamps (create_chunks.py), embeds with BGE-M3 (api.py), and searches with cosine similarity.
    - For his 9.60 CGPA, cite Silicon University, Bhubaneswar (2023–2027), foundational mastery in Data Structures, OS, and ML, 2nd Place in Algo Arena 2.0, and 91.2% at JNV Panikoili.
-   - If asked about GitHub repos or projects, discuss the real repositories listed below.
+   - If asked about GitHub repos or projects, discuss the real repositories listed below with their actual files.
    - For general programming questions, answer directly and accurately without repeating unrequested portfolio descriptions.
    - If relevant information is genuinely unavailable, state what is unknown briefly in 1 sentence.
 5. TECH NEWS: Only discuss tech news if the user explicitly asks for news, headlines, or a briefing.
@@ -1415,9 +1502,13 @@ ${sourceEvidenceSection}${newsContextSection}`;
       }
     }
 
-    // Seamless fallback ensures 100% uptime without 500/503 errors
+    // Seamless fallback ensures 100% uptime: uses verified RAG evidence if available, else smart heuristic engine
     if (!reply) {
-      reply = generateSmartFallbackResponse(trimmedMessage, repos, cachedNewsStories);
+      if (urlEvidence.results.length > 0 && !lowerMsg.startsWith("hi") && !lowerMsg.startsWith("hello") && !lowerMsg.startsWith("hey")) {
+        reply = ragEngine.synthesizeDeterministicAnswer(trimmedMessage, urlEvidence.results, false);
+      } else {
+        reply = generateSmartFallbackResponse(trimmedMessage, repos, cachedNewsStories);
+      }
     }
 
     res.json({

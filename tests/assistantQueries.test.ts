@@ -35,6 +35,9 @@ function testAssistantBehavior() {
   assert(isCodeRequest("quicksort algorithm in python"), "Detects 'quicksort algorithm'");
   assert(!isCodeRequest("what is Umesh's CGPA?"), "Does not misclassify portfolio question as code");
   assert(!isCodeRequest("tell me about your internships"), "Does not misclassify internship question as code");
+  assert(!isCodeRequest("rag code base"), "Does not misclassify 'rag code base' as code request");
+  assert(!isCodeRequest("what is the codebase architecture?"), "Does not misclassify 'codebase architecture' as code request");
+  assert(!isCodeRequest("show me the repo files"), "Does not misclassify 'repo files' as code request");
 
   // 2. Code-First Output Generation
   console.log("\n💻 Group 2: Code-First Runnable Output Generation");
@@ -64,11 +67,25 @@ function testAssistantBehavior() {
     assert(formatted.includes("clearTimeout"), "Contains runnable debounce logic");
   }
 
+  const chunkSnippet = generateCodeSnippet("write audio chunking code with whisper");
+  assert(chunkSnippet !== null, "Generates audio chunking snippet");
+  if (chunkSnippet) {
+    assert(chunkSnippet.code.includes("whisper.load_model"), "Contains Whisper model loading code");
+  }
+
+  const cosineSnippet = generateCodeSnippet("cosine similarity vector search code");
+  assert(cosineSnippet !== null, "Generates cosine similarity snippet");
+  if (cosineSnippet) {
+    assert(cosineSnippet.code.includes("cosine_similarity"), "Contains cosine similarity code");
+  }
+
   // 3. Portfolio Query Intent vs General Programming
   console.log("\n📋 Group 3: Intent Classification & Context Segregation");
   assert(isPortfolioQuery("how he got 9.60"), "Detects 'how he got 9.60' as portfolio query");
   assert(isPortfolioQuery("what is Umesh's background?"), "Detects 'Umesh's background' as portfolio query");
   assert(isPortfolioQuery("tell me about his internships at Ingenious and Syllogistick"), "Detects internship query as portfolio");
+  assert(isPortfolioQuery("rag code base"), "Detects 'rag code base' as portfolio query");
+  assert(isPortfolioQuery("what files are in the teaching assistant repo"), "Detects repo file query as portfolio");
   assert(!isPortfolioQuery("what is a closure in javascript"), "General CS question is NOT portfolio query");
   assert(!isPortfolioQuery("what is the difference between TCP and UDP"), "TCP vs UDP is NOT portfolio query");
   assert(!isPortfolioQuery("explain let vs const"), "Let vs const is NOT portfolio query");
