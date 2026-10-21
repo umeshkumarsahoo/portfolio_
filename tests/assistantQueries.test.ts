@@ -242,6 +242,42 @@ Description: Time-series analysis and forecasting system on the Nifty-50 stock m
   const anyTimeSeries = fgRetrieval.results.some((r) => r.chunk.metadata?.projectId === "timeseries");
   assert(!anyTimeSeries, "Strict project isolation: FreshGuard query retrieves 0 Time Series chunks");
 
+  // 9. Multi-Repo Enumeration, Negation, & Small ML Disambiguation
+  console.log("\n📚 Group 9: Repository Enumeration & Negation Routing");
+  // 9a. Repo listing queries
+  const repoList1 = engine.synthesizeDeterministicAnswer("name the repo names umesh have", []);
+  assert(repoList1.includes("30 total repositories"), "Lists 30 total repositories for 'name the repo names umesh have'");
+  assert(repoList1.includes("lab_project_fresh_guard"), "Includes FreshGuard in repo list");
+  assert(repoList1.includes("ecommerce_advance"), "Includes e-commerce in repo list");
+
+  const repoList2 = engine.synthesizeDeterministicAnswer("can you show me repos umesh have", [], false, [
+    { role: "user", content: "can you extract rag code base" },
+    { role: "model", content: "import whisper..." }
+  ]);
+  assert(repoList2.includes("30 total repositories"), "Lists 30 repositories for 'can you show me repos umesh have' despite RAG in history");
+  assert(!repoList2.includes("Audio Extraction (process_video.py)"), "Does NOT erroneously dump RAG assistant description");
+
+  // 9b. Small ML code extraction disambiguation
+  const smallMLSnippet = generateCodeSnippet("extract small ml project code base");
+  assert(smallMLSnippet !== null, "Extracts small ml project code snippet");
+  if (smallMLSnippet) {
+    const formattedML = formatCodeFirstResponse(smallMLSnippet.code, smallMLSnippet.language, smallMLSnippet.explanation);
+    assert(formattedML.includes("GradientBoostingRegressor") || formattedML.includes("best_regressor.pkl"), "Returns GradientBoostingRegressor ML code");
+    assert(!formattedML.includes("whisper.load_model"), "Does NOT return Whisper RAG audio code for small ML request");
+    assert(formattedML.includes("lab_project_fresh_guard"), "Cites lab_project_fresh_guard");
+  }
+
+  // 9c. Negation of RAG
+  const negAns1 = engine.synthesizeDeterministicAnswer("i am not asking about rag", []);
+  assert(negAns1.toLowerCase().includes("won't focus on the rag assistant") || negAns1.toLowerCase().includes("other project"), "Acknowledges negation for 'i am not asking about rag'");
+  assert(!negAns1.includes("Audio Extraction (process_video.py)"), "Does NOT repeat RAG lecture video description");
+
+  const negProj = resolveQueryProject("i am not asking about rag");
+  assert(negProj !== "rag", "resolveQueryProject returns undefined or non-rag for negated query");
+
+  const multiRepoProj = resolveQueryProject("name the repo names umesh have");
+  assert(multiRepoProj === undefined, "resolveQueryProject returns undefined for multi-repo listing");
+
   console.log("\n==================================================");
   console.log(`📊 SUMMARY: ${passed}/${total} TESTS PASSED`);
   console.log("==================================================");

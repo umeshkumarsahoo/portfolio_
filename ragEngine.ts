@@ -1719,13 +1719,52 @@ ADDITIONAL CONSTRAINTS:
       }
     }
 
-    // 4. Repository Catalogue & Enumeration Queries
+    // 3b. Explicit Negation: user says "i am not asking about rag", "no rag", "stop talking about rag"
     if (
-      (qLower.includes("how many") && (qLower.includes("repo") || qLower.includes("repositories") || qLower.includes("project"))) ||
-      qLower === "repo count" ||
-      qLower === "repository count"
+      /\b(not|no|stop|never|don't|dont)\s+(asking about\s+|about\s+|interested in\s+)?(rag|teaching assistant)\b/i.test(qLower) ||
+      qLower.includes("not asking about rag") ||
+      qLower === "no rag" ||
+      qLower === "not rag"
     ) {
-      return "Umesh has **30 total repositories** on GitHub (**23 original repositories** and **7 forks**):\n\n• **Machine Learning:** [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard), [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-), [Time_series-](https://github.com/umeshkumarsahoo/Time_series-), [sentiment_analysis](https://github.com/umeshkumarsahoo/sentiment_analysis), [water-borne](https://github.com/umeshkumarsahoo/water-borne), [ml-projects](https://github.com/umeshkumarsahoo/ml-projects)\n• **Full-Stack & Cloud:** [ecommerce_advance](https://github.com/umeshkumarsahoo/ecommerce_advance), [devops-umesh](https://github.com/umeshkumarsahoo/devops-umesh), [portfolio_](https://github.com/umeshkumarsahoo/portfolio_), [aws](https://github.com/umeshkumarsahoo/aws)\n• **Algorithms & Practice:** [leet-code-daily](https://github.com/umeshkumarsahoo/leet-code-daily), [MERN-STACK-](https://github.com/umeshkumarsahoo/MERN-STACK-), [python](https://github.com/umeshkumarsahoo/python)";
+      return "Understood! We won't focus on the RAG assistant. Umesh has several other projects you can explore:\n\n1. **FreshGuard (`lab_project_fresh_guard`):** Supervised produce shelf-life regression model (`GradientBoostingRegressor`) with Flask API.\n2. **Emotion Detection API (`sentiment_analysis`):** BiGRU text emotion classification with Keras and FastAPI.\n3. **Cloud & DevOps (`devops-umesh`):** Infrastructure as Code with Terraform, Docker, AWS CodeDeploy/CodeBuild, and Kubernetes.\n4. **Time Series Forecasting (`Time_series-`):** Stock market forecasting on Nifty-50 data with ARIMA and LSTM RNNs.\n5. **Full-Stack E-Commerce (`ecommerce_advance`):** Express auth routes, MongoDB models, and React.\n\nWhich one would you like to explore?";
+    }
+
+    // 4. Repository Catalogue & Enumeration Queries
+    const isRepoListQuery =
+      (qLower.includes("repo") || qLower.includes("repositories")) &&
+      (qLower.includes("name") ||
+        qLower.includes("show") ||
+        qLower.includes("list") ||
+        qLower.includes("what") ||
+        qLower.includes("which") ||
+        qLower.includes("all") ||
+        qLower.includes("how many") ||
+        qLower.includes("umesh has") ||
+        qLower.includes("umesh have"));
+
+    if (
+      isRepoListQuery ||
+      qLower === "repo count" ||
+      qLower === "repository count" ||
+      qLower === "repos" ||
+      qLower === "repositories" ||
+      qLower.includes("show me repos") ||
+      qLower.includes("show repos") ||
+      qLower.includes("name the repo") ||
+      qLower.includes("what repos") ||
+      (qLower.includes("how many") && (qLower.includes("repo") || qLower.includes("project")))
+    ) {
+      return "Umesh has **30 total repositories** on GitHub (**23 original repositories** and **7 forks**):\n\n🌟 **Flagship Machine Learning & AI:**\n• [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard): Produce shelf-life predictor using `GradientBoostingRegressor` on 3,552 records with Flask API.\n• [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-): Video RAG system transcribing lectures via Whisper `large-v2` and Streamlit cosine search.\n• [Time_series-](https://github.com/umeshkumarsahoo/Time_series-): Nifty-50 stock market forecasting with ARIMA, pmdarima, and Keras LSTM RNNs.\n• [sentiment_analysis](https://github.com/umeshkumarsahoo/sentiment_analysis): Sequence-aware text emotion classifier using a BiGRU in Keras/TensorFlow and FastAPI.\n• [water-borne](https://github.com/umeshkumarsahoo/water-borne): Water-borne disease outbreak prediction pipeline.\n• [ml-projects](https://github.com/umeshkumarsahoo/ml-projects): Exploratory machine learning models, scikit-learn pipelines, and data science experiments.\n\n🚀 **Full-Stack, Cloud & DevOps:**\n• [portfolio_](https://github.com/umeshkumarsahoo/portfolio_): AI terminal portfolio with React, Express, cached RAG engine, and CSRF protection.\n• [devops-umesh](https://github.com/umeshkumarsahoo/devops-umesh): Cloud infrastructure automation with Terraform IaC, Docker, AWS specs, and Kubernetes.\n• [ecommerce_advance](https://github.com/umeshkumarsahoo/ecommerce_advance): Full-stack MERN e-commerce application with Express authentication routing and MongoDB.\n• [aws](https://github.com/umeshkumarsahoo/aws): Dedicated cloud infrastructure and AWS automation scripts.\n\n💻 **Algorithms & Practice:**\n• [leet-code-daily](https://github.com/umeshkumarsahoo/leet-code-daily), [MERN-STACK-](https://github.com/umeshkumarsahoo/MERN-STACK-), [python](https://github.com/umeshkumarsahoo/python)\n\n• **GitHub Profile:** [github.com/umeshkumarsahoo](https://github.com/umeshkumarsahoo)";
+    }
+
+    // 4b. Real-World Impact & Qualitative Repo Assessment
+    if (
+      qLower.includes("real world impact") ||
+      qLower.includes("real-world impact") ||
+      (qLower.includes("how many") && (qLower.includes("work") || qLower.includes("impact") || qLower.includes("good"))) ||
+      (qLower.includes("which are") && history && history.length > 0 && history.some(h => h.content.toLowerCase().includes("impact") || h.content.toLowerCase().includes("work")))
+    ) {
+      return "Several of Umesh's repositories have direct real-world engineering utility and production-grade architectures:\n\n1. **FreshGuard (`lab_project_fresh_guard`):** Designed to reduce commercial produce waste by predicting shelf life in days from temperature, humidity, and damage scores. Evaluated on 3,552 records with `best_regressor.pkl` served through a live Flask API.\n2. **RAG Teaching Assistant (`Teaching_assistant-rag-based-`):** Solves educational video navigation by automatically transcribing lectures via Whisper `large-v2` and indexing vector embeddings so students can jump straight to exact timestamps.\n3. **AI Terminal Portfolio (`portfolio_`):** Live in production on Render with Express security (rate limiting, CSRF protection, Helmet), dual-model Gemini fallback, and persistent multi-layer RAG caching.\n4. **Cloud & DevOps Automation (`devops-umesh`):** Practical production deployments using Terraform IaC, multi-stage Docker builds, AWS CodeDeploy/CodeBuild specs, and Kubernetes manifests.\n5. **E-Commerce Backend (`ecommerce_advance`):** Full authentication and product ordering backend with Express and MongoDB.\n\n• **GitHub Profile:** [github.com/umeshkumarsahoo](https://github.com/umeshkumarsahoo)";
     }
 
     // 5. What projects has Umesh built / List projects
@@ -1785,8 +1824,17 @@ ADDITIONAL CONSTRAINTS:
       return "FreshGuard is a supervised machine learning produce shelf-life predictor built by Umesh Kumar Sahoo and his team. It trains regression pipelines on 3,552 produce records across 9 physical and environmental features (`Initial_Brix_Level`, storage temperature, humidity, produce type, and damage score) to forecast remaining produce shelf life in days. The trained model is served through a responsive Flask web application running on port 8080 with a `/predict` endpoint.\n\n• **Frameworks:** Python, scikit-learn, Flask\n• **Source Citation:** [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard)";
     }
 
-    // RAG Teaching Assistant
-    if (resolvedProj === "rag" || qLower.includes("rag") || qLower.includes("teaching assistant")) {
+    // RAG Teaching Assistant (strict check: never trigger on negated RAG)
+    const isNegatingRagExplicit =
+      /\b(not|no|stop|never|don't|dont)\s+(asking about\s+|about\s+|interested in\s+)?(rag|teaching assistant)\b/i.test(qLower) ||
+      qLower.includes("not asking about rag");
+
+    if (
+      !isNegatingRagExplicit &&
+      (resolvedProj === "rag" ||
+        (qLower.includes("rag") && !qLower.includes("not") && !qLower.includes("no ")) ||
+        qLower.includes("teaching assistant"))
+    ) {
       return "The RAG Teaching Assistant is an end-to-end video content search system that enables students to query lecture videos and receive precise answers with exact video timestamps:\n\n1. **Audio Extraction (`process_video.py`):** Uses `ffmpeg` to extract audio tracks from MP4 video lectures.\n2. **Transcription & Chunking (`create_chunks.py`):** Uses OpenAI Whisper `large-v2` to transcribe speech and generate timestamped JSON chunks with start/end markers.\n3. **Dense Embeddings (`APP.PY`, `api.py`):** Computes dense vector embeddings using BGE-M3 (via Ollama) or all-MiniLM-L6-v2 (via Hugging Face) and caches them in `embeddings.joblib`.\n4. **Vector Search & UI (`api.py`):** A Streamlit web application computes cosine similarity with a 0.60 threshold to jump directly to the video timestamp.\n\n• **Source Citation:** [Teaching_assistant-rag-based-](https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-)";
     }
 
@@ -1898,31 +1946,60 @@ export function resolveQueryProject(
 ): ProjectId | undefined {
   const q = query.toLowerCase().trim();
 
-  // 1. Direct explicit mentions in the current question
+  // 0. Multi-repository or general catalogue queries must NEVER resolve to a single project
+  const isMultiRepoOrListing =
+    /\b(all repos|list repos|show repos|show me repos|repo names|name the repo|what repos|how many repos|repositories|all repositories|list repositories|show repositories)\b/i.test(q) ||
+    q.includes("repos umesh") ||
+    q.includes("repos he has") ||
+    q.includes("repos he have") ||
+    q.includes("repos does umesh have") ||
+    q.includes("name the repo") ||
+    q.includes("all projects") ||
+    q.includes("list projects");
+
+  if (isMultiRepoOrListing) {
+    return undefined;
+  }
+
+  // 1. Negation detection
+  const isNegatingRag =
+    /\b(not|no|stop|never|don't|dont)\s+(asking about\s+|about\s+|interested in\s+)?(rag|teaching assistant)\b/i.test(q) ||
+    q.includes("not asking about rag") ||
+    q === "no rag" ||
+    q === "not rag";
+  const isNegatingFreshguard =
+    /\b(not|no|stop|never|don't|dont)\s+(asking about\s+|about\s+)?(freshguard|fresh guard|shelf life)\b/i.test(q);
+
+  // 2. Direct explicit mentions in the current question
   if (
-    q.includes("freshguard") ||
-    q.includes("fresh guard") ||
-    q.includes("shelf life") ||
-    q.includes("produce") ||
-    q.includes("brix") ||
-    q.includes("best_regressor") ||
-    q.includes("gradientboosting") ||
-    q.includes("damage score") ||
-    q.includes("firmness")
+    !isNegatingFreshguard &&
+    (q.includes("freshguard") ||
+      q.includes("fresh guard") ||
+      q.includes("shelf life") ||
+      q.includes("produce") ||
+      q.includes("brix") ||
+      q.includes("best_regressor") ||
+      q.includes("gradientboosting") ||
+      q.includes("damage score") ||
+      q.includes("firmness") ||
+      q.includes("small ml project") ||
+      q.includes("ml project") ||
+      q.includes("machine learning project"))
   ) {
     return "freshguard";
   }
 
   if (
-    q.includes("rag") ||
-    q.includes("teaching assistant") ||
-    q.includes("whisper") ||
-    q.includes("create_chunks") ||
-    q.includes("bge-m3") ||
-    q.includes("embeddings.joblib") ||
-    q.includes("timestamp") ||
-    q.includes("video search") ||
-    q.includes("retrieval augmented")
+    !isNegatingRag &&
+    (q.includes("rag") ||
+      q.includes("teaching assistant") ||
+      q.includes("whisper") ||
+      q.includes("create_chunks") ||
+      q.includes("bge-m3") ||
+      q.includes("embeddings.joblib") ||
+      q.includes("timestamp") ||
+      q.includes("video search") ||
+      q.includes("retrieval augmented"))
   ) {
     return "rag";
   }
@@ -1985,17 +2062,22 @@ export function resolveQueryProject(
     return "ecommerce";
   }
 
-  // 2. Follow-Up Resolution using Conversation History
-  if (history && history.length > 0) {
+  // 3. Follow-Up Resolution using Conversation History ONLY for contextual questions
+  const isContextualFollowUp =
+    /\b(it|this|that|its|code|function|implementation|architecture|overview|model|files|what does|how does|explain that)\b/i.test(q) &&
+    !/\b(repos|repositories|all|list|how many|news|headline|cgpa|education|background|contact|email|message)\b/i.test(q);
+
+  if (isContextualFollowUp && history && history.length > 0) {
     for (let i = history.length - 1; i >= 0; i--) {
       const prevMsg = history[i].content.toLowerCase();
 
-      // If previous context was RAG
+      // If previous context was RAG and not negating
       if (
-        prevMsg.includes("rag") ||
-        prevMsg.includes("teaching assistant") ||
-        prevMsg.includes("create_chunks") ||
-        prevMsg.includes("whisper")
+        !isNegatingRag &&
+        (prevMsg.includes("rag") ||
+          prevMsg.includes("teaching assistant") ||
+          prevMsg.includes("create_chunks") ||
+          prevMsg.includes("whisper"))
       ) {
         if (
           q.includes("code") ||
@@ -2011,12 +2093,13 @@ export function resolveQueryProject(
         }
       }
 
-      // If previous context was FreshGuard
+      // If previous context was FreshGuard and not negating
       if (
-        prevMsg.includes("freshguard") ||
-        prevMsg.includes("fresh guard") ||
-        prevMsg.includes("shelf life") ||
-        prevMsg.includes("produce")
+        !isNegatingFreshguard &&
+        (prevMsg.includes("freshguard") ||
+          prevMsg.includes("fresh guard") ||
+          prevMsg.includes("shelf life") ||
+          prevMsg.includes("produce"))
       ) {
         if (
           q.includes("model") ||
@@ -2157,13 +2240,48 @@ export function formatCodeFirstResponse(code: string, language: string, explanat
 export function generateCodeSnippet(query: string, project?: ProjectId): { code: string; explanation: string; language: string } | null {
   const q = query.toLowerCase();
 
-  // 0. Actual RAG Boilerplate Code from Teaching_assistant-rag-based-
+  // 0a. Actual FreshGuard ML Code from lab_project_fresh_guard
+  if (
+    project === "freshguard" ||
+    q.includes("freshguard code") ||
+    q.includes("small ml project") ||
+    q.includes("ml project code") ||
+    q.includes("extract small ml") ||
+    (q.includes("freshguard") && (q.includes("code") || q.includes("model code") || q.includes("pipeline"))) ||
+    (q.includes("ml project") && (q.includes("code") || q.includes("extract") || q.includes("boilerplate"))) ||
+    (q.includes("machine learning") && (q.includes("code") || q.includes("extract") || q.includes("boilerplate")))
+  ) {
+    return {
+      language: "python",
+      code: `from flask import Flask, render_template, request
+from sklearn.ensemble import GradientBoostingRegressor
+import joblib
+
+app = Flask(__name__, template_folder='.')
+
+# 1. Train GradientBoostingRegressor on produce dataset (selected best by RMSE)
+gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
+gb.fit(X_train, y_train)
+joblib.dump(gb, "best_regressor.pkl")
+
+# 2. Flask prediction endpoint for produce shelf life
+@app.route("/predict", methods=["POST"])
+def predict():
+    model = joblib.load("best_regressor.pkl")
+    features = [float(request.form[k]) for k in numeric_cols]
+    prediction = model.predict([features])
+    return {"remaining_shelf_life_days": float(prediction[0])}`,
+      explanation: "This source code from `app.py` in [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard) trains a GradientBoostingRegressor (evaluated with MAE, RMSE, and R²) and serves shelf-life predictions via a Flask `/predict` endpoint.",
+    };
+  }
+
+  // 0b. Actual RAG Boilerplate Code from Teaching_assistant-rag-based-
   if (
     project === "rag" ||
     q.includes("rag code") ||
     q.includes("rag boilerplate") ||
-    (q.includes("boilerplate") && (q.includes("rag") || q.includes("repository") || q.includes("repo") || !project)) ||
-    (q.includes("extract") && q.includes("code") && (q.includes("rag") || !project))
+    (q.includes("boilerplate") && (q.includes("rag") || q.includes("teaching assistant"))) ||
+    (q.includes("extract") && q.includes("code") && (q.includes("rag") || q.includes("teaching assistant") || q.includes("whisper")))
   ) {
     return {
       language: "python",

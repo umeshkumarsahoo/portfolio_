@@ -778,21 +778,57 @@ export class GitHubService {
    * Resolves target repository from query text or recent conversation history.
    */
   public resolveRepoForQuery(query: string, history?: { role: string; content: string }[]): string | null {
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
 
-    // Direct mappings
-    if (q.includes("freshguard") || q.includes("fresh guard") || q.includes("shelf life") || q.includes("produce")) {
+    // 1. Multi-repository or general catalogue queries must NEVER resolve to a single repository
+    const isMultiRepoOrListing =
+      /\b(all repos|list repos|show repos|show me repos|repo names|name the repo|what repos|how many repos|repositories|all repositories|list repositories|show repositories)\b/i.test(q) ||
+      q.includes("repos umesh") ||
+      q.includes("repos he has") ||
+      q.includes("repos he have") ||
+      q.includes("repos does umesh have") ||
+      q.includes("name the repo") ||
+      q.includes("all projects") ||
+      q.includes("list projects");
+
+    if (isMultiRepoOrListing) {
+      return null;
+    }
+
+    // 2. Negation detection
+    const isNegatingRag =
+      /\b(not|no|stop|never|don't|dont)\s+(asking about\s+|about\s+|interested in\s+)?(rag|teaching assistant)\b/i.test(q) ||
+      q.includes("not asking about rag") ||
+      q === "no rag" ||
+      q === "not rag";
+    const isNegatingFreshguard =
+      /\b(not|no|stop|never|don't|dont)\s+(asking about\s+|about\s+)?(freshguard|fresh guard|shelf life)\b/i.test(q);
+
+    // 3. Direct mappings
+    if (
+      !isNegatingFreshguard &&
+      (q.includes("freshguard") ||
+        q.includes("fresh guard") ||
+        q.includes("shelf life") ||
+        q.includes("produce") ||
+        q.includes("small ml project") ||
+        q.includes("ml project") ||
+        q.includes("machine learning project"))
+    ) {
       return "lab_project_fresh_guard";
     }
+
     if (
-      q.includes("rag") ||
-      q.includes("teaching assistant") ||
-      q.includes("create_chunks") ||
-      q.includes("whisper") ||
-      q.includes("video lecture")
+      !isNegatingRag &&
+      (q.includes("rag") ||
+        q.includes("teaching assistant") ||
+        q.includes("create_chunks") ||
+        q.includes("whisper") ||
+        q.includes("video lecture"))
     ) {
       return "Teaching_assistant-rag-based-";
     }
+
     if (q.includes("time series") || q.includes("timeseries") || q.includes("nifty") || q.includes("arima")) {
       return "Time_series-";
     }
@@ -826,14 +862,18 @@ export class GitHubService {
       }
     }
 
-    // Follow-up resolution from history
-    if (history && history.length > 0) {
+    // 4. Follow-up resolution from history ONLY when user is asking a contextual follow-up about that project
+    const isContextualFollowUp =
+      /\b(it|this|that|its|code|function|implementation|architecture|overview|model|files|endpoint|pipeline|what does|how does|explain that)\b/i.test(q) &&
+      !/\b(repos|repositories|all|list|how many|news|headline|cgpa|education|background|contact|email|message)\b/i.test(q);
+
+    if (isContextualFollowUp && history && history.length > 0) {
       for (let i = history.length - 1; i >= 0; i--) {
         const prev = history[i].content.toLowerCase();
-        if (prev.includes("freshguard") || prev.includes("lab_project_fresh_guard")) {
+        if (!isNegatingFreshguard && (prev.includes("freshguard") || prev.includes("lab_project_fresh_guard"))) {
           return "lab_project_fresh_guard";
         }
-        if (prev.includes("teaching assistant") || prev.includes("teaching_assistant") || prev.includes("rag")) {
+        if (!isNegatingRag && (prev.includes("teaching assistant") || prev.includes("teaching_assistant") || prev.includes("rag"))) {
           return "Teaching_assistant-rag-based-";
         }
         if (prev.includes("time series") || prev.includes("time_series")) {

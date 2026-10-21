@@ -48,6 +48,42 @@ function normalizeText(value: unknown, maxLength: number, allowNewlines = false)
 }
 
 /**
+ * Validates whether a candidate string is an actual human name,
+ * filtering out conversational phrases, negations, verbs, and keywords.
+ */
+export function isValidPersonName(candidate: string): boolean {
+  if (!candidate || typeof candidate !== "string") return false;
+  const cleaned = candidate.trim().replace(/[^A-Za-z\s]/g, "").trim();
+  if (cleaned.length < 2 || cleaned.length > 35) return false;
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 3) return false;
+
+  const invalidNameWords = new Set([
+    "not", "no", "just", "looking", "asking", "trying", "here", "interested",
+    "wondering", "sorry", "writing", "reaching", "contacting", "sending",
+    "a", "an", "the", "student", "developer", "engineer", "user", "visitor",
+    "coder", "learning", "working", "explaining", "saying", "telling", "testing",
+    "doing", "curious", "ready", "sure", "happy", "fine", "good", "ok", "okay",
+    "willing", "planning", "hoping", "able", "back", "new", "online",
+    "rag", "project", "code", "repo", "repository", "github", "umesh", "terminal",
+    "assistant", "news", "headline", "email", "mail", "message", "msg", "draft", "feature",
+    "model", "bigru", "freshguard", "timeseries", "devops", "docker", "python",
+    "javascript", "react", "fastapi", "whisper", "speech", "audio", "video",
+    "hi", "hello", "hey", "yo", "thanks", "thank", "please", "can", "could", "would",
+    "want", "wanted", "wanting", "like", "liked", "send", "sent", "chat", "talk",
+    "blah", "blahblah", "test", "testing", "who", "what", "where", "why", "how",
+    "know", "about", "neither", "either", "none"
+  ]);
+
+  for (const w of words) {
+    if (invalidNameWords.has(w.toLowerCase())) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Validates contact input fields.
  */
 export function validateContactInput(data: { name?: unknown; email?: unknown; message?: unknown; msg?: unknown }): {
@@ -355,9 +391,8 @@ export function parseContactWorkflow(
 
   // Check if current message is an explicit new contact intent
   const isExplicitContactIntent =
-    /conta[a-z]*/i.test(currentLower) ||
+    /\b(contact|contatc|conatct|reach out|get in touch)\b/i.test(currentLower) ||
     /s[en]{2}d.*(message|msg|email)/i.test(currentLower) ||
-    currentLower.includes("reach out") ||
     currentLower.includes("tell umesh") ||
     currentLower.includes("talk to umesh") ||
     currentLower.includes("connect with umesh") ||
@@ -382,7 +417,14 @@ export function parseContactWorkflow(
       currentLower.includes("silicon university") ||
       currentLower.includes("who are you") ||
       currentLower.includes("what projects") ||
-      currentLower.includes("explain your"));
+      currentLower.includes("explain your") ||
+      currentLower.includes("repo") ||
+      currentLower.includes("code") ||
+      currentLower.includes("extract") ||
+      currentLower.includes("not asking") ||
+      currentLower.includes("how many") ||
+      currentLower.includes("news") ||
+      currentLower.includes("headline"));
 
   if (isTopicShiftOrProjectQuestion) {
     return {
@@ -399,7 +441,7 @@ export function parseContactWorkflow(
   const historyHasContactFlow = history.some((h) => {
     const c = h.content.toLowerCase();
     return (
-      /conta[a-z]*/i.test(c) ||
+      /\b(contact|contatc|conatct)\b/i.test(c) ||
       c.includes("send a message") ||
       c.includes("send message") ||
       c.includes("send my message") ||
@@ -467,20 +509,22 @@ export function parseContactWorkflow(
 
   // 6. Extract Name
   let name = explicitName;
-  const namePatterns = [
-    /(?:my name is|i am|i'm|name is|call me)\s+([A-Za-z\s]{2,30})/i,
+  const explicitNamePatterns = [
+    /my name is\s+([A-Za-z\s]{2,30})/i,
     /name:\s*([A-Za-z\s]{2,30})/i,
     /from:\s*([A-Za-z\s]{2,30})/i,
+    /call me\s+([A-Za-z\s]{2,30})/i,
   ];
+  const casualNamePattern = /(?:i am|i'm)\s+([A-Za-z\s]{2,30})/i;
 
   if (!name) {
-    // Check current message first
-    for (const pat of namePatterns) {
+    // Check current message first with explicit name patterns
+    for (const pat of explicitNamePatterns) {
       const m = currentMessage.match(pat);
       if (m && m[1]) {
         let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
         candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
-        if (candidate.length >= 2 && !candidate.includes("@")) {
+        if (isValidPersonName(candidate)) {
           name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
           break;
         }
@@ -488,23 +532,35 @@ export function parseContactWorkflow(
     }
   }
 
+  if (!name) {
+    // Check casual "i am / i'm" in current message only if candidate is a strictly valid person name
+    const m = currentMessage.match(casualNamePattern);
+    if (m && m[1]) {
+      let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
+      candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
+      if (isValidPersonName(candidate)) {
+        name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+      }
+    }
+  }
+
   if (!name && draftFromMatch && draftFromMatch[1]) {
     const candidate = draftFromMatch[1].trim();
-    if (candidate.length >= 2) {
+    if (isValidPersonName(candidate)) {
       name = candidate;
     }
   }
 
   if (!name) {
-    // Check user history in reverse
+    // Check user history in reverse ONLY for explicit name patterns
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i].role !== "user") continue;
-      for (const pat of namePatterns) {
+      for (const pat of explicitNamePatterns) {
         const m = history[i].content.match(pat);
         if (m && m[1]) {
           let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
           candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
-          if (candidate.length >= 2 && !candidate.includes("@")) {
+          if (isValidPersonName(candidate)) {
             name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
             break;
           }
@@ -528,7 +584,8 @@ export function parseContactWorkflow(
         currentMessage.length <= 40 &&
         !currentEmailMatch &&
         !isConfirmWord &&
-        !isCancelWord
+        !isCancelWord &&
+        isValidPersonName(currentMessage)
       ) {
         name = currentMessage.trim();
       }

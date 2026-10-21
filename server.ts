@@ -1277,10 +1277,16 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
         // If user is requesting code, find and fetch the REAL source file from GitHub API
         if (isCode && !reply) {
           let fileToFetch: string | null = null;
-          if (targetRepoName === "Teaching_assistant-rag-based-") {
-            fileToFetch = lowerMsg.includes("api") ? "api.py" : lowerMsg.includes("process_video") ? "process_video.py" : "create_chunks.py";
-          } else if (targetRepoName === "lab_project_fresh_guard") {
+          if (
+            targetRepoName === "lab_project_fresh_guard" ||
+            lowerMsg.includes("ml project") ||
+            lowerMsg.includes("small ml") ||
+            lowerMsg.includes("machine learning") ||
+            lowerMsg.includes("freshguard")
+          ) {
             fileToFetch = "app.py";
+          } else if (targetRepoName === "Teaching_assistant-rag-based-") {
+            fileToFetch = lowerMsg.includes("api") ? "api.py" : lowerMsg.includes("process_video") ? "process_video.py" : "create_chunks.py";
           } else if (targetRepoName === "ecommerce_advance") {
             fileToFetch = "backend/routes/auth.js";
           } else if (targetRepoName === "devops-umesh") {

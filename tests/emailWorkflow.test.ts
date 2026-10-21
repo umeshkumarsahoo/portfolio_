@@ -272,6 +272,19 @@ async function runEmailWorkflowTests() {
     const topicShiftQuery = parseContactWorkflow("no i want to know abput rag project", historyCollecting);
     assert(!topicShiftQuery.isContactWorkflow, "Breaks out of contact workflow when user shifts topic to RAG project");
     assert(topicShiftQuery.status === "idle", "Resets status to 'idle' on topic shift");
+
+    // Case 7: Anti-hallucination: 'i am not asking about rag' in history must NEVER be parsed as a person's name
+    const historyWithCasualSentence = [
+      { role: "user", text: "can you show me repos umesh have" },
+      { role: "assistant", text: "Umesh has 30 total repositories on GitHub..." },
+      { role: "user", text: "i am not asking about rag" },
+      { role: "assistant", text: "Understood! We won't focus on the RAG assistant." },
+    ];
+    const contactAfterNonNameSentence = parseContactWorkflow("I want to send a message to Umesh", historyWithCasualSentence);
+    assert(contactAfterNonNameSentence.isContactWorkflow, "Initiates contact workflow");
+    assert(contactAfterNonNameSentence.draft?.name === undefined, "Does NOT parse 'Not asking about rag' as user name");
+    assert(contactAfterNonNameSentence.missingFields.includes("name"), "Correctly marks name as missing");
+    assert(contactAfterNonNameSentence.missingFields.includes("email"), "Correctly marks email as missing");
   }
 
   console.log("\n==================================================");
