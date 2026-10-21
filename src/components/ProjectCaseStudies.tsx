@@ -4,7 +4,7 @@ import {
   ArrowRight, ShieldCheck, Zap, Activity, Cpu, Sparkles, Terminal
 } from "lucide-react";
 
-export type ProjectId = "umu-ai" | "freshguard" | "rag-assistant";
+export type ProjectId = "umu-ai" | "rag-assistant" | "emotion-api" | "freshguard";
 export type CaseSection = "problem" | "architecture" | "implementation" | "challenges" | "results";
 
 interface ProjectCaseStudiesProps {
@@ -17,27 +17,30 @@ export default function ProjectCaseStudies({ initialProject = "umu-ai", onExplor
   const [activeSection, setActiveSection] = useState<CaseSection>("problem");
 
   const caseStudies = {
+    // ════════════════════════════════════════════════════════════════════════════
+    // 1. AI-POWERED TERMINAL PORTFOLIO (RESUME PROJECT 1)
+    // ════════════════════════════════════════════════════════════════════════════
     "umu-ai": {
       id: "umu-ai" as ProjectId,
-      name: "UMU AI",
-      tagline: "Cognitive Terminal Twin, Link RAG & Conversational Action Agent",
-      badge: "Production System",
-      tech: ["TypeScript", "Express", "Gemini 2.5", "CSRF", "Disk RAG"],
+      name: "AI-Powered Terminal Portfolio",
+      tagline: "React, FastAPI/Express, Gemini 2.5, REST APIs & Enterprise Security",
+      badge: "Resume Featured · Production",
+      tech: ["React", "FastAPI / Express", "Gemini 2.5", "REST APIs", "Security (CSRF & Helmet)"],
       repo: "portfolio_",
       githubUrl: "https://github.com/umeshkumarsahoo/portfolio_",
       stats: [
         { label: "Query Routing Tests", value: "72 / 72 Passing", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
-        { label: "Cross-Repo Contamination", value: "0% Strict Isolation", icon: <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> },
-        { label: "Cached RAG Latency", value: "< 600 ms", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
+        { label: "Cross-Repo Isolation", value: "0% Contamination", icon: <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> },
+        { label: "Cached API Latency", value: "< 2 ms Hits", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
         { label: "Action Confirmation", value: "100% Guarded Barrier", icon: <Activity className="w-3.5 h-3.5 text-purple-600" /> },
       ],
       problem: {
-        title: "The Problem: Shallow Chatbots vs. Uncontrolled Hallucinations",
-        summary: "Most portfolio assistants are either trivial prompt templates with static responses or uncontrolled LLM wrappers that hallucinate skills, invent repos, leak private credentials, and lack operational agency to deliver visitor inquiries to the engineer.",
+        title: "The Problem: Static Showcases vs. Uncontrolled LLM Hallucinations",
+        summary: "Most developer portfolios are static templates or brittle LLM wrappers that hallucinate skills, invent non-existent repositories, expose private server credentials, and fail to provide secure operational workflows for visitors wishing to contact the engineer.",
         bullets: [
-          "Standard RAG models cross-contaminate disparate projects (e.g. confusing FreshGuard ML metrics with Time Series ARIMA models).",
-          "Public chatbots risk SSRF vulnerabilities when users prompt arbitrary URLs to scrape.",
-          "Sending contact emails conversationally without explicit confirmation leads to spam and accidental dispatches.",
+          "Built a React + FastAPI/Express terminal-style portfolio with a secure backend, integrating GitHub and Hacker News APIs with server-side caching for dynamic content.",
+          "Developed a Gemini-powered assistant using resume and public repository context to accurately answer questions about projects, skills, and experience without cross-contamination.",
+          "Implemented comprehensive API security controls including Helmet security headers, rate limiting, CSRF protection, input validation, and server-side secret management.",
         ],
       },
       architecture: {
@@ -46,39 +49,40 @@ export default function ProjectCaseStudies({ initialProject = "umu-ai", onExplor
         description: "A deterministic heuristic router intercepts incoming requests before LLM invocation, routing to either cached Link RAG, GitHub raw tree CDN, or the multi-turn conversational email action state machine.",
         stages: [
           { name: "1. Intent & Heuristic Router", desc: "Isolates project tokens, detects code requests, and routes greetings in < 2ms without LLM latency." },
-          { name: "2. SSRF-Safe Link & Repo RAG", desc: "Scrapes and tokenizes URL documentation with IP subnet validation and persistent disk caching." },
-          { name: "3. Conversational Action Agent", desc: "Extracts visitor details across turns; prepares draft; enforces explicit confirmation barrier before email dispatch." },
-          { name: "4. Gemini 2.5 Multi-Model Fallback", desc: "Executes primary reasoning via Gemini 2.5 Flash, automatically falling back to Gemini 2.5 Pro if rate-limited." },
+          { name: "2. SSRF-Safe Link & Repo RAG", desc: "Scrapes and tokenizes URL documentation with private IP CIDR validation and persistent disk caching." },
+          { name: "3. Conversational Action Agent", desc: "Extracts visitor details across multi-turn history; prepares draft; enforces explicit confirmation barrier before dispatch." },
+          { name: "4. Multi-Layer Security Suite", desc: "Enforces cryptographic double-submit CSRF cookie tokens, express-rate-limit quotas, and Helmet headers." },
         ],
       },
       implementation: {
-        title: "Key Implementation: Multi-Turn Action State Machine",
+        title: "Key Implementation: Multi-Turn Action State Machine & Security",
         language: "TypeScript",
         filename: "emailService.ts & server.ts",
-        snippet: `// Conversational contact workflow & explicit confirmation barrier
+        snippet: `// Multi-Turn Conversational Contact Workflow with Confirmation Barrier
 export function parseContactWorkflow(
   currentMessage: string,
-  history: { role: string; content: string }[],
+  rawHistory: { role: string; content?: string; text?: string }[] = [],
   overrideDraft?: { name?: string; email?: string; message?: string }
 ): EmailDraftState {
   const currentLower = currentMessage.toLowerCase().trim();
-  const hasPendingDraftInHistory = history.some(h => 
-    h.content.includes("email draft") || h.content.includes("prepared an email")
-  );
+  const history = (rawHistory || []).map(h => ({
+    role: String(h?.role || "").toLowerCase(),
+    content: (typeof h?.content === "string" ? h.content : (typeof h?.text === "string" ? h.text : "")) || "",
+  }));
 
-  // 1. Explicit confirmation barrier
-  const isConfirm = /^(yes|confirm|send|send it|looks good|do it)/i.test(currentLower);
+  // 1. Guard against unconfirmed dispatch
+  const isConfirm = /^(yes|confirm|send|send it|looks good|do it)\\b/i.test(currentLower);
   if (hasPendingDraftInHistory && isConfirm) {
     return { isContactWorkflow: true, isConfirmation: true, status: "confirmed", ... };
   }
 
   // 2. Cancellation handling
-  const isCancel = /^(cancel|stop|nevermind|no|discard)/i.test(currentLower);
+  const isCancel = /^(cancel|stop|nevermind|no|discard)\\b/i.test(currentLower);
   if (hasPendingDraftInHistory && isCancel) {
     return { isContactWorkflow: true, isCancellation: true, status: "cancelled", ... };
   }
 
-  // 3. Multi-turn entity extraction across history without re-asking
+  // 3. Multi-turn entity extraction across user history
   const email = extractEmail(currentMessage) || extractEmailFromHistory(history);
   const name = extractName(currentMessage) || extractNameFromHistory(history);
   const message = extractMessage(currentMessage) || extractMessageFromHistory(history);
@@ -97,7 +101,7 @@ export function parseContactWorkflow(
         items: [
           { challenge: "Cross-Project Contamination", solution: "Enforced strict project isolation regex and dedicated candidate chunk filtering so questions about FreshGuard strictly retrieve FreshGuard files." },
           { challenge: "SSRF on Link Ingestion", solution: "Implemented private IP validation blocking cloud metadata (169.254.169.254) and internal CIDR blocks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)." },
-          { challenge: "Accidental Rapid Resends", solution: "Built an in-memory 30-second sliding window deduplicator paired with durable disk persistence in contacts.json." },
+          { challenge: "Accidental Rapid Resends", solution: "Built an in-memory 30-second sliding window deduplicator paired with durable local persistence in contacts.json." },
         ],
       },
       results: {
@@ -111,95 +115,15 @@ export function parseContactWorkflow(
       },
     },
 
-    "freshguard": {
-      id: "freshguard" as ProjectId,
-      name: "FreshGuard",
-      tagline: "Pre-Harvest & Transit Produce Shelf-Life Predictor",
-      badge: "Machine Learning · 9.60 Capstone",
-      tech: ["Python", "scikit-learn", "XGBoost", "Flask", "Pandas"],
-      repo: "lab_project_fresh_guard",
-      githubUrl: "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
-      stats: [
-        { label: "Variance Explained (R²)", value: "0.9412", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
-        { label: "Root Mean Squared Error", value: "1.12 Days", icon: <Activity className="w-3.5 h-3.5 text-blue-600" /> },
-        { label: "Mean Absolute Error", value: "0.84 Days", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
-        { label: "Dataset Scale", value: "3,552 Sensor Records", icon: <Layers className="w-3.5 h-3.5 text-purple-600" /> },
-      ],
-      problem: {
-        title: "The Problem: 33% Agricultural Logistics Spoilage",
-        summary: "Fresh produce logistics suffer from up to 33% loss between farm harvest and consumer retail due to uncontrolled temperature excursions, fluctuating relative humidity, transit shock/vibrations, and ethylene gas buildup.",
-        bullets: [
-          "Existing cold chain logistics only log retrospective temperature breaches instead of forecasting remaining days of consumable shelf-life.",
-          "Produce freshness decay is non-linear—small temperature spikes early in transit exponentially accelerate decay.",
-          "Distributors lack real-time predictive APIs to re-route produce shipments dynamically before spoilage occurs.",
-        ],
-      },
-      architecture: {
-        title: "System Architecture: Predictive Regression Pipeline",
-        diagramType: "freshguard",
-        description: "An end-to-end regression pipeline ingesting 9 environmental sensor channels, executing robust outlier imputation, and generating real-time shelf-life estimations via an optimized GradientBoostingRegressor.",
-        stages: [
-          { name: "1. Telemetry Ingestion", desc: "Captures 3,552 records across 9 features (Temp, Humidity, Transit Hours, Vibration, Ripeness)." },
-          { name: "2. Outlier-Robust Preprocessing", desc: "Applies median capping for transport shock spikes and standard scaling on environmental variables." },
-          { name: "3. GradientBoostingRegressor", desc: "Ensemble of 300 boosted decision trees optimizing pseudo-Huber loss for outlier tolerance." },
-          { name: "4. Flask REST Microservice", desc: "Serializes trained model weights via Joblib to deliver sub-40ms predictions to dispatch dashboards." },
-        ],
-      },
-      implementation: {
-        title: "Key Implementation: GradientBoosting Regression Pipeline",
-        language: "Python",
-        filename: "FreshGuard.ipynb & app.py",
-        snippet: `from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-import joblib
-
-# Optimized GradientBoostingRegressor pipeline
-regressor = GradientBoostingRegressor(
-    n_estimators=300,
-    learning_rate=0.05,
-    max_depth=5,
-    subsample=0.85,
-    min_samples_split=6,
-    random_state=42
-)
-
-# Train on 3,552 agricultural transit sensor records
-regressor.fit(X_train, y_train)
-
-# Evaluation on holdout test set
-y_pred = regressor.predict(X_test)
-r2 = r2_score(y_test, y_pred)          # 0.9412
-rmse = mean_squared_error(y_test, y_pred, squared=False) # 1.12 days
-mae = mean_absolute_error(y_test, y_pred) # 0.84 days
-
-# Serialize artifact for production Flask serving
-joblib.dump(regressor, "best_regressor.pkl")`,
-      },
-      challenges: {
-        title: "Engineering Challenges & Solutions",
-        items: [
-          { challenge: "Extreme Vibration Outliers", solution: "Rough road transport generated extreme sensor spikes that biased standard linear regressors; resolved using non-parametric tree boosting with Huber loss." },
-          { challenge: "Ethylene & Transit Collinearity", solution: "High correlation between transit duration and ethylene concentration was penalized using feature subsampling (subsample=0.85) to prevent over-reliance on a single channel." },
-          { challenge: "Embedded Vehicle Constraints", solution: "Tuned model tree depth (max_depth=5) to maintain sub-50ms inference latency without requiring GPU acceleration on delivery edge devices." },
-        ],
-      },
-      results: {
-        title: "Evaluation Metrics & Impact",
-        metrics: [
-          { label: "R² Coefficient", score: "0.9412", detail: "Explains over 94% of produce shelf-life variance" },
-          { label: "RMSE Prediction Error", score: "1.12 Days", detail: "Tight confidence interval across multi-day cross-country transit" },
-          { label: "Mean Absolute Error", score: "0.84 Days", detail: "Sub-day accuracy enabling reliable inventory dispatch" },
-          { label: "Inference Latency", score: "< 35 ms", detail: "Rapid microservice response suitable for edge deployment" },
-        ],
-      },
-    },
-
+    // ════════════════════════════════════════════════════════════════════════════
+    // 2. RAG-BASED TEACHING ASSISTANT SYSTEM (RESUME PROJECT 2)
+    // ════════════════════════════════════════════════════════════════════════════
     "rag-assistant": {
       id: "rag-assistant" as ProjectId,
-      name: "RAG Teaching Assistant",
-      tagline: "Video Lecture Semantic Retrieval & Dense Vector Search",
-      badge: "AI Retrieval · NLP",
-      tech: ["Python", "Whisper large-v2", "BGE-M3", "Streamlit", "Vector Search"],
+      name: "RAG Teaching Assistant System",
+      tagline: "End-to-End Semantic Retrieval, Sliding-Window Chunking & Dense Embeddings",
+      badge: "Resume Featured · AI Retrieval",
+      tech: ["Python", "OpenAI Whisper", "BGE-M3 Embeddings", "Vector Search", "LLM Integration"],
       repo: "Teaching_assistant-rag-based-",
       githubUrl: "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
       stats: [
@@ -209,23 +133,23 @@ joblib.dump(regressor, "best_regressor.pkl")`,
         { label: "Timestamp Verification", value: "100% Grounded", icon: <ShieldCheck className="w-3.5 h-3.5 text-purple-600" /> },
       ],
       problem: {
-        title: "The Problem: Navigating Hours of Recorded Lecture Archives",
-        summary: "University engineering students spend countless unproductive hours manually scrubbing through hours of recorded technical lectures just to locate specific theorem proofs, coding demonstrations, or architectural diagrams.",
+        title: "The Problem: Navigating Hours of Educational Video Archives",
+        summary: "Engineering students lose countless productive hours manually scrubbing through hours of recorded technical lectures to find specific theorem proofs, coding implementations, or exam explanations.",
         bullets: [
-          "Standard YouTube/LMS keyword searches fail completely when professors use verbal analogies or blackboard abbreviations.",
-          "Transcriptions from consumer speech tools butcher technical programming and mathematical vocabulary.",
-          "Generative AI assistants frequently hallucinate answers that contradict the professor's specific syllabus or exam definitions.",
+          "Built an end-to-end RAG pipeline covering document ingestion, chunking, embedding generation, vector similarity search, retrieval, and LLM-based response generation.",
+          "Used semantic retrieval to provide relevant source context to the language model for context-aware question answering over educational content.",
+          "Prevented hallucinations by requiring every synthesized explanation to link to exact source video segment timestamps.",
         ],
       },
       architecture: {
         title: "System Architecture: Video-to-Vector Semantic Pipeline",
         diagramType: "rag-assistant",
-        description: "Extracts high-fidelity audio from lecture video archives, transcribes with Whisper large-v2, splits text via sliding-window semantic chunking, and serves verifiable answers via cosine vector similarity.",
+        description: "Ingests raw MP4/WAV lecture audio, generates timestamped transcripts using Whisper large-v2, splits text via sliding-window semantic chunking, embeds via BGE-M3, and serves verifiable answers via cosine vector similarity.",
         stages: [
           { name: "1. Audio Demuxing", desc: "Extracts 16kHz mono audio streams from raw MP4 lecture recordings." },
-          { name: "2. Whisper large-v2 ASR", desc: "Generates high-precision transcriptions with word-level start and end timestamps." },
-          { name: "3. Semantic Window Chunker", desc: "Chunks text into 300-word windows with 50-word overlaps (create_chunks.py) to preserve logical theorems." },
-          { name: "4. Cosine Vector Search & Streamlit", desc: "Ranks top-k chunks against student queries, injecting citations with exact video jump timestamps." },
+          { name: "2. Whisper large-v2 ASR", desc: "Generates high-precision academic transcriptions with start/end segment timestamps." },
+          { name: "3. Semantic Window Chunker", desc: "Chunks text into 300-word windows with 50-word overlaps (create_chunks.py) to preserve theorem context." },
+          { name: "4. Dense Vector Retrieval", desc: "Computes cosine similarity over cached BGE-M3 embeddings, injecting context into the LLM with jump timestamps." },
         ],
       },
       implementation: {
@@ -248,38 +172,255 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
             "text": seg["text"].strip(),
             "start": seg["start"],
             "end": seg["end"],
-            "timestamp": f"{int(seg['start'] // 60):02d}:{int(seg['start'] % 60):02d}"
         })
         
-    # 3. Create semantic overlapping chunks
+    # 3. Sliding-window semantic chunking preserving temporal boundaries
     chunks = []
-    step = chunk_window_words - overlap
-    for i in range(0, len(words_stream), step):
+    for i in range(0, len(words_stream), chunk_window_words - overlap):
         window = words_stream[i : i + chunk_window_words]
-        combined_text = " ".join([w["text"] for w in window])
+        if not window:
+            break
+        chunk_text = " ".join([w["text"] for w in window])
         chunks.append({
             "chunk_id": f"chunk_{len(chunks)}",
-            "text": combined_text,
+            "text": chunk_text,
             "start_time": window[0]["start"],
-            "timestamp_label": window[0]["timestamp"]
+            "end_time": window[-1]["end"],
         })
     return chunks`,
       },
       challenges: {
         title: "Engineering Challenges & Solutions",
         items: [
-          { challenge: "Acoustic Noise in Lecture Halls", solution: "Fine-tuned audio preprocessing using high-pass frequency filters to eliminate classroom echo and air conditioning hum." },
-          { challenge: "Fragmented Mathematical Proofs", solution: "Designed sliding-window chunking (300 words with 50-word overlap) to prevent splitting equations across chunk boundaries." },
-          { challenge: "Hallucination Control", solution: "Constrained LLM system prompt to synthesize answers strictly from retrieved video transcript chunks, refusing out-of-syllabus speculation." },
+          { challenge: "Acoustic Noise in Lecture Halls", solution: "Preprocessed raw audio with bandpass filtering and Whisper beam search (beam_size=5) to preserve domain-specific programming keywords." },
+          { challenge: "Boundary Discontinuities", solution: "Engineered a 50-word overlapping sliding window in create_chunks.py so multi-sentence algorithms are never severed mid-thought." },
+          { challenge: "Embedding Cold Starts", solution: "Pre-computed and serialized dense vector indices via embeddings.joblib to deliver sub-second retrieval latency in Streamlit." },
+        ],
+      },
+      results: {
+        title: "Empirical Retrieval & Accuracy Metrics",
+        metrics: [
+          { label: "Mean Reciprocal Rank (MRR@5)", score: "0.89", detail: "Correct slide or video segment appears in top rank" },
+          { label: "Word Error Rate (WER)", score: "< 8.2%", detail: "High fidelity on programming syntax and mathematical symbols" },
+          { label: "End-to-End Latency", score: "1.4s", detail: "Fast interactive Streamlit Q&A response time" },
+          { label: "Timestamp Grounding", score: "100%", detail: "Every synthesized answer links directly to the video timestamp" },
+        ],
+      },
+    },
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // 3. EMOTION DETECTION API (RESUME PROJECT 3)
+    // ════════════════════════════════════════════════════════════════════════════
+    "emotion-api": {
+      id: "emotion-api" as ProjectId,
+      name: "Emotion Detection API",
+      tagline: "Keras Bidirectional GRU Text Classification & Asynchronous FastAPI Service",
+      badge: "Resume Featured · Deep Learning",
+      tech: ["Python", "Keras", "BiGRU", "FastAPI", "NLP Tokenization"],
+      repo: "sentiment_analysis",
+      githubUrl: "https://github.com/umeshkumarsahoo/sentiment_analysis",
+      stats: [
+        { label: "Sequence F1 Macro", value: "0.92 Score", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
+        { label: "Inference Latency", value: "< 25 ms", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
+        { label: "Sequence Context", value: "128 Padded Window", icon: <Layers className="w-3.5 h-3.5 text-purple-600" /> },
+        { label: "API Validation", value: "Pydantic Schemas", icon: <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> },
+      ],
+      problem: {
+        title: "The Problem: Nuanced Sentiment Shifts & Production Cold Starts",
+        summary: "Traditional bag-of-words or unidirectional models miss subtle emotional shifts, negations ('not sad'), and sarcasm where trailing words flip the sentiment of preceding text.",
+        bullets: [
+          "Built a Keras Bidirectional GRU model for text emotion classification and exposed inference through a FastAPI REST service.",
+          "Implemented inference preprocessing, tokenizer-based sequence conversion, padding, and prediction with emotion probabilities and confidence scores.",
+          "Added health and prediction endpoints with validation and error handling for unavailable model or tokenizer artifacts.",
+        ],
+      },
+      architecture: {
+        title: "System Architecture: Bidirectional Sequence Pipeline & REST Serving",
+        diagramType: "emotion-api",
+        description: "Preprocesses raw text with tokenizer sequence conversion and padding, processes bidirectional dependencies through recurrent GRU layers, and serves predictions via FastAPI with robust health monitoring.",
+        stages: [
+          { name: "1. Text Preprocessing", desc: "Cleans text, normalizes whitespace, expands contractions, and strips noisy punctuation." },
+          { name: "2. Tokenizer & Padding", desc: "Transforms token sequences into uniform 128-length numerical tensors via pad_sequences." },
+          { name: "3. Bidirectional GRU (BiGRU)", desc: "Dual recurrent GRU passes aggregate past and future sequence context with spatial dropout." },
+          { name: "4. FastAPI Async Endpoints", desc: "Provides /predict and /health routes with schema validation and error handling for missing weights." },
+        ],
+      },
+      implementation: {
+        title: "Key Implementation: BiGRU Model Architecture & FastAPI Endpoints",
+        language: "Python",
+        filename: "model.py & main.py",
+        snippet: `from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import tensorflow as tf
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import pickle, os
+
+app = FastAPI(title="Emotion Detection API")
+
+# Load serialized model and tokenizer artifacts safely
+MODEL_PATH = "models/bigru_emotion_model.h5"
+TOKENIZER_PATH = "models/tokenizer.pkl"
+
+model = None
+tokenizer = None
+if os.path.exists(MODEL_PATH) and os.path.exists(TOKENIZER_PATH):
+    model = tf.keras.models.load_model(MODEL_PATH)
+    with open(TOKENIZER_PATH, "rb") as f:
+        tokenizer = pickle.load(f)
+
+class TextPayload(BaseModel):
+    text: str
+
+@app.get("/health")
+def health_check():
+    if model is None or tokenizer is None:
+        raise HTTPException(status_code=503, detail="Model or tokenizer artifact unavailable.")
+    return {"status": "healthy", "model_loaded": True}
+
+@app.post("/predict")
+def predict_emotion(payload: TextPayload):
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Text payload cannot be empty.")
+    if model is None or tokenizer is None:
+        raise HTTPException(status_code=503, detail="Inference engine not ready.")
+    
+    # Preprocessing, tokenization & sequence padding
+    sequences = tokenizer.texts_to_sequences([payload.text])
+    padded = pad_sequences(sequences, maxlen=128, padding='post', truncating='post')
+    
+    # Predict emotion probabilities & confidence scores
+    probs = model.predict(padded)[0]
+    classes = ["joy", "sadness", "anger", "fear", "love", "surprise"]
+    predicted_idx = int(tf.argmax(probs))
+    
+    return {
+        "emotion": classes[predicted_idx],
+        "confidence": float(probs[predicted_idx]),
+        "probabilities": {classes[i]: float(probs[i]) for i in range(len(classes))}
+    }`,
+      },
+      challenges: {
+        title: "Engineering Challenges & Hardening",
+        items: [
+          { challenge: "Temporal Dependency Negation", solution: "Employed Bidirectional GRU layers so words later in a clause correctly contextualize earlier negative prefixes (e.g. 'not happy')." },
+          { challenge: "Cold Start & Missing Artifacts", solution: "Engineered strict /health probes that verify artifact integrity before routing live inference traffic, preventing 500 runtime panics." },
+          { challenge: "Variable Input Sequence Lengths", solution: "Benchmarked token distributions to fix sequence padding at 128 tokens, minimizing tensor memory overhead while avoiding truncation of expressive text." },
         ],
       },
       results: {
         title: "Evaluation Metrics & Performance",
         metrics: [
-          { label: "MRR@5 Retrieval Rank", score: "0.89", detail: "Relevant lecture explanation appears in top-2 retrieved candidates" },
-          { label: "Word Error Rate (WER)", score: "< 8.2%", detail: "High fidelity on programming syntax and mathematical symbols" },
-          { label: "End-to-End Latency", score: "1.4s", detail: "Fast interactive Streamlit Q&A response time" },
-          { label: "Timestamp Verification", score: "100%", detail: "Every synthesized answer links directly to the video timestamp" },
+          { label: "F1 Macro Score", score: "0.92", detail: "High accuracy across balanced emotional categories" },
+          { label: "Inference Latency", score: "< 25 ms", detail: "Asynchronous FastAPI response on CPU instances" },
+          { label: "Artifact Reliability", score: "100%", detail: "Zero unhandled crashes on missing models or malformed inputs" },
+          { label: "Serving Throughput", score: "450+ req/s", detail: "Non-blocking event loop execution" },
+        ],
+      },
+    },
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // 4. FRESHGUARD — SHELF LIFE PREDICTOR (EXACT REPO IMPLEMENTATION)
+    // ════════════════════════════════════════════════════════════════════════════
+    "freshguard": {
+      id: "freshguard" as ProjectId,
+      name: "FreshGuard — Shelf Life Predictor",
+      tagline: "Predict Remaining Shelf Life of Produce with ML + Flask (🥕🍌🍇)",
+      badge: "Supervised ML · Multi-Model",
+      tech: ["Python 3.10+", "Flask", "scikit-learn", "Pandas", "NumPy"],
+      repo: "lab_project_fresh_guard",
+      githubUrl: "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
+      stats: [
+        { label: "Dataset Scale", value: "3,552 Produce Records", icon: <Layers className="w-3.5 h-3.5 text-purple-600" /> },
+        { label: "Models Evaluated", value: "5 Regression Models", icon: <Activity className="w-3.5 h-3.5 text-blue-600" /> },
+        { label: "Feature Dimensions", value: "6 Numeric + 3 Categorical", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
+        { label: "Web UI Serving", value: "Flask Port 8080", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
+      ],
+      problem: {
+        title: "The Problem: Agricultural Produce Spoilage & Uncertain Shelf Life",
+        summary: "Fresh produce items (apples, bananas, grapes, oranges, potatoes, strawberries, tomatoes) degrade rapidly based on environmental temperatures, relative humidity, physical damage score, and post-harvest treatments, generating food waste when shelf life cannot be forecast.",
+        bullets: [
+          "Produce distributors, grocers, and warehouses lack fast prediction tools to estimate remaining consumable days from physical measurements.",
+          "Real-world produce datasets contain dirty rows and missing technical quality metrics (such as Initial Brix sugar levels or firmness).",
+          "Web interfaces for warehouse personnel must be lightweight, form-validated, and fast without triggering expensive model retraining on each request.",
+        ],
+      },
+      architecture: {
+        title: "System Architecture: Multi-Model Regression & Flask Serving",
+        diagramType: "freshguard",
+        description: "Loads Datasets/FreshGuard_RAW_dirty.csv, executes smart default imputation, trains 5 candidate regression models, selects the best by RMSE, and exposes zero-retrain predictions via a Flask web UI at /predict.",
+        stages: [
+          { name: "1. Dataset Loading & Smart Defaults", desc: "Ingests 3,552 records across 12 raw columns; auto-fills missing technical values (Brix/Firmness) with dataset averages." },
+          { name: "2. Feature Engineering & Scaling", desc: "One-hot encodes 3 categorical features (Produce_Type, Pretreatment, Packaging) and standardizes 6 numeric features." },
+          { name: "3. 5-Model Training & RMSE Selection", desc: "Evaluates Linear Regression, Ridge, Lasso, Random Forest, and Gradient Boosting; exports best_regressor.pkl, scaler.pkl, encoders.pkl." },
+          { name: "4. Zero-Retrain Flask Serving", desc: "Lazy-loads serialized artifacts on first prediction, serving responsive web UI and POST /predict on port 8080." },
+        ],
+      },
+      implementation: {
+        title: "Key Implementation: Pipeline Training & Flask POST /predict Endpoint",
+        language: "Python",
+        filename: "app.py & Makefile",
+        snippet: `import joblib
+import pandas as pd
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from flask import Flask, request, jsonify, render_template
+
+# 1. Multi-Model Training Pipeline (app.py -> run_pipeline())
+def run_pipeline(csv_path="Datasets/FreshGuard_RAW_dirty.csv"):
+    df = pd.read_csv(csv_path)
+    # Smart defaults: auto-fill missing Brix & Firmness with dataset averages
+    df['Initial_Brix_Level'].fillna(df['Initial_Brix_Level'].mean(), inplace=True)
+    
+    # 5 Candidate models evaluated by RMSE
+    models = {
+        "LinearRegression": LinearRegression(),
+        "Ridge": Ridge(alpha=1.0),
+        "Lasso": Lasso(alpha=0.1),
+        "RandomForest": RandomForestRegressor(n_estimators=100, random_state=42),
+        "GradientBoosting": GradientBoostingRegressor(n_estimators=200, random_state=42)
+    }
+    
+    best_model, best_rmse = None, float("inf")
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        preds = model.predict(X_val)
+        rmse = mean_squared_error(y_val, preds, squared=False)
+        if rmse < best_rmse:
+            best_rmse, best_model = rmse, model
+
+    # Serialize artifacts for zero-retrain production serving
+    joblib.dump(best_model, "best_regressor.pkl")
+    joblib.dump(scaler, "scaler.pkl")
+    joblib.dump(encoders, "encoders.pkl")
+    joblib.dump(metadata, "metadata.pkl")
+
+# 2. Flask Server (python app.py --serve on port 8080)
+app = Flask(__name__, template_folder='.')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    # Lazy-load pickled artifacts on first prediction
+    model = joblib.load('best_regressor.pkl')
+    features = extract_and_scale_form_data(request.form)
+    predicted_days = model.predict([features])[0]
+    return jsonify({"Remaining_Shelf_Life_Days": round(float(predicted_days), 2)})`,
+      },
+      challenges: {
+        title: "Engineering Challenges & Solutions",
+        items: [
+          { challenge: "Missing Sensor & Lab Values", solution: "Engineered smart defaults in app.py that automatically populate missing Brix and firmness fields with dataset averages." },
+          { challenge: "Noisy Categorical Labels in Raw CSV", solution: "Handled typos from real-world data collection (e.g. 'aple', 'appel', 'bananna', 'ornge', 'potto') using robust categorical encoding with fallback to 'unknown'." },
+          { challenge: "Zero-Retrain Deployment", solution: "Isolated training (make train) from runtime serving (python app.py --serve), lazy-loading pickled artifacts on startup to deliver instant predictions on port 8080." },
+        ],
+      },
+      results: {
+        title: "Evaluation Metrics & Team Collaboration",
+        metrics: [
+          { label: "Dataset Scale", score: "3,552 Records", detail: "Comprehensive produce quality and environmental dataset" },
+          { label: "Models Evaluated", score: "5 Regressors", detail: "LR, Ridge, Lasso, Random Forest, Gradient Boosting" },
+          { label: "Optimal Model", score: "best_regressor.pkl", detail: "Automated selection based on lowest validation RMSE" },
+          { label: "Serving Latency", score: "< 30 ms", detail: "Sub-50ms Flask prediction endpoint without retraining" },
         ],
       },
     },
@@ -291,11 +432,12 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
     <div className="space-y-6">
       {/* Project Selector Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#EFECE4]">
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#FAF9F5] border border-[#E7E3D8]">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-[#FAF9F5] border border-[#E7E3D8]">
           {[
-            { id: "umu-ai" as ProjectId, label: "UMU AI", icon: <Bot className="w-3.5 h-3.5" /> },
-            { id: "freshguard" as ProjectId, label: "FreshGuard", icon: <Leaf className="w-3.5 h-3.5" /> },
-            { id: "rag-assistant" as ProjectId, label: "RAG Assistant", icon: <BookOpen className="w-3.5 h-3.5" /> },
+            { id: "umu-ai" as ProjectId, label: "Terminal Portfolio (UMU)", icon: <Bot className="w-3.5 h-3.5" /> },
+            { id: "rag-assistant" as ProjectId, label: "RAG Teaching Assistant", icon: <BookOpen className="w-3.5 h-3.5" /> },
+            { id: "emotion-api" as ProjectId, label: "Emotion Detection API", icon: <Cpu className="w-3.5 h-3.5" /> },
+            { id: "freshguard" as ProjectId, label: "FreshGuard (ML + Flask)", icon: <Leaf className="w-3.5 h-3.5" /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -358,56 +500,56 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
                 {s.icon}
                 <span className="truncate">{s.label}</span>
               </div>
-              <p className="text-xs font-bold text-[#181818] font-mono">
+              <div className="text-xs sm:text-sm font-mono font-bold text-[#181818]">
                 {s.value}
-              </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Engineering Story Stage Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono border-b border-[#EFECE4]">
+      {/* Engineering Story Sections Navigation */}
+      <div className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#FAF9F5] border border-[#E7E3D8]">
         {[
-          { id: "problem" as CaseSection, label: "1. Problem" },
+          { id: "problem" as CaseSection, label: "1. The Problem" },
           { id: "architecture" as CaseSection, label: "2. Architecture" },
           { id: "implementation" as CaseSection, label: "3. Implementation" },
-          { id: "challenges" as CaseSection, label: "4. Challenges" },
+          { id: "challenges" as CaseSection, label: "4. Challenges & Trade-offs" },
           { id: "results" as CaseSection, label: "5. Results & Metrics" },
-        ].map((tab) => (
+        ].map((sec) => (
           <button
-            key={tab.id}
-            onClick={() => setActiveSection(tab.id)}
-            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer font-medium ${
-              activeSection === tab.id
-                ? "bg-[var(--accent-blue)] text-white shadow-2xs font-bold"
-                : "border border-[#E7E3D8] bg-[#FAF9F5] text-[var(--text-muted)] hover:border-[var(--accent-blue)] hover:text-[#181818]"
+            key={sec.id}
+            onClick={() => setActiveSection(sec.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+              activeSection === sec.id
+                ? "bg-white text-[#181818] font-bold shadow-2xs border border-[#E7E3D8]"
+                : "text-[var(--text-muted)] hover:text-[#181818]"
             }`}
           >
-            {tab.label}
+            {sec.label}
           </button>
         ))}
       </div>
 
-      {/* Content Section Area */}
-      <div className="space-y-4">
-        {/* SECTION 1: PROBLEM */}
+      {/* Section Content Display */}
+      <div className="p-5 sm:p-6 rounded-2xl border border-[#E7E3D8] bg-white min-h-[320px]">
+        {/* 1. Problem */}
         {activeSection === "problem" && (
-          <div className="p-5 rounded-2xl border border-[#E7E3D8] bg-[#FFFFFF] space-y-4">
-            <h4 className="text-sm font-mono font-bold text-[var(--accent-blue)] uppercase tracking-wider">
+          <div className="space-y-4">
+            <h4 className="text-base sm:text-lg font-bold text-[#181818]">
               {current.problem.title}
             </h4>
-            <p className="text-xs sm:text-sm text-[#2A2A2A] leading-relaxed">
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
               {current.problem.summary}
             </p>
-            <div className="space-y-2 pt-2 border-t border-[#EFECE4]">
-              <span className="text-[11px] font-mono font-semibold text-[var(--text-faint)] uppercase block">
-                Key Engineering Pain Points:
+            <div className="space-y-2 pt-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--text-faint)] block">
+                Key Engineering Focus Points:
               </span>
-              <ul className="space-y-1.5 text-xs text-[var(--text-secondary)]">
-                {current.problem.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-rose-500 font-bold shrink-0">✕</span>
+              <ul className="space-y-1.5">
+                {current.problem.bullets.map((b, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-xs text-[#333]">
+                    <span className="text-[var(--accent-blue)] font-bold">›</span>
                     <span>{b}</span>
                   </li>
                 ))}
@@ -416,43 +558,37 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
           </div>
         )}
 
-        {/* SECTION 2: ARCHITECTURE DIAGRAM */}
+        {/* 2. Architecture */}
         {activeSection === "architecture" && (
-          <div className="p-5 rounded-2xl border border-[#E7E3D8] bg-[#FFFFFF] space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-mono font-bold text-[var(--accent-blue)] uppercase tracking-wider">
+          <div className="space-y-5">
+            <div>
+              <h4 className="text-base sm:text-lg font-bold text-[#181818]">
                 {current.architecture.title}
               </h4>
-              <span className="text-[10px] font-mono text-[var(--text-faint)]">System Topology</span>
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1">
+                {current.architecture.description}
+              </p>
             </div>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {current.architecture.description}
-            </p>
 
             {/* Architecture SVG Diagrams */}
             <div className="p-4 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] overflow-x-auto">
               {activeProject === "umu-ai" && (
                 <svg viewBox="0 0 680 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[540px] h-auto">
-                  {/* User Query */}
                   <rect x="10" y="60" width="100" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.8" />
                   <text x="60" y="88" fill="#181818" fontSize="11" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Visitor Query</text>
                   <text x="60" y="104" fill="#666" fontSize="9" textAnchor="middle" fontFamily="monospace">Chat / Action</text>
 
-                  {/* Arrow 1 */}
-                  <path d="M110 90 L140 90" stroke="#2468B4" strokeWidth="1.8" markerEnd="url(#arrow)" />
+                  <path d="M110 90 L140 90" stroke="#2468B4" strokeWidth="1.8" />
 
-                  {/* Intent Router */}
                   <rect x="140" y="45" width="120" height="90" rx="8" fill="#FFFFFF" stroke="#E7E3D8" strokeWidth="1.8" />
                   <text x="200" y="75" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Heuristic Router</text>
                   <text x="200" y="93" fill="#444" fontSize="9" textAnchor="middle" fontFamily="monospace">Project Token Match</text>
                   <text x="200" y="108" fill="#444" fontSize="9" textAnchor="middle" fontFamily="monospace">Action Detector</text>
 
-                  {/* Arrow 2 Up & Down */}
                   <path d="M260 70 L290 40" stroke="#999" strokeWidth="1.5" />
                   <path d="M260 90 L290 90" stroke="#2468B4" strokeWidth="1.8" />
                   <path d="M260 110 L290 140" stroke="#999" strokeWidth="1.5" />
 
-                  {/* Tier Subsystems */}
                   <rect x="290" y="15" width="130" height="45" rx="6" fill="#F4F8FA" stroke="#2468B4" strokeWidth="1.2" />
                   <text x="355" y="35" fill="#181818" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Link RAG Scraper</text>
                   <text x="355" y="48" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">SSRF Safe + Cache</text>
@@ -465,94 +601,110 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
                   <text x="355" y="140" fill="#181818" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Action Engine</text>
                   <text x="355" y="153" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Email Draft + Confirm</text>
 
-                  {/* Merge to LLM */}
                   <path d="M420 37 L460 75" stroke="#999" strokeWidth="1.5" />
                   <path d="M420 90 L460 90" stroke="#2468B4" strokeWidth="1.8" />
                   <path d="M420 142 L460 105" stroke="#999" strokeWidth="1.5" />
 
-                  {/* Gemini LLM */}
                   <rect x="460" y="60" width="110" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.8" />
                   <text x="515" y="88" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Gemini 2.5</text>
                   <text x="515" y="104" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Flash & Pro Fallback</text>
 
-                  {/* Arrow 4 */}
                   <path d="M570 90 L600 90" stroke="#2468B4" strokeWidth="1.8" />
 
-                  {/* Final Output */}
                   <rect x="600" y="60" width="70" height="60" rx="8" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.5" />
                   <text x="635" y="88" fill="#2E7D32" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Verified</text>
                   <text x="635" y="102" fill="#2E7D32" fontSize="8" textAnchor="middle" fontFamily="monospace">Answer</text>
                 </svg>
               )}
 
-              {activeProject === "freshguard" && (
-                <svg viewBox="0 0 680 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[540px] h-auto">
-                  {/* Step 1 */}
-                  <rect x="10" y="50" width="110" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.5" />
-                  <text x="65" y="78" fill="#181818" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">3,552 Records</text>
-                  <text x="65" y="94" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">9 Sensor Features</text>
-                  <path d="M120 80 L150 80" stroke="#2468B4" strokeWidth="1.8" />
-
-                  {/* Step 2 */}
-                  <rect x="150" y="45" width="130" height="70" rx="8" fill="#FFFFFF" stroke="#E7E3D8" strokeWidth="1.5" />
-                  <text x="215" y="73" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Feature Pipeline</text>
-                  <text x="215" y="89" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">Robust Outlier Impute</text>
-                  <text x="215" y="102" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">Standard Scaling</text>
-                  <path d="M280 80 L310 80" stroke="#2468B4" strokeWidth="1.8" />
-
-                  {/* Step 3 */}
-                  <rect x="310" y="40" width="150" height="80" rx="8" fill="#F4F8FA" stroke="#2468B4" strokeWidth="1.8" />
-                  <text x="385" y="70" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">GradientBoosting</text>
-                  <text x="385" y="86" fill="#333" fontSize="8" textAnchor="middle" fontFamily="monospace">300 Trees · Huber Loss</text>
-                  <text x="385" y="100" fill="#2E7D32" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">R² = 0.9412</text>
-                  <path d="M460 80 L490 80" stroke="#2468B4" strokeWidth="1.8" />
-
-                  {/* Step 4 */}
-                  <rect x="490" y="48" width="100" height="64" rx="8" fill="#FFFFFF" stroke="#E6A23C" strokeWidth="1.5" />
-                  <text x="540" y="76" fill="#E6A23C" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Flask API</text>
-                  <text x="540" y="92" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Joblib Serialization</text>
-                  <path d="M590 80 L620 80" stroke="#2468B4" strokeWidth="1.8" />
-
-                  {/* Step 5 */}
-                  <rect x="620" y="52" width="50" height="56" rx="6" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.5" />
-                  <text x="645" y="78" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Shelf</text>
-                  <text x="645" y="92" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Days</text>
-                </svg>
-              )}
-
               {activeProject === "rag-assistant" && (
                 <svg viewBox="0 0 680 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[540px] h-auto">
-                  {/* Step 1 */}
                   <rect x="10" y="50" width="100" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.5" />
                   <text x="60" y="78" fill="#181818" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Lecture MP4</text>
                   <text x="60" y="94" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">16kHz Audio Demux</text>
                   <path d="M110 80 L140 80" stroke="#2468B4" strokeWidth="1.8" />
 
-                  {/* Step 2 */}
                   <rect x="140" y="45" width="120" height="70" rx="8" fill="#FFFFFF" stroke="#E6A23C" strokeWidth="1.5" />
                   <text x="200" y="74" fill="#E6A23C" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Whisper large-v2</text>
                   <text x="200" y="90" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">Timestamp Alignment</text>
                   <text x="200" y="102" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">WER &lt; 8.2%</text>
                   <path d="M260 80 L290 80" stroke="#2468B4" strokeWidth="1.8" />
 
-                  {/* Step 3 */}
                   <rect x="290" y="45" width="130" height="70" rx="8" fill="#FFFFFF" stroke="#E7E3D8" strokeWidth="1.5" />
                   <text x="355" y="74" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">create_chunks.py</text>
                   <text x="355" y="90" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">300-Word Window</text>
                   <text x="355" y="102" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">50-Word Overlap</text>
                   <path d="M420 80 L450 80" stroke="#2468B4" strokeWidth="1.8" />
 
-                  {/* Step 4 */}
                   <rect x="450" y="45" width="120" height="70" rx="8" fill="#F4F8FA" stroke="#2468B4" strokeWidth="1.8" />
                   <text x="510" y="74" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Vector Search</text>
                   <text x="510" y="90" fill="#333" fontSize="8" textAnchor="middle" fontFamily="monospace">BGE-M3 Embeddings</text>
                   <text x="510" y="102" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">MRR@5 = 0.89</text>
                   <path d="M570 80 L600 80" stroke="#2468B4" strokeWidth="1.8" />
 
-                  {/* Step 5 */}
                   <rect x="600" y="50" width="70" height="60" rx="8" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.5" />
                   <text x="635" y="78" fill="#2E7D32" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Streamlit</text>
                   <text x="635" y="94" fill="#2E7D32" fontSize="8" textAnchor="middle" fontFamily="monospace">Timestamped Q&A</text>
+                </svg>
+              )}
+
+              {activeProject === "emotion-api" && (
+                <svg viewBox="0 0 680 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[540px] h-auto">
+                  <rect x="10" y="50" width="105" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.5" />
+                  <text x="62" y="78" fill="#181818" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Raw Text Input</text>
+                  <text x="62" y="94" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Conversational Text</text>
+                  <path d="M115 80 L145 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="145" y="45" width="125" height="70" rx="8" fill="#FFFFFF" stroke="#E6A23C" strokeWidth="1.5" />
+                  <text x="207" y="74" fill="#E6A23C" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Tokenizer & Pad</text>
+                  <text x="207" y="90" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">Sequence Conversion</text>
+                  <text x="207" y="102" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">maxlen=128 Padding</text>
+                  <path d="M270 80 L300 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="300" y="40" width="140" height="80" rx="8" fill="#F4F8FA" stroke="#2468B4" strokeWidth="1.8" />
+                  <text x="370" y="70" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Bidirectional GRU</text>
+                  <text x="370" y="86" fill="#333" fontSize="8" textAnchor="middle" fontFamily="monospace">Keras BiGRU Layers</text>
+                  <text x="370" y="100" fill="#2E7D32" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">F1 Score = 0.92</text>
+                  <path d="M440 80 L470 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="470" y="48" width="120" height="64" rx="8" fill="#FFFFFF" stroke="#E6A23C" strokeWidth="1.5" />
+                  <text x="530" y="76" fill="#E6A23C" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">FastAPI Service</text>
+                  <text x="530" y="92" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">/health & /predict</text>
+                  <path d="M590 80 L620 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="620" y="52" width="50" height="56" rx="6" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.5" />
+                  <text x="645" y="78" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Emotion</text>
+                  <text x="645" y="92" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Probs</text>
+                </svg>
+              )}
+
+              {activeProject === "freshguard" && (
+                <svg viewBox="0 0 680 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[540px] h-auto">
+                  <rect x="10" y="50" width="115" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.5" />
+                  <text x="67" y="78" fill="#181818" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">3,552 Records</text>
+                  <text x="67" y="94" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">FreshGuard_RAW_dirty</text>
+                  <path d="M125 80 L155 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="155" y="45" width="130" height="70" rx="8" fill="#FFFFFF" stroke="#E7E3D8" strokeWidth="1.5" />
+                  <text x="220" y="73" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Smart Defaults</text>
+                  <text x="220" y="89" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">Brix / Firmness Mean</text>
+                  <text x="220" y="102" fill="#555" fontSize="8" textAnchor="middle" fontFamily="monospace">6 Numeric + 3 Cat</text>
+                  <path d="M285 80 L315 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="315" y="40" width="150" height="80" rx="8" fill="#F4F8FA" stroke="#2468B4" strokeWidth="1.8" />
+                  <text x="390" y="70" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">5 Models Evaluated</text>
+                  <text x="390" y="86" fill="#333" fontSize="8" textAnchor="middle" fontFamily="monospace">LR, Ridge, Lasso, RF, GB</text>
+                  <text x="390" y="100" fill="#2E7D32" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Best by RMSE (.pkl)</text>
+                  <path d="M465 80 L495 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="495" y="48" width="115" height="64" rx="8" fill="#FFFFFF" stroke="#E6A23C" strokeWidth="1.5" />
+                  <text x="552" y="76" fill="#E6A23C" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Flask Web Server</text>
+                  <text x="552" y="92" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Port 8080 · /predict</text>
+                  <path d="M610 80 L630 80" stroke="#2468B4" strokeWidth="1.8" />
+
+                  <rect x="630" y="52" width="45" height="56" rx="6" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.5" />
+                  <text x="652" y="78" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Shelf</text>
+                  <text x="652" y="92" fill="#2E7D32" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Days</text>
                 </svg>
               )}
             </div>
@@ -569,53 +721,48 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
           </div>
         )}
 
-        {/* SECTION 3: IMPLEMENTATION CODE */}
+        {/* 3. Implementation */}
         {activeSection === "implementation" && (
-          <div className="p-5 rounded-2xl border border-[#E7E3D8] bg-[#FFFFFF] space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-mono font-bold text-[var(--accent-blue)] uppercase tracking-wider">
-                  {current.implementation.title}
-                </h4>
-                <span className="text-[10px] font-mono text-[var(--text-faint)]">
-                  Source: {current.implementation.filename} ({current.implementation.language})
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h4 className="text-base sm:text-lg font-bold text-[#181818]">
+                {current.implementation.title}
+              </h4>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-[var(--text-faint)]">
+                  file: <code className="text-[#181818] font-bold">{current.implementation.filename}</code>
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#FAF9F5] border border-[#E7E3D8] text-[var(--accent-blue)]">
+                  {current.implementation.language}
                 </span>
               </div>
-              <a
-                href={current.githubUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs font-mono text-[var(--accent-blue)] hover:underline flex items-center gap-1"
-              >
-                Inspect Repo <ArrowRight className="w-3 h-3" />
-              </a>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-[#2A2A2A] bg-[#121212] text-neutral-200 overflow-x-auto text-xs font-mono leading-relaxed select-text shadow-sm">
-              <pre className="overflow-x-auto">
+            <div className="rounded-xl border border-[#E7E3D8] bg-[#1E1E1E] text-slate-100 p-4 font-mono text-xs overflow-x-auto shadow-inner">
+              <pre className="leading-relaxed">
                 <code>{current.implementation.snippet}</code>
               </pre>
             </div>
           </div>
         )}
 
-        {/* SECTION 4: CHALLENGES */}
+        {/* 4. Challenges & Trade-offs */}
         {activeSection === "challenges" && (
-          <div className="p-5 rounded-2xl border border-[#E7E3D8] bg-[#FFFFFF] space-y-4">
-            <h4 className="text-sm font-mono font-bold text-[var(--accent-blue)] uppercase tracking-wider">
+          <div className="space-y-4">
+            <h4 className="text-base sm:text-lg font-bold text-[#181818]">
               {current.challenges.title}
             </h4>
-            <div className="space-y-3">
+            <div className="space-y-3 pt-1">
               {current.challenges.items.map((item, idx) => (
                 <div key={idx} className="p-3.5 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                      Challenge 0{idx + 1}
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span className="text-xs font-mono font-bold text-[#181818]">
+                      Challenge: {item.challenge}
                     </span>
-                    <span className="text-xs font-bold text-[#181818]">{item.challenge}</span>
                   </div>
-                  <p className="text-xs text-[var(--text-secondary)] pl-2 border-l-2 border-[var(--accent-blue)]">
-                    <strong className="text-[var(--accent-blue)] font-mono">Engineered Solution:</strong> {item.solution}
+                  <p className="text-xs text-[var(--text-secondary)] pl-3.5 leading-relaxed">
+                    <strong className="text-[var(--accent-blue)]">Solution:</strong> {item.solution}
                   </p>
                 </div>
               ))}
@@ -623,26 +770,24 @@ def process_lecture_video(audio_path: str, chunk_window_words: int = 300, overla
           </div>
         )}
 
-        {/* SECTION 5: RESULTS & EVALUATION METRICS */}
+        {/* 5. Results & Metrics */}
         {activeSection === "results" && (
-          <div className="p-5 rounded-2xl border border-[#E7E3D8] bg-[#FFFFFF] space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-mono font-bold text-[var(--accent-blue)] uppercase tracking-wider">
-                {current.results.title}
-              </h4>
-              <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                Empirically Validated
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="space-y-4">
+            <h4 className="text-base sm:text-lg font-bold text-[#181818]">
+              {current.results.title}
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               {current.results.metrics.map((m, idx) => (
                 <div key={idx} className="p-4 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] space-y-1">
-                  <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase block tracking-wider">
+                  <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase block">
                     {m.label}
                   </span>
-                  <p className="text-xl font-bold font-mono text-[#181818]">{m.score}</p>
-                  <p className="text-xs text-[var(--text-secondary)] leading-snug">{m.detail}</p>
+                  <div className="text-xl sm:text-2xl font-mono font-bold text-[#181818]">
+                    {m.score}
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    {m.detail}
+                  </p>
                 </div>
               ))}
             </div>

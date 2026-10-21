@@ -35,15 +35,34 @@ export async function secureFetch(input: RequestInfo | URL, init: RequestInit = 
     headers.set("x-csrf-token", await getCsrfToken());
   }
 
-  const response = await fetch(input, {
-    ...init,
-    method,
-    headers,
-    credentials: "same-origin",
-  });
+  const doFetch = async () => {
+    return fetch(input, {
+      ...init,
+      method,
+      headers,
+      credentials: "same-origin",
+    });
+  };
 
+  let response: Response;
+  try {
+    response = await doFetch();
+  } catch (netErr) {
+    // Retry once after 600ms on transient connection failure (e.g. server restart)
+    await new Promise((r) => setTimeout(r, 600));
+    response = await doFetch();
+  }
+
+  // If 403 returned on mutating method (e.g. expired or invalid CSRF session), refresh token and retry once
   if (response.status === 403 && MUTATING_METHODS.has(method)) {
     csrfTokenPromise = null;
+    try {
+      const freshToken = await getCsrfToken();
+      headers.set("x-csrf-token", freshToken);
+      response = await doFetch();
+    } catch {
+      // Return original response if refresh fails
+    }
   }
 
   return response;

@@ -288,13 +288,29 @@ export function parseContactWorkflow(
 ): EmailDraftState {
   const currentLower = currentMessage.toLowerCase().trim();
 
-  // Normalize history entries so both .content and .text formats work, and normalize role
-  const history = (rawHistory || []).map((h: any) => ({
+  const isAssistantRole = (role: string) => role === "assistant" || role === "agent" || role === "model";
+
+  // 0. Sift history: Prune any turns prior to the most recently completed or cancelled email workflow
+  const rawItems = (rawHistory || []).map((h: any) => ({
     role: String(h?.role || "").toLowerCase(),
     content: (typeof h?.content === "string" ? h.content : (typeof h?.text === "string" ? h.text : "")) || "",
   }));
 
-  const isAssistantRole = (role: string) => role === "assistant" || role === "agent" || role === "model";
+  const lastCompletionReversedIdx = [...rawItems].reverse().findIndex((h) => {
+    if (!isAssistantRole(h.role)) return false;
+    const c = h.content.toLowerCase();
+    return (
+      c.includes("message delivered") ||
+      c.includes("dispatched to umesh") ||
+      c.includes("draft cancelled") ||
+      c.includes("no message was sent")
+    );
+  });
+
+  const history =
+    lastCompletionReversedIdx !== -1
+      ? rawItems.slice(rawItems.length - lastCompletionReversedIdx)
+      : rawItems;
 
   // If client supplied explicit draft fields (e.g. from UI confirmation or inline edit)
   let explicitName = overrideDraft?.name ? normalizeText(overrideDraft.name, 120) : undefined;
@@ -326,7 +342,7 @@ export function parseContactWorkflow(
     currentLower === "cancel" ||
     currentLower === "no";
 
-  if (hasPendingDraftInHistory && isCancelWord) {
+  if (hasPendingDraftInHistory && isCancelWord && !currentLower.includes("project") && !currentLower.includes("rag")) {
     return {
       isContactWorkflow: true,
       isConfirmation: false,
@@ -337,7 +353,49 @@ export function parseContactWorkflow(
     };
   }
 
-  // 4. Check for Contact Context in History
+  // Check if current message is an explicit new contact intent
+  const isExplicitContactIntent =
+    /conta[a-z]*/i.test(currentLower) ||
+    /s[en]{2}d.*(message|msg|email)/i.test(currentLower) ||
+    currentLower.includes("reach out") ||
+    currentLower.includes("tell umesh") ||
+    currentLower.includes("talk to umesh") ||
+    currentLower.includes("connect with umesh") ||
+    currentLower.includes("say hi to umesh") ||
+    currentLower.includes("say hello to umesh") ||
+    currentLower.includes("collaborate") ||
+    currentLower.includes("collaboration") ||
+    (currentLower.includes("hire") && (currentLower.includes("umesh") || currentLower.includes("you"))) ||
+    currentLower.includes("internship");
+
+  // Check if user is asking a project or general question to break out of contact loop
+  const isTopicShiftOrProjectQuestion =
+    !isExplicitContactIntent &&
+    (/^(no|nope|wait|hold on|stop)\b/i.test(currentLower) ||
+      currentLower === "rag" ||
+      currentLower.includes("about rag") ||
+      currentLower.includes("rag-based") ||
+      currentLower.includes("freshguard") ||
+      currentLower.includes("emotion") ||
+      currentLower.includes("bigru") ||
+      currentLower.includes("cgpa") ||
+      currentLower.includes("silicon university") ||
+      currentLower.includes("who are you") ||
+      currentLower.includes("what projects") ||
+      currentLower.includes("explain your"));
+
+  if (isTopicShiftOrProjectQuestion) {
+    return {
+      isContactWorkflow: false,
+      isConfirmation: false,
+      isCancellation: false,
+      isEdit: false,
+      missingFields: [],
+      status: "idle",
+    };
+  }
+
+  // 4. Check for Contact Context in History (from active, non-completed history only)
   const historyHasContactFlow = history.some((h) => {
     const c = h.content.toLowerCase();
     return (
@@ -356,20 +414,6 @@ export function parseContactWorkflow(
       c.includes("tell umesh")
     );
   });
-
-  const isExplicitContactIntent =
-    /conta[a-z]*/i.test(currentLower) ||
-    /send.*(message|msg|email)/i.test(currentLower) ||
-    currentLower.includes("reach out") ||
-    currentLower.includes("tell umesh") ||
-    currentLower.includes("talk to umesh") ||
-    currentLower.includes("connect with umesh") ||
-    currentLower.includes("say hi to umesh") ||
-    currentLower.includes("say hello to umesh") ||
-    currentLower.includes("collaborate") ||
-    currentLower.includes("collaboration") ||
-    (currentLower.includes("hire") && (currentLower.includes("umesh") || currentLower.includes("you"))) ||
-    currentLower.includes("internship");
 
   const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
 
@@ -434,9 +478,10 @@ export function parseContactWorkflow(
     for (const pat of namePatterns) {
       const m = currentMessage.match(pat);
       if (m && m[1]) {
-        const candidate = m[1].trim().replace(/\b(and|my|email|at|is)\b.*$/i, "").trim();
+        let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
+        candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
         if (candidate.length >= 2 && !candidate.includes("@")) {
-          name = candidate;
+          name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
           break;
         }
       }
@@ -457,9 +502,10 @@ export function parseContactWorkflow(
       for (const pat of namePatterns) {
         const m = history[i].content.match(pat);
         if (m && m[1]) {
-          const candidate = m[1].trim().replace(/\b(and|my|email|at|is)\b.*$/i, "").trim();
+          let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
+          candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
           if (candidate.length >= 2 && !candidate.includes("@")) {
-            name = candidate;
+            name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
             break;
           }
         }
@@ -492,18 +538,19 @@ export function parseContactWorkflow(
   // 7. Extract Message
   let message = explicitMessage;
   const msgPatterns = [
-    /(?:send(?:\s+my)?\s+message(?:\s+to\s+umesh)?\s+that)\s+(.+)/i,
-    /(?:tell umesh that|send a message to umesh that|send him a message that|tell him that|tell umesh|tell him)\s+(.+)/i,
+    /(?:s[en]{2}d|sned|send|tell)(?:\s+my|\s+a)?\s+(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+)\s*(.+)/i,
+    /(?:i\s+want\s+to\s+(?:send|sned|tell)\s+(?:a\s+|my\s+)?(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+))\s*(.+)/i,
+    /(?:tell umesh that|send a message to umesh that|send him a message that|tell him that)\s+(.+)/i,
     /(?:change message to|edit message to|update message to|message is|my message is|message:\s*)(.+)/i,
-    /(?:interested in|want to discuss|collaborate on|hiring for)\s+(.+)/i,
+    /(?:can we collaborate|want to collaborate|interested in collaborating)\b(.*)/i,
   ];
 
   if (!message) {
     for (const pat of msgPatterns) {
       const m = currentMessage.match(pat);
       if (m && m[1]) {
-        const candidate = m[1].trim();
-        if (candidate.length >= 2 && !candidate.toLowerCase().startsWith("what")) {
+        let candidate = m[1].trim().replace(/^(?:to\s+(?:umesh|him|you)\s*)/i, "").trim();
+        if (candidate.length >= 2 && !candidate.toLowerCase().startsWith("what") && candidate.toLowerCase() !== "umesh") {
           message = candidate;
           break;
         }
@@ -513,6 +560,8 @@ export function parseContactWorkflow(
 
   if (!message && (currentLower.includes("said hi") || currentLower.includes("say hi") || currentLower.includes("say hello"))) {
     message = "Hello Umesh, I wanted to say hi!";
+  } else if (!message && currentLower.includes("can we collaborate")) {
+    message = "Can we collaborate now?";
   } else if (!message && currentLower.includes("collaborat")) {
     message = currentMessage.replace(/^.*?(collaborat\w*)/i, "I'm interested in collaborating").trim();
   } else if (!message && (currentLower.includes("hire") || currentLower.includes("internship"))) {
@@ -531,8 +580,8 @@ export function parseContactWorkflow(
       for (const pat of msgPatterns) {
         const m = history[i].content.match(pat);
         if (m && m[1]) {
-          const candidate = m[1].trim();
-          if (candidate.length > 4 && !candidate.toLowerCase().startsWith("what")) {
+          let candidate = m[1].trim().replace(/^(?:to\s+(?:umesh|him|you)\s*)/i, "").trim();
+          if (candidate.length > 4 && !candidate.toLowerCase().startsWith("what") && candidate.toLowerCase() !== "umesh") {
             message = candidate;
             break;
           }

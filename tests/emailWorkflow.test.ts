@@ -244,6 +244,34 @@ async function runEmailWorkflowTests() {
     assert(t3.draft?.name === "Alex", "Maintains sender name for delivery");
     assert(t3.draft?.email === "alex@example.com", "Maintains sender email for delivery");
     assert(t3.draft?.message === "i said hi", "Maintains sender message for delivery");
+
+    // Case 4: Slang abbreviations and typos (e.g. 'nd mail is', 'sned message')
+    const slangQuery = "my name is hari nd mail is pupuql123@gmail.com and i want to sned message to umesh that can we collaborate now";
+    const tSlang = parseContactWorkflow(slangQuery, []);
+    assert(tSlang.isContactWorkflow, "Handles conversational slang query");
+    assert(tSlang.draft?.name === "Hari", `Cleanly extracts name 'Hari' without 'nd mail' (got: '${tSlang.draft?.name}')`);
+    assert(tSlang.draft?.email === "pupuql123@gmail.com", "Extracts email 'pupuql123@gmail.com'");
+    assert(tSlang.draft?.message?.includes("collaborate") === true, "Extracts collaboration message");
+    assert(tSlang.status === "pending_confirmation", "Reaches 'pending_confirmation' state");
+
+    // Case 5: Breaking out of loop after email delivery
+    const historyAfterSent = [
+      ...historyTurn3,
+      { role: "user", text: "yes send it" },
+      { role: "assistant", text: "✅ **Message Delivered!**\n\nYour message has been accepted by the email system and dispatched to Umesh's inbox (sahooumesh2003@gmail.com)." }
+    ];
+    const postSentQuery = parseContactWorkflow("Explain your RAG-Based Assistant", historyAfterSent);
+    assert(!postSentQuery.isContactWorkflow, "Breaks out of contact workflow after email delivery");
+    assert(postSentQuery.status === "idle", "Resets status to 'idle' for post-delivery questions");
+
+    // Case 6: Breaking out of loop during collecting on explicit question
+    const historyCollecting = [
+      { role: "user", text: "contact umesh" },
+      { role: "assistant", text: "I'd be glad to help you send a direct message to Umesh! Could you please share your name, your email address, and what message you'd like to send?" }
+    ];
+    const topicShiftQuery = parseContactWorkflow("no i want to know abput rag project", historyCollecting);
+    assert(!topicShiftQuery.isContactWorkflow, "Breaks out of contact workflow when user shifts topic to RAG project");
+    assert(topicShiftQuery.status === "idle", "Resets status to 'idle' on topic shift");
   }
 
   console.log("\n==================================================");

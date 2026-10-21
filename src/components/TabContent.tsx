@@ -732,24 +732,31 @@ export default function TabContent({
     const featuredProjects = [
       {
         title: "AI-Powered Terminal Portfolio",
-        tech: "React, Vite, Express, Gemini 2.0, Rate-limiting, CSRF Security",
-        desc: "Full-stack editorial web portfolio featuring an integrated Gemini digital twin, live Hacker News caching, real-time GitHub sync, and custom Markdown rendering.",
+        tech: "React • FastAPI/Express • Gemini • REST APIs • Security",
+        desc: "Built a React + FastAPI/Express terminal-style portfolio with a secure backend, integrating GitHub and Hacker News APIs with server-side caching, Gemini assistant grounded in resume/repo context, and Helmet, CSRF, and rate-limiting security controls.",
         link: "https://github.com/umeshkumarsahoo/portfolio_",
-        badge: "Production Stack"
+        badge: "Resume Featured"
       },
       {
         title: "RAG-Based Teaching Assistant System",
-        tech: "Python, Vector Embeddings, Cosine Similarity, LLM Orchestration",
-        desc: "Semantic retrieval pipeline chunking high-dimensional academic corpora and querying vector spaces to provide verifiable, hallucination-free student answers.",
-        link: "https://github.com/umeshkumarsahoo",
-        badge: "AI Retrieval"
+        tech: "Python • RAG • Embeddings • Vector Search • LLM Integration",
+        desc: "Built an end-to-end RAG pipeline covering document ingestion, chunking, embedding generation, vector similarity search, retrieval, and semantic context-aware LLM response generation over educational video lecture archives.",
+        link: "https://github.com/umeshkumarsahoo/Teaching_assistant-rag-based-",
+        badge: "Resume Featured"
       },
       {
-        title: "BiGRU Text Emotion Classifier",
-        tech: "Python, Keras, TensorFlow, FastAPI, NLP Tokenization",
-        desc: "Bidirectional Recurrent Neural Network (GRU) analyzing nuanced textual sentiments, deployed as an asynchronous FastAPI inference service.",
-        link: "https://github.com/umeshkumarsahoo",
-        badge: "Deep Learning"
+        title: "Emotion Detection API",
+        tech: "Python • Keras • BiGRU • FastAPI • NLP",
+        desc: "Built a Keras Bidirectional GRU model for text emotion classification with inference preprocessing, tokenizer sequence conversion, padding, emotion probabilities, confidence scores, and FastAPI health/prediction endpoints.",
+        link: "https://github.com/umeshkumarsahoo/sentiment_analysis",
+        badge: "Resume Featured"
+      },
+      {
+        title: "FreshGuard — Shelf Life Predictor",
+        tech: "Python 3.10+ • Flask • scikit-learn • Regression • Supervised ML",
+        desc: "Predicts remaining shelf life of produce items (apples, bananas, grapes, oranges, potatoes, strawberries, tomatoes) in days. Evaluates 5 regressors on 3,552 records with smart defaults and a Flask web UI at /predict on port 8080.",
+        link: "https://github.com/umeshkumarsahoo/lab_project_fresh_guard",
+        badge: "ML Project"
       }
     ];
 
@@ -820,7 +827,7 @@ export default function TabContent({
 
           <div className="hidden sm:flex items-center gap-2">
             <span className="text-[11px] font-mono text-[var(--text-faint)]">
-              {projectSubTab === "case-studies" ? "UMU AI · FreshGuard · RAG" : "@umeshkumarsahoo"}
+              {projectSubTab === "case-studies" ? "Resume Works · Terminal Portfolio · RAG · Emotion API · FreshGuard" : "@umeshkumarsahoo"}
             </span>
           </div>
         </div>
