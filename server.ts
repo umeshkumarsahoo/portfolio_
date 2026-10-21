@@ -21,6 +21,7 @@ import {
   ChunkMetadata,
 } from "./ragEngine";
 import { githubService } from "./githubService";
+import { sendContactEmail, parseContactWorkflow } from "./emailService";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -956,176 +957,12 @@ app.get("/api/github/repos/:repo/contents", async (req, res) => {
 // Secure Contact Form Direct Email and Persistence Endpoint
 app.post("/api/contact", contactLimiter, async (req, res) => {
   try {
-    const { name, email, msg } = req.body;
-    const trimmedName = normalizeText(name, 120);
-    const trimmedEmail = normalizeText(email, 254).toLowerCase();
-    const trimmedMessage = normalizeText(msg, 4000, true);
-
-    if (!trimmedName || !trimmedEmail || !trimmedMessage) {
-      res.status(400).json({ error: "Name, email, and message fields are required." });
+    const result = await sendContactEmail(req.body);
+    if (!result.success) {
+      res.status(400).json({ error: result.message });
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      res.status(400).json({ error: "Please provide a valid email address." });
-      return;
-    }
-    if (trimmedMessage.length > 4000) {
-      res.status(400).json({ error: "Message is too long. Please keep it under 4000 characters." });
-      return;
-    }
-
-    console.log(`[BACKEND] Secure message received from ${trimmedName} <${trimmedEmail}>`);
-
-    // 1. Durably persist message locally to contacts.json so Umesh never loses contacts
-    const contactMessage = {
-      timestamp: new Date().toISOString(),
-      name: trimmedName,
-      email: trimmedEmail,
-      message: trimmedMessage
-    };
-
-    const filePath = path.join(process.cwd(), "contacts.json");
-    let messagesList: unknown[] = [];
-    try {
-      if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, "utf-8");
-        const parsed = JSON.parse(fileContent);
-        messagesList = Array.isArray(parsed) ? parsed : [];
-      }
-    } catch (err) {
-      console.error("[BACKEND] Error reading contacts.json file:", err);
-    }
-
-    messagesList.push(contactMessage);
-
-    try {
-      fs.writeFileSync(filePath, JSON.stringify(messagesList, null, 2), { encoding: "utf-8", mode: 0o600 });
-      fs.chmodSync(filePath, 0o600);
-      console.log(`[BACKEND] Securely logged contact message in contacts.json`);
-    } catch (err) {
-      console.error("[BACKEND] Error writing to contacts.json file:", err);
-    }
-
-    // 2. Dispatch real email via Resend HTTPS (port 443, Render Free compatible) or SMTP
-    const resendApiKey = process.env.RESEND_API_KEY?.trim();
-    const smtpHost = process.env.SMTP_HOST?.trim();
-    const smtpPort = process.env.SMTP_PORT?.trim();
-    const smtpUser = process.env.SMTP_USER?.trim();
-    const smtpPass = process.env.SMTP_PASS?.trim();
-    const mailTo = process.env.SMTP_TO?.trim() || "sahooumesh2003@gmail.com";
-
-    const safeName = escapeHtml(trimmedName);
-    const safeEmail = escapeHtml(trimmedEmail);
-    const safeMessage = escapeHtml(trimmedMessage);
-    let emailSent = false;
-
-    // Option A: Resend HTTPS API (Works 100% on Render Free Tier on Port 443)
-    if (resendApiKey) {
-      try {
-        console.log(`[BACKEND] Dispatching email via Resend HTTPS API (port 443) to ${mailTo}...`);
-        const resendRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${resendApiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            from: "Portfolio Contact <onboarding@resend.dev>",
-            to: [mailTo],
-            reply_to: trimmedEmail,
-            subject: `New Portfolio Message from ${trimmedName}`,
-            text: `You have received a new contact submission from your portfolio.\n\nFrom: ${trimmedName} <${trimmedEmail}>\nDate: ${new Date().toLocaleString()}\n\nMessage:\n${trimmedMessage}\n\n(Persisted durably in contacts.json)`,
-            html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; border: 1px solid #e7e2d8; padding: 24px; border-radius: 8px; background: #fdfcf9; color: #171717;">
-                <h2 style="margin-top: 0; padding-bottom: 12px; border-bottom: 1px solid #e7e2d8; font-size: 20px; font-weight: 600;">New Portfolio Contact</h2>
-                <p style="margin: 8px 0; font-size: 14px;"><strong>From:</strong> ${safeName} &lt;<a href="mailto:${safeEmail}" style="color: #2468B4;">${safeEmail}</a>&gt;</p>
-                <p style="margin: 8px 0; font-size: 14px;"><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-                <div style="background: #f7f4ec; padding: 16px; border-left: 3px solid #2468B4; margin-top: 16px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; border-radius: 4px;">${safeMessage}</div>
-                <p style="font-size: 11px; color: #888; margin-top: 24px; border-top: 1px solid #e7e2d8; padding-top: 12px;">This message was also securely saved to your contacts.json file on the server.</p>
-              </div>
-            `
-          })
-        });
-
-        if (resendRes.ok) {
-          console.log(`[BACKEND] Resend HTTPS email dispatched successfully to ${mailTo}`);
-          emailSent = true;
-        } else {
-          const errBody = await resendRes.text();
-          console.error(`[BACKEND] Resend API error: ${resendRes.status} - ${errBody}`);
-        }
-      } catch (err: any) {
-        console.error(`[BACKEND] Resend connection error:`, err.message);
-      }
-    }
-
-    // Option B: Standard SMTP (Nodemailer - Gmail / Brevo / Custom)
-    if (!emailSent && smtpUser && smtpPass && (smtpHost || process.env.SMTP_SERVICE === "gmail")) {
-      const cleanPass = smtpPass.replace(/\s+/g, ""); // Remove accidental spaces from Google 16-char app passwords
-      const isGmail = (smtpHost && smtpHost.includes("gmail")) || process.env.SMTP_SERVICE === "gmail";
-      const port = Number(smtpPort) || (isGmail ? 465 : 587);
-      const isSecure = port === 465;
-
-      console.log(`[BACKEND] Attempting SMTP dispatch via ${isGmail ? "Gmail service" : `${smtpHost}:${port}`} to ${mailTo}...`);
-
-      try {
-        const transportConfig: any = isGmail
-          ? {
-              service: "gmail",
-              auth: {
-                user: smtpUser,
-                pass: cleanPass
-              }
-            }
-          : {
-              host: smtpHost,
-              port: port,
-              secure: isSecure,
-              auth: {
-                user: smtpUser,
-                pass: cleanPass
-              },
-              connectionTimeout: 10000,
-              greetingTimeout: 10000,
-              socketTimeout: 15000,
-              tls: {
-                rejectUnauthorized: false
-              }
-            };
-
-        const transporter = nodemailer.createTransport(transportConfig);
-
-        await transporter.sendMail({
-          from: `"${trimmedName} (Portfolio Contact)" <${smtpUser}>`,
-          to: mailTo,
-          replyTo: trimmedEmail,
-          subject: `New Portfolio Message from ${trimmedName}`,
-          text: `You have received a new contact submission from your portfolio.\n\nFrom: ${trimmedName} <${trimmedEmail}>\nDate: ${new Date().toLocaleString()}\n\nMessage:\n${trimmedMessage}\n\n(Persisted durably in contacts.json)`,
-          html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; border: 1px solid #e7e2d8; padding: 24px; border-radius: 8px; background: #fdfcf9; color: #171717;">
-              <h2 style="margin-top: 0; padding-bottom: 12px; border-bottom: 1px solid #e7e2d8; font-size: 20px; font-weight: 600;">New Portfolio Contact</h2>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>From:</strong> ${safeName} &lt;<a href="mailto:${safeEmail}" style="color: #2468B4;">${safeEmail}</a>&gt;</p>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-              <div style="background: #f7f4ec; padding: 16px; border-left: 3px solid #2468B4; margin-top: 16px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; border-radius: 4px;">${safeMessage}</div>
-              <p style="font-size: 11px; color: #888; margin-top: 24px; border-top: 1px solid #e7e2d8; padding-top: 12px;">This message was also securely saved to your contacts.json file on the server.</p>
-            </div>
-          `
-        });
-        console.log(`[BACKEND] SMTP email dispatched successfully to ${mailTo}`);
-        emailSent = true;
-      } catch (mailError: any) {
-        console.error(`[BACKEND] SMTP Dispatch Warning (${mailError.code || "ERR"}):`, mailError.message);
-        if (mailError.code === "EAUTH") {
-          console.error(`[BACKEND] SMTP Auth Hint: Google/Provider rejected credentials. For Gmail, make sure SMTP_PASS is a 16-character Google App Password (generate at https://myaccount.google.com/apppasswords).`);
-        } else if (mailError.code === "ETIMEDOUT" || mailError.code === "ECONNREFUSED" || mailError.code === "ESOCKET") {
-          console.error(`[BACKEND] SMTP Network Hint: Outbound connection timed out. Note: Render Free Tier blocks outbound SMTP ports 25, 465, and 587. To send emails on Render Free tier, add RESEND_API_KEY (over HTTPS port 443). The contact message was safely saved in contacts.json.`);
-        }
-      }
-    } else if (!emailSent) {
-      console.log(`[BACKEND] No active email provider configured (set RESEND_API_KEY or SMTP_USER/PASS). Message saved locally in contacts.json.`);
-    }
-
-    res.json({ success: true, message: "Transmission complete. Your direct message has been securely submitted." });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: "Failed to process message." });
   }
@@ -1162,12 +999,13 @@ ${storySummaries}
 // UMU Chat Agent Endpoint (Dual-Persona: Portfolio Digital Twin + Tech News Analyst)
 app.post("/api/agent/query", agentLimiter, async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { message, history = [], confirmedDraft, actionIntent } = req.body;
     const trimmedMessage = normalizeText(message, 1000, true);
-    if (!trimmedMessage) {
+    if (!trimmedMessage && !actionIntent && !confirmedDraft) {
       res.status(400).json({ error: "Missing query message parameter." });
       return;
     }
+    const effectiveMessage = trimmedMessage || (actionIntent === "cancel" ? "cancel" : "confirm");
     if (typeof message === "string" && message.length > 1000) {
       res.status(400).json({ error: "Message is too long. Please keep it under 1000 characters." });
       return;
@@ -1215,7 +1053,7 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     }
 
     let reply = "";
-    const lowerMsg = trimmedMessage.toLowerCase();
+    const lowerMsg = effectiveMessage.toLowerCase();
     const hasExplicitNewsIntent =
       lowerMsg === "brief" ||
       lowerMsg === "news" ||
@@ -1227,12 +1065,113 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       lowerMsg.includes("briefing");
 
     // Ingest any explicit URLs detected in the query for real-time link RAG
-    const detectedUrls = extractUrlsFromText(trimmedMessage);
+    const detectedUrls = extractUrlsFromText(effectiveMessage);
     for (const u of detectedUrls) {
       ragEngine.ingestUrl(u).catch(() => {});
     }
 
-    const safeHistory = Array.isArray(history) ? history.slice(-6) : [];
+    const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
+    let actionPayload: any = undefined;
+
+    // Conversational Contact / Email Action Workflow
+    const contactWorkflow = parseContactWorkflow(effectiveMessage, safeHistory, confirmedDraft);
+    if (actionIntent === "cancel") {
+      contactWorkflow.isCancellation = true;
+      contactWorkflow.isConfirmation = false;
+    } else if (actionIntent === "confirm") {
+      contactWorkflow.isConfirmation = true;
+      contactWorkflow.isCancellation = false;
+    }
+
+    if (contactWorkflow.isContactWorkflow) {
+      if (
+        contactWorkflow.isConfirmation &&
+        contactWorkflow.draft?.name &&
+        contactWorkflow.draft?.email &&
+        contactWorkflow.draft?.message
+      ) {
+        console.log(`[BACKEND] Dispatching confirmed contact email for ${contactWorkflow.draft.name}...`);
+        const sendResult = await sendContactEmail({
+          name: contactWorkflow.draft.name,
+          email: contactWorkflow.draft.email,
+          msg: contactWorkflow.draft.message,
+        });
+
+        if (sendResult.success) {
+          reply = `✅ **Message Delivered!**\n\nYour message has been accepted by the email system and dispatched to Umesh's inbox (\`sahooumesh2003@gmail.com\`). A copy has also been safely recorded. Umesh will get back to you soon at \`${contactWorkflow.draft.email}\`.`;
+          actionPayload = {
+            type: "email_draft",
+            name: contactWorkflow.draft.name,
+            email: contactWorkflow.draft.email,
+            message: contactWorkflow.draft.message,
+            status: "sent",
+            provider: sendResult.provider,
+          };
+        } else {
+          reply = `❌ **Delivery Notice:** I attempted to send your email, but the service reported: "${sendResult.message}". However, your message was securely saved in local logs for Umesh.`;
+          actionPayload = {
+            type: "email_draft",
+            name: contactWorkflow.draft.name,
+            email: contactWorkflow.draft.email,
+            message: contactWorkflow.draft.message,
+            status: "failed",
+            error: sendResult.message,
+          };
+        }
+      } else if (contactWorkflow.isCancellation) {
+        reply = "Draft cancelled. No message was sent to Umesh. Feel free to explore his projects, review his code, or ask me any questions!";
+        actionPayload = {
+          type: "email_draft",
+          status: "cancelled",
+        };
+      } else if (
+        contactWorkflow.status === "pending_confirmation" &&
+        contactWorkflow.draft?.name &&
+        contactWorkflow.draft?.email &&
+        contactWorkflow.draft?.message
+      ) {
+        reply = `I've prepared an email draft to send to Umesh:\n\n• **Recipient:** Umesh Kumar Sahoo (\`sahooumesh2003@gmail.com\`)\n• **From:** ${contactWorkflow.draft.name} (\`${contactWorkflow.draft.email}\`)\n• **Message:** "${contactWorkflow.draft.message}"\n\nWould you like me to send this now? Please confirm, or let me know if you want to edit or cancel.`;
+        actionPayload = {
+          type: "email_draft",
+          name: contactWorkflow.draft.name,
+          email: contactWorkflow.draft.email,
+          message: contactWorkflow.draft.message,
+          status: "pending_confirmation",
+        };
+      } else if (contactWorkflow.status === "collecting") {
+        const { name, email, message } = contactWorkflow.draft || {};
+        if (!name && !email && !message) {
+          reply = "I'd be glad to help you send a direct message to Umesh! Could you please share your name, your email address, and what message you'd like to send?";
+        } else if (!email && !message) {
+          reply = `Hi ${name}! What email address should Umesh reply to, and what message would you like to send?`;
+        } else if (!email) {
+          reply = `Thanks ${name || "there"}! What email address should Umesh use to get back to you?`;
+        } else if (!message) {
+          reply = `Got it, ${name || "there"}! What message or collaboration proposal would you like me to send to Umesh?`;
+        } else if (!name) {
+          reply = "Thanks for your message! May I have your name so Umesh knows who is contacting him?";
+        }
+        actionPayload = {
+          type: "email_draft",
+          name,
+          email,
+          message,
+          status: "collecting",
+          missingFields: contactWorkflow.missingFields,
+        };
+      }
+
+      if (reply) {
+        res.json({
+          reply,
+          sources: [],
+          reposScanned: repos.length,
+          action: actionPayload,
+        });
+        return;
+      }
+    }
+
     const projectFilter = resolveQueryProject(trimmedMessage, safeHistory);
     const isCode = isCodeRequest(trimmedMessage);
     const targetRepoName = githubService.resolveRepoForQuery(trimmedMessage, safeHistory);

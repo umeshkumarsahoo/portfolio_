@@ -4,7 +4,7 @@ import {
   Send, Terminal, Cpu, Bot, Star, ExternalLink, RefreshCw, Sparkles, BookOpen, 
   Calendar, User, MapPin, Mail, GraduationCap, TrendingUp, Cloud, Trophy, 
   Brain, Leaf, Plane, Award, Code, Globe, Play, Github, Linkedin, Eye, ArrowRight,
-  GitFork, Check
+  GitFork, Check, X, Edit2, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { secureFetch } from "../lib/api";
 import UmuDoodle from "./UmuDoodle";
@@ -30,10 +30,22 @@ interface TabContentProps {
   clearInitialAgentQuery?: () => void;
 }
 
+export interface ActionDraft {
+  type: "email_draft";
+  name?: string;
+  email?: string;
+  message?: string;
+  status: "idle" | "collecting" | "pending_confirmation" | "sent" | "cancelled" | "failed";
+  provider?: "resend" | "smtp" | "local_persisted";
+  error?: string;
+  missingFields?: string[];
+}
+
 interface Message {
   role: "user" | "agent";
   content: string;
   timestamp: string;
+  actionDraft?: ActionDraft;
 }
 
 interface GithubRepo {
@@ -72,6 +84,8 @@ export default function TabContent({
   const [queryStatus, setQueryStatus] = useState("Thinking...");
   const [doodleState, setDoodleState] = useState<DoodleState>("idle");
   const [isRefreshingRepos, setIsRefreshingRepos] = useState(false);
+  const [editingDraftIndex, setEditingDraftIndex] = useState<number | null>(null);
+  const [editDraftForm, setEditDraftForm] = useState({ name: "", email: "", message: "" });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -147,7 +161,118 @@ export default function TabContent({
     }
   }, [activeTab, initialAgentQuery]);
 
-  // Submit query to Gemini Agent
+  // Confirm and dispatch email action
+  const handleConfirmEmailAction = async (draftToConfirm?: { name?: string; email?: string; message?: string }) => {
+    const currentDraft = draftToConfirm || messages.slice().reverse().find(m => m.actionDraft?.status === "pending_confirmation")?.actionDraft;
+    if (!currentDraft || !currentDraft.name || !currentDraft.email || !currentDraft.message || isQuerying) return;
+
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const userMsg: Message = { role: "user", content: "Yes, confirm and send this message to Umesh.", timestamp };
+    setMessages(prev => [...prev, userMsg]);
+
+    setIsQuerying(true);
+    setQueryStatus("Completing the action...");
+    setDoodleState("processing");
+
+    try {
+      const chatHistory = messages.map(m => ({ role: m.role, content: m.content })).slice(-8);
+      const response = await secureFetch("/api/agent/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Yes, confirm and send this message to Umesh.",
+          history: chatHistory,
+          confirmedDraft: {
+            name: currentDraft.name,
+            email: currentDraft.email,
+            message: currentDraft.message,
+          },
+          actionIntent: "confirm"
+        })
+      });
+
+      const responseTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (response.ok) {
+        const data = await response.json();
+        setDoodleState("success");
+        setQueryStatus("Completing the action...");
+        setMessages(prev => [...prev, {
+          role: "agent",
+          content: data.reply,
+          timestamp: responseTimestamp,
+          actionDraft: data.action
+        }]);
+        setTimeout(() => {
+          setDoodleState("idle");
+          setQueryStatus("Listening attentively · Ready to brief you");
+        }, 3000);
+      } else {
+        const errData = await response.json();
+        setDoodleState("error");
+        setMessages(prev => [...prev, {
+          role: "agent",
+          content: `Sorry, unable to dispatch message: ${errData.error || "Server error"}`,
+          timestamp: responseTimestamp
+        }]);
+        setTimeout(() => setDoodleState("idle"), 3000);
+      }
+    } catch (err: any) {
+      const responseTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setDoodleState("error");
+      setMessages(prev => [...prev, {
+        role: "agent",
+        content: "Connection error while confirming action. Please try again.",
+        timestamp: responseTimestamp
+      }]);
+      setTimeout(() => setDoodleState("idle"), 3000);
+    } finally {
+      setIsQuerying(false);
+    }
+  };
+
+  // Cancel email action
+  const handleCancelEmailAction = async () => {
+    if (isQuerying) return;
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const userMsg: Message = { role: "user", content: "Cancel", timestamp };
+    setMessages(prev => [...prev, userMsg]);
+
+    setIsQuerying(true);
+    setQueryStatus("Action cancelled");
+    setDoodleState("idle");
+
+    try {
+      const chatHistory = messages.map(m => ({ role: m.role, content: m.content })).slice(-8);
+      const response = await secureFetch("/api/agent/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Cancel",
+          history: chatHistory,
+          actionIntent: "cancel"
+        })
+      });
+      const responseTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(prev => [...prev, {
+          role: "agent",
+          content: data.reply,
+          timestamp: responseTimestamp,
+          actionDraft: data.action
+        }]);
+        setTimeout(() => {
+          setQueryStatus("Listening attentively · Ready to brief you");
+        }, 2000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsQuerying(false);
+    }
+  };
+
+  // Submit query to Gemini Agent with Simple Agent Mode for Action Tasks
   const handleQuerySubmit = async (e?: FormEvent, customQuery?: string) => {
     if (e) e.preventDefault();
     const activeQuery = customQuery || query;
@@ -159,28 +284,40 @@ export default function TabContent({
     setMessages(prev => [...prev, newMsg]);
     if (!customQuery) setQuery("");
     setIsQuerying(true);
-    setDoodleState("thinking");
-    setQueryStatus("Thinking...");
 
-    let statusTimer1: NodeJS.Timeout | undefined;
-    let statusTimer2: NodeJS.Timeout | undefined;
-    let statusTimer3: NodeJS.Timeout | undefined;
+    // Identify if this query requires action mode (email / contact / action task)
+    const lastDraft = messages.slice().reverse().find(m => m.actionDraft)?.actionDraft;
+    const hasPendingAction = lastDraft?.status === "pending_confirmation" || lastDraft?.status === "collecting";
+    const lowerQ = activeQuery.toLowerCase().trim();
+    const isActionTask =
+      hasPendingAction ||
+      lowerQ.includes("contact") ||
+      lowerQ.includes("message") ||
+      lowerQ.includes("email") ||
+      lowerQ.includes("collaborat") ||
+      lowerQ.includes("hire") ||
+      lowerQ.includes("internship") ||
+      /^(yes|confirm|send|cancel|stop|no|discard)\b/i.test(lowerQ);
+
+    let actionStageTimer: NodeJS.Timeout | undefined;
+
+    if (isActionTask) {
+      // Meaningful Step 1: Understanding the request
+      setQueryStatus("Understanding the request...");
+      setDoodleState("thinking");
+
+      // Meaningful Step 2: Preparing the action
+      actionStageTimer = setTimeout(() => {
+        setQueryStatus("Preparing the action...");
+        setDoodleState("processing");
+      }, 550);
+    } else {
+      // Ordinary question: respond normally without an elaborate process
+      setQueryStatus("Thinking...");
+      setDoodleState("thinking");
+    }
 
     try {
-      statusTimer1 = setTimeout(() => {
-        setQueryStatus("Searching repositories...");
-        setDoodleState("searching");
-      }, 700);
-
-      statusTimer2 = setTimeout(() => {
-        setQueryStatus("Composing response...");
-        setDoodleState("processing");
-      }, 1600);
-
-      statusTimer3 = setTimeout(() => {
-        setQueryStatus("Almost there...");
-      }, 2500);
-
       const chatHistory = messages.map(m => ({
         role: m.role,
         content: m.content
@@ -196,14 +333,48 @@ export default function TabContent({
 
       if (response.ok) {
         const data = await response.json();
-        setDoodleState("speaking");
+        
+        if (data.action?.status === "pending_confirmation") {
+          // Meaningful Step 3: Waiting for confirmation
+          setDoodleState("waiting");
+          setQueryStatus("Waiting for confirmation...");
+        } else if (data.action?.status === "sent") {
+          // Meaningful Step 4: Completing the action
+          setDoodleState("success");
+          setQueryStatus("Completing the action...");
+          setTimeout(() => {
+            setDoodleState("idle");
+            setQueryStatus("Listening attentively · Ready to brief you");
+          }, 3000);
+        } else if (data.action?.status === "cancelled") {
+          setDoodleState("idle");
+          setQueryStatus("Action cancelled");
+          setTimeout(() => {
+            setQueryStatus("Listening attentively · Ready to brief you");
+          }, 2000);
+        } else if (data.action?.status === "failed") {
+          setDoodleState("error");
+          setQueryStatus("Delivery notice: Recorded locally");
+          setTimeout(() => {
+            setDoodleState("idle");
+            setQueryStatus("Listening attentively · Ready to brief you");
+          }, 3500);
+        } else {
+          // Normal inquiry response
+          setDoodleState("speaking");
+          setTimeout(() => setDoodleState("success"), 500);
+          setTimeout(() => {
+            setDoodleState("idle");
+            setQueryStatus("Listening attentively · Ready to brief you");
+          }, 2000);
+        }
+
         setMessages(prev => [...prev, {
           role: "agent",
           content: data.reply,
-          timestamp: responseTimestamp
+          timestamp: responseTimestamp,
+          actionDraft: data.action
         }]);
-        setTimeout(() => setDoodleState("success"), 500);
-        setTimeout(() => setDoodleState("idle"), 2000);
       } else {
         const errData = await response.json();
         setDoodleState("error");
@@ -224,9 +395,7 @@ export default function TabContent({
       }]);
       setTimeout(() => setDoodleState("idle"), 3000);
     } finally {
-      if (statusTimer1) clearTimeout(statusTimer1);
-      if (statusTimer2) clearTimeout(statusTimer2);
-      if (statusTimer3) clearTimeout(statusTimer3);
+      if (actionStageTimer) clearTimeout(actionStageTimer);
       setIsQuerying(false);
     }
   };
@@ -1135,6 +1304,162 @@ export default function TabContent({
                     }`}
                   >
                     <MarkdownRenderer content={m.content} role={m.role} />
+
+                    {/* Email Action Draft Card */}
+                    {m.actionDraft && m.actionDraft.status === "pending_confirmation" && (
+                      <div className="mt-3.5 p-3.5 rounded-xl border border-amber-200 bg-amber-50/70 shadow-2xs space-y-2.5 text-left text-xs text-[#181818]">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/80">
+                          <div className="flex items-center gap-1.5 font-semibold text-amber-900">
+                            <Mail className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Email Action Draft</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                            Waiting for Confirmation
+                          </span>
+                        </div>
+
+                        {editingDraftIndex === idx ? (
+                          <div className="space-y-2 pt-1 text-xs">
+                            <div>
+                              <label className="text-[10px] font-mono text-[var(--text-faint)] uppercase block mb-1">Your Name</label>
+                              <input
+                                type="text"
+                                value={editDraftForm.name}
+                                onChange={(e) => setEditDraftForm({ ...editDraftForm, name: e.target.value })}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-[#E7E3D8] bg-white text-xs focus:outline-none focus:border-[var(--accent-blue)]"
+                                placeholder="e.g. Jane Doe"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-mono text-[var(--text-faint)] uppercase block mb-1">Your Email</label>
+                              <input
+                                type="email"
+                                value={editDraftForm.email}
+                                onChange={(e) => setEditDraftForm({ ...editDraftForm, email: e.target.value })}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-[#E7E3D8] bg-white text-xs focus:outline-none focus:border-[var(--accent-blue)]"
+                                placeholder="e.g. jane@example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-mono text-[var(--text-faint)] uppercase block mb-1">Message</label>
+                              <textarea
+                                rows={3}
+                                value={editDraftForm.message}
+                                onChange={(e) => setEditDraftForm({ ...editDraftForm, message: e.target.value })}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-[#E7E3D8] bg-white text-xs focus:outline-none focus:border-[var(--accent-blue)] resize-none"
+                                placeholder="Your collaboration or inquiry details..."
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingDraftIndex(null);
+                                  handleConfirmEmailAction(editDraftForm);
+                                }}
+                                disabled={!editDraftForm.name || !editDraftForm.email || !editDraftForm.message || isQuerying}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Save & Confirm
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingDraftIndex(null)}
+                                className="px-3 py-1.5 rounded-lg border border-[#E7E3D8] bg-white hover:bg-neutral-50 text-neutral-700 font-mono text-xs transition-colors cursor-pointer"
+                              >
+                                Cancel Edit
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-1.5 text-xs text-[#2A2A2A] pt-0.5">
+                              <div className="flex flex-col sm:flex-row sm:items-baseline gap-1">
+                                <span className="font-mono text-[10px] text-[var(--text-faint)] uppercase w-16 shrink-0">Recipient:</span>
+                                <span className="font-semibold text-[#181818]">Umesh Kumar Sahoo</span>
+                                <span className="text-[10px] font-mono text-[var(--text-muted)]">(sahooumesh2003@gmail.com)</span>
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-baseline gap-1">
+                                <span className="font-mono text-[10px] text-[var(--text-faint)] uppercase w-16 shrink-0">From:</span>
+                                <span className="font-semibold text-[#181818]">{m.actionDraft.name}</span>
+                                <span className="text-[10px] font-mono text-[var(--text-muted)]">({m.actionDraft.email})</span>
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 pt-0.5">
+                                <span className="font-mono text-[10px] text-[var(--text-faint)] uppercase w-16 shrink-0">Message:</span>
+                                <span className="italic text-[#333333]">"{m.actionDraft.message}"</span>
+                              </div>
+                            </div>
+
+                            {/* Action buttons (only interactive if it's the latest pending draft) */}
+                            {idx === (() => {
+                              for (let i = messages.length - 1; i >= 0; i--) {
+                                if (messages[i].actionDraft?.status === "pending_confirmation") return i;
+                              }
+                              return -1;
+                            })() && (
+                              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-200/60">
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmEmailAction(m.actionDraft)}
+                                  disabled={isQuerying}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  Confirm & Send
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingDraftIndex(idx);
+                                    setEditDraftForm({
+                                      name: m.actionDraft?.name || "",
+                                      email: m.actionDraft?.email || "",
+                                      message: m.actionDraft?.message || "",
+                                    });
+                                  }}
+                                  disabled={isQuerying}
+                                  className="px-3 py-1.5 rounded-lg border border-[#E7E3D8] bg-white hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)] font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEmailAction}
+                                  disabled={isQuerying}
+                                  className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50/50 text-rose-700 hover:bg-rose-100/70 font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {m.actionDraft && m.actionDraft.status === "sent" && (
+                      <div className="mt-2.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 font-mono text-left">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Email accepted & dispatched to Umesh ({m.actionDraft.provider === "smtp" ? "SMTP" : m.actionDraft.provider === "resend" ? "Resend" : "Persisted locally"}).</span>
+                      </div>
+                    )}
+
+                    {m.actionDraft && m.actionDraft.status === "failed" && (
+                      <div className="mt-2.5 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 font-mono text-left">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>Delivery notice: {m.actionDraft.error || "Email provider rejected delivery"} (Safely saved to local inbox).</span>
+                      </div>
+                    )}
+
+                    {m.actionDraft && m.actionDraft.status === "cancelled" && (
+                      <div className="mt-2.5 px-3 py-2 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-600 text-xs flex items-center gap-2 font-mono text-left">
+                        <X className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                        <span>Email action draft cancelled. No email was sent to Umesh.</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1158,6 +1483,7 @@ export default function TabContent({
             {/* Quick Prompts Bar */}
             <div className="px-3 py-2 border-t border-[#E7E3D8] overflow-x-auto flex gap-1.5 shrink-0 bg-white/70">
               {[
+                { label: "✉️ Message Umesh", prompt: "I want to send a message to Umesh" },
                 { label: "📡 Tech Pulse", prompt: "Brief me on the latest top trending tech news headlines." },
                 { label: "🎓 Credentials", prompt: "Tell me about Umesh's education, CGPA, and background" },
                 { label: "RAG Assistant", prompt: "Explain your RAG-Based Assistant" },
