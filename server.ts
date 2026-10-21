@@ -21,7 +21,12 @@ import {
   ChunkMetadata,
 } from "./ragEngine";
 import { githubService } from "./githubService";
-import { sendContactEmail, parseContactWorkflow } from "./emailService";
+import {
+  sendContactEmail,
+  parseContactWorkflow,
+  resolveContactWorkflow,
+  createOpenRouterClient,
+} from "./emailService";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -100,6 +105,8 @@ const ai = geminiApiKey
       apiKey: geminiApiKey,
     })
   : null;
+
+const openRouter = createOpenRouterClient();
 
 // Initialize Cached Link-Based RAG Engine (1-hour TTL, persistent multi-layer caching)
 const ragEngine = new CachedLinkRAGEngine({
@@ -1138,14 +1145,22 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
     let actionPayload: any = undefined;
 
-    // Conversational Contact / Email Action Workflow
-    const contactWorkflow = parseContactWorkflow(effectiveMessage, safeHistory, confirmedDraft);
+    // Conversational Contact / Email Action Workflow (Dual-LLM Decision Reasoning + Context Awareness)
+    const contactWorkflow = await resolveContactWorkflow(
+      effectiveMessage,
+      safeHistory,
+      confirmedDraft,
+      openRouter,
+      ai
+    );
     if (actionIntent === "cancel") {
       contactWorkflow.isCancellation = true;
       contactWorkflow.isConfirmation = false;
+      contactWorkflow.status = "cancelled";
     } else if (actionIntent === "confirm") {
       contactWorkflow.isConfirmation = true;
       contactWorkflow.isCancellation = false;
+      contactWorkflow.status = "confirmed";
     }
 
     if (contactWorkflow.isContactWorkflow) {
@@ -1206,15 +1221,15 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       } else if (contactWorkflow.status === "collecting") {
         const { name, email, message } = contactWorkflow.draft || {};
         if (!name && !email && !message) {
-          reply = "I'd be glad to help you send a direct message to Umesh! Could you please share your name, your email address, and what message you'd like to send?";
+          reply = "I'd be glad to help you send a direct message to Umesh!\n\nPlease share your **name**, **email**, and **message**. You can provide them in any format, for example:\n> `Name: Alex | Email: alex@example.com | Message: Hi Umesh, let's connect!`\n\n*(Type **cancel** at any time to exit)*";
         } else if (!email && !message) {
-          reply = `Hi ${name}! What email address should Umesh reply to, and what message would you like to send?`;
+          reply = `Hi ${name}! What email address should Umesh reply to, and what message would you like to send?\n> Example: \`Email: alex@example.com | Message: Let's collaborate on AI\`\n\n*(Type **cancel** at any time to exit)*`;
         } else if (!email) {
-          reply = `Thanks ${name || "there"}! What email address should Umesh use to get back to you?`;
+          reply = `Thanks ${name || "there"}! What email address should Umesh use to get back to you?\n> Example: \`alex@example.com\`\n\n*(Type **cancel** at any time to exit)*`;
         } else if (!message) {
-          reply = `Got it, ${name || "there"}! What message or collaboration proposal would you like me to send to Umesh?`;
+          reply = `Got it, ${name || "there"}! What message or collaboration proposal would you like me to send to Umesh?\n> Example: \`Message: I would like to discuss an engineering role / collaboration\`\n\n*(Type **cancel** at any time to exit)*`;
         } else if (!name) {
-          reply = "Thanks for your message! May I have your name so Umesh knows who is contacting him?";
+          reply = `Thanks for your message! May I have your name so Umesh knows who is contacting him?\n> Example: \`Name: Alex\`\n\n*(Type **cancel** at any time to exit)*`;
         }
         actionPayload = {
           type: "email_draft",

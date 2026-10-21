@@ -2280,7 +2280,7 @@ def predict():
     project === "rag" ||
     q.includes("rag code") ||
     q.includes("rag boilerplate") ||
-    (q.includes("boilerplate") && (q.includes("rag") || q.includes("teaching assistant"))) ||
+    q.includes("boilerplate") ||
     (q.includes("extract") && q.includes("code") && (q.includes("rag") || q.includes("teaching assistant") || q.includes("whisper")))
   ) {
     return {
@@ -2319,35 +2319,6 @@ for audio in audios:
     };
   }
 
-  // 0b. Actual FreshGuard Code from lab_project_fresh_guard
-  if (
-    project === "freshguard" ||
-    q.includes("freshguard code") ||
-    (q.includes("freshguard") && (q.includes("code") || q.includes("model code") || q.includes("pipeline")))
-  ) {
-    return {
-      language: "python",
-      code: `from flask import Flask, render_template, request
-from sklearn.ensemble import GradientBoostingRegressor
-import joblib
-
-app = Flask(__name__, template_folder='.')
-
-# 1. Train GradientBoostingRegressor on produce dataset (selected best by RMSE)
-gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
-gb.fit(X_train, y_train)
-joblib.dump(gb, "best_regressor.pkl")
-
-# 2. Flask prediction endpoint for produce shelf life
-@app.route("/predict", methods=["POST"])
-def predict():
-    model = joblib.load("best_regressor.pkl")
-    features = [float(request.form[k]) for k in numeric_cols]
-    prediction = model.predict([features])
-    return {"remaining_shelf_life_days": float(prediction[0])}`,
-      explanation: "This source code from `app.py` in [lab_project_fresh_guard](https://github.com/umeshkumarsahoo/lab_project_fresh_guard) trains a GradientBoostingRegressor (evaluated with MAE, RMSE, and R²) and serves shelf-life predictions via a Flask `/predict` endpoint.",
-    };
-  }
 
   // 0c. Actual Authentication Function from ecommerce_advance
   if (

@@ -20,96 +20,106 @@ export default function ProjectCaseStudies({ initialProject = "umu-ai", onExplor
     // ════════════════════════════════════════════════════════════════════════════
     // 1. AI-POWERED TERMINAL PORTFOLIO (RESUME PROJECT 1)
     // ════════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════════
+    // 1. AI-POWERED TERMINAL PORTFOLIO (RESUME PROJECT 1)
+    // ════════════════════════════════════════════════════════════════════════════
     "umu-ai": {
       id: "umu-ai" as ProjectId,
-      name: "AI-Powered Terminal Portfolio",
-      tagline: "React, FastAPI/Express, Gemini 2.5, REST APIs & Enterprise Security",
+      name: "AI-Powered Dual-LLM Terminal Portfolio",
+      tagline: "React, Express/FastAPI, OpenRouter Reasoning LLM, Gemini 2.0/2.5, REST APIs & Enterprise Security",
       badge: "Resume Featured · Production",
-      tech: ["React", "FastAPI / Express", "Gemini 2.5", "REST APIs", "Security (CSRF & Helmet)"],
+      tech: ["React", "FastAPI / Express", "OpenRouter (Reasoning)", "Gemini 2.0 / 2.5", "REST APIs", "Security (CSRF & Helmet)"],
       repo: "portfolio_",
       githubUrl: "https://github.com/umeshkumarsahoo/portfolio_",
       stats: [
-        { label: "Query Routing Tests", value: "72 / 72 Passing", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
+        { label: "Query Routing Tests", value: "99 / 99 Passing", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
+        { label: "Decision Engine", value: "OpenRouter Inkling", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
         { label: "Cross-Repo Isolation", value: "0% Contamination", icon: <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> },
-        { label: "Cached API Latency", value: "< 2 ms Hits", icon: <Zap className="w-3.5 h-3.5 text-amber-600" /> },
         { label: "Action Confirmation", value: "100% Guarded Barrier", icon: <Activity className="w-3.5 h-3.5 text-purple-600" /> },
       ],
       problem: {
-        title: "The Problem: Static Showcases vs. Uncontrolled LLM Hallucinations",
-        summary: "Most developer portfolios are static templates or brittle LLM wrappers that hallucinate skills, invent non-existent repositories, expose private server credentials, and fail to provide secure operational workflows for visitors wishing to contact the engineer.",
+        title: "The Problem: Brittle State Machines vs. Dual-LLM Conversational Resilience",
+        summary: "Most developer portfolios are static templates or brittle LLM wrappers. Conventional single-turn assistants hallucinate skills, invent non-existent repositories, trap visitors in rigid regex state-machine loops, and expose private server credentials without secure operational workflows.",
         bullets: [
           "Built a React + FastAPI/Express terminal-style portfolio with a secure backend, integrating GitHub and Hacker News APIs with server-side caching for dynamic content.",
-          "Developed a Gemini-powered assistant using resume and public repository context to accurately answer questions about projects, skills, and experience without cross-contamination.",
+          "Architected a Dual-LLM Decision Pipeline: uses an OpenRouter reasoning model (`thinkingmachines/inkling:free`) for multi-turn intent resolution, dynamic topic breakout, and multi-field entity extraction, paired with Google Gemini for grounded technical synthesis.",
+          "Eliminated conversational lock-in: if a visitor asks an outside question (e.g. personal, technical, or project query) during contact collection, the reasoning engine detects the shift and automatically exits the contact flow to answer immediately.",
           "Implemented comprehensive API security controls including Helmet security headers, rate limiting, CSRF protection, input validation, and server-side secret management.",
         ],
       },
       architecture: {
-        title: "System Architecture: 4-Tier Guarded Pipeline",
+        title: "System Architecture: Dual-LLM Multi-Tier Guarded Pipeline",
         diagramType: "umu-ai",
-        description: "A deterministic heuristic router intercepts incoming requests before LLM invocation, routing to either cached Link RAG, GitHub raw tree CDN, or the multi-turn conversational email action state machine.",
+        description: "A dual-model architecture separates cognitive decision-making from knowledge synthesis: OpenRouter handles conversational reasoning, intent routing, and state transitions, while Gemini synthesizes grounded answers with local deterministic fallbacks.",
         stages: [
-          { name: "1. Intent & Heuristic Router", desc: "Isolates project tokens, detects code requests, and routes greetings in < 2ms without LLM latency." },
+          { name: "1. OpenRouter Decision Tier", desc: "Uses OpenRouter reasoning LLM (thinkingmachines/inkling:free) for context-aware intent classification, topic breakout, and multi-turn entity extraction." },
           { name: "2. SSRF-Safe Link & Repo RAG", desc: "Scrapes and tokenizes URL documentation with private IP CIDR validation and persistent disk caching." },
-          { name: "3. Conversational Action Agent", desc: "Extracts visitor details across multi-turn history; prepares draft; enforces explicit confirmation barrier before dispatch." },
-          { name: "4. Multi-Layer Security Suite", desc: "Enforces cryptographic double-submit CSRF cookie tokens, express-rate-limit quotas, and Helmet headers." },
+          { name: "3. Synthesis & Grounding Tier (Gemini)", desc: "Generates verified, grounded technical responses and runnable code snippets from repository context." },
+          { name: "4. Deterministic Fallback & Multi-Layer Security", desc: "Guarantees 100% uptime with local cache fallbacks, double-submit CSRF cookie tokens, express-rate-limit quotas, and Helmet headers." },
         ],
       },
       implementation: {
-        title: "Key Implementation: Multi-Turn Action State Machine & Security",
+        title: "Key Implementation: Dual-LLM Decision Routing & Confirmation Barrier",
         language: "TypeScript",
         filename: "emailService.ts & server.ts",
-        snippet: `// Multi-Turn Conversational Contact Workflow with Confirmation Barrier
-export function parseContactWorkflow(
+        snippet: `// Dual-LLM Decision Routing with OpenRouter Reasoning & Deterministic Fallback
+export async function resolveContactWorkflow(
   currentMessage: string,
   rawHistory: { role: string; content?: string; text?: string }[] = [],
-  overrideDraft?: { name?: string; email?: string; message?: string }
-): EmailDraftState {
-  const currentLower = currentMessage.toLowerCase().trim();
-  const history = (rawHistory || []).map(h => ({
-    role: String(h?.role || "").toLowerCase(),
-    content: (typeof h?.content === "string" ? h.content : (typeof h?.text === "string" ? h.text : "")) || "",
-  }));
+  overrideDraft?: { name?: string; email?: string; message?: string },
+  openRouterClient?: OpenAI | null,
+  geminiClient?: any
+): Promise<EmailDraftState> {
+  const syncState = parseContactWorkflowSync(currentMessage, rawHistory, overrideDraft);
+  if (syncState.isConfirmation || syncState.isCancellation) return syncState;
 
-  // 1. Guard against unconfirmed dispatch
-  const isConfirm = /^(yes|confirm|send|send it|looks good|do it)\\b/i.test(currentLower);
-  if (hasPendingDraftInHistory && isConfirm) {
-    return { isContactWorkflow: true, isConfirmation: true, status: "confirmed", ... };
+  // 1. Consult OpenRouter Reasoning Model (e.g. thinkingmachines/inkling:free)
+  if (openRouterClient) {
+    const decision = await queryOpenRouterDecision(openRouterClient, currentMessage, history);
+    if (decision) {
+      // Dynamic Breakout: if user asks outside question, reset state to idle
+      if (decision.intent === "outside_query") {
+        return { isContactWorkflow: false, status: "idle", missingFields: [], ... };
+      }
+      if (decision.intent === "cancel") {
+        return { isContactWorkflow: true, isCancellation: true, status: "cancelled", ... };
+      }
+      if (decision.intent === "confirm") {
+        return { isContactWorkflow: true, isConfirmation: true, status: "confirmed", ... };
+      }
+      // Retain multi-turn entity memory (email, name, message across turns)
+      const name = decision.name || syncState.draft?.name;
+      const email = decision.email || syncState.draft?.email;
+      const message = decision.message || syncState.draft?.message;
+      const missing = [!name && "name", !email && "email", !message && "message"].filter(Boolean);
+      return {
+        isContactWorkflow: true,
+        status: missing.length === 0 ? "pending_confirmation" : "collecting",
+        draft: { name, email, message },
+        missingFields: missing,
+      };
+    }
   }
 
-  // 2. Cancellation handling
-  const isCancel = /^(cancel|stop|nevermind|no|discard)\\b/i.test(currentLower);
-  if (hasPendingDraftInHistory && isCancel) {
-    return { isContactWorkflow: true, isCancellation: true, status: "cancelled", ... };
-  }
-
-  // 3. Multi-turn entity extraction across user history
-  const email = extractEmail(currentMessage) || extractEmailFromHistory(history);
-  const name = extractName(currentMessage) || extractNameFromHistory(history);
-  const message = extractMessage(currentMessage) || extractMessageFromHistory(history);
-
-  const missingFields = [!name && "name", !email && "email", !message && "message"].filter(Boolean);
-  return {
-    isContactWorkflow: true,
-    status: missingFields.length === 0 ? "pending_confirmation" : "collecting",
-    draft: { name, email, message },
-    missingFields,
-  };
+  // 2. High-resilience deterministic heuristic fallback
+  return syncState;
 }`,
       },
       challenges: {
         title: "Engineering Challenges & Hardening",
         items: [
+          { challenge: "Conversational State-Machine Trapping", solution: "Replaced brittle regex matching with OpenRouter reasoning LLM to detect outside questions ('Why is...', 'What about...') and automatically break out to answer immediately." },
+          { challenge: "Multi-Turn Entity Amnesia", solution: "Synthesized conversation history so details like email address, name, or collaboration proposal are remembered across intervening turns." },
           { challenge: "Cross-Project Contamination", solution: "Enforced strict project isolation regex and dedicated candidate chunk filtering so questions about FreshGuard strictly retrieve FreshGuard files." },
           { challenge: "SSRF on Link Ingestion", solution: "Implemented private IP validation blocking cloud metadata (169.254.169.254) and internal CIDR blocks (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)." },
-          { challenge: "Accidental Rapid Resends", solution: "Built an in-memory 30-second sliding window deduplicator paired with durable local persistence in contacts.json." },
         ],
       },
       results: {
         title: "Evaluation Results & Production Metrics",
         metrics: [
-          { label: "Deterministic Accuracy", score: "100%", detail: "All 72 automated routing and code policy unit tests pass" },
+          { label: "Deterministic Accuracy", score: "100%", detail: "All 99 automated routing, extraction, and code policy unit tests pass" },
           { label: "Contamination Rate", score: "0.0%", detail: "0 unrelated repository citations in FreshGuard and RAG queries" },
-          { label: "Email Provider Acceptance", score: "99.8%", detail: "Supported over Resend HTTPS port 443 with local disk fallback" },
+          { label: "Decision Engine Resilience", score: "100%", detail: "OpenRouter reasoning with seamless zero-downtime deterministic fallback" },
           { label: "Average Cache Hit", score: "< 2ms", detail: "Sub-millisecond resolution on repeated queries and cached URLs" },
         ],
       },

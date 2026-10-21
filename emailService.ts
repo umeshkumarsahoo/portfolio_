@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
+import OpenAI from "openai";
 
 export interface ContactData {
   name: string;
@@ -362,7 +363,27 @@ export function parseContactWorkflow(
     lastAgentMsgLower.includes("would you like me to send this") ||
     lastAgentMsgLower.includes("please confirm");
 
-  // 2. Check for explicit Confirmation of a pending draft
+  // 2. Check for Contact Context in History (from active, non-completed history only)
+  const historyHasContactFlow = history.some((h) => {
+    const c = h.content.toLowerCase();
+    return (
+      /\b(contact|contatc|conatct)\b/i.test(c) ||
+      c.includes("send a message") ||
+      c.includes("send message") ||
+      c.includes("send my message") ||
+      c.includes("direct message to umesh") ||
+      c.includes("email draft") ||
+      c.includes("what email address") ||
+      c.includes("may i have your name") ||
+      c.includes("who is contacting him") ||
+      c.includes("what message") ||
+      c.includes("collaborat") ||
+      c.includes("email umesh") ||
+      c.includes("tell umesh")
+    );
+  });
+
+  // 3. Check for explicit Confirmation of a pending draft
   const isConfirmWord =
     /^(yes|confirm|send|send it|send email|do it|go ahead|sure|looks good|please send|submit|ok send|confirm and send)\b/i.test(
       currentLower
@@ -371,23 +392,6 @@ export function parseContactWorkflow(
     currentLower === "confirm" ||
     currentLower === "send" ||
     currentLower === "ok";
-
-  // 3. Check for Cancellation
-  const isCancelWord =
-    /^(cancel|stop|nevermind|never mind|don't send|dont send|abort|no|discard)\b/i.test(currentLower) ||
-    currentLower === "cancel" ||
-    currentLower === "no";
-
-  if (hasPendingDraftInHistory && isCancelWord && !currentLower.includes("project") && !currentLower.includes("rag")) {
-    return {
-      isContactWorkflow: true,
-      isConfirmation: false,
-      isCancellation: true,
-      isEdit: false,
-      missingFields: [],
-      status: "cancelled",
-    };
-  }
 
   // Check if current message is an explicit new contact intent
   const isExplicitContactIntent =
@@ -403,12 +407,32 @@ export function parseContactWorkflow(
     (currentLower.includes("hire") && (currentLower.includes("umesh") || currentLower.includes("you"))) ||
     currentLower.includes("internship");
 
-  // Check if user is asking a project or general question to break out of contact loop
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  const currentEmailMatch = currentMessage.match(emailRegex);
+
+  // Question patterns (e.g., "Why is...", "What is...", "Who is...", or ending with ?)
+  const isQuestionPattern =
+    /\?$/.test(currentLower) ||
+    /^(why|what|who|where|when|how|which|is|are|can you|could you|would you|do you|did you|tell me|explain|show me)\b/i.test(currentLower);
+
+  const isCollaborationPhrase =
+    /s[en]{2}d.*(message|msg|email)/i.test(currentLower) ||
+    currentLower.includes("tell umesh") ||
+    currentLower.includes("talk to umesh") ||
+    currentLower.includes("collaborat") ||
+    currentLower.includes("hire") ||
+    currentLower.includes("internship") ||
+    currentLower.includes("said hi") ||
+    currentLower.includes("say hi");
+
+  // Check if user is asking a project, outside question, or topic shift to automatically exit contact loop
   const isTopicShiftOrProjectQuestion =
     !isExplicitContactIntent &&
-    (/^(no|nope|wait|hold on|stop)\b/i.test(currentLower) ||
+    ((isQuestionPattern && !isCollaborationPhrase && !currentEmailMatch) ||
+      /^(no|nope|wait|hold on|stop)\b.*(want to|know|about|tell|project|rag|repo|code|news|what|why|how)/i.test(currentLower) ||
       currentLower === "rag" ||
       currentLower.includes("about rag") ||
+      currentLower.includes("abput rag") ||
       currentLower.includes("rag-based") ||
       currentLower.includes("freshguard") ||
       currentLower.includes("emotion") ||
@@ -437,30 +461,29 @@ export function parseContactWorkflow(
     };
   }
 
-  // 4. Check for Contact Context in History (from active, non-completed history only)
-  const historyHasContactFlow = history.some((h) => {
-    const c = h.content.toLowerCase();
-    return (
-      /\b(contact|contatc|conatct)\b/i.test(c) ||
-      c.includes("send a message") ||
-      c.includes("send message") ||
-      c.includes("send my message") ||
-      c.includes("direct message to umesh") ||
-      c.includes("email draft") ||
-      c.includes("what email address") ||
-      c.includes("may i have your name") ||
-      c.includes("who is contacting him") ||
-      c.includes("what message") ||
-      c.includes("collaborat") ||
-      c.includes("email umesh") ||
-      c.includes("tell umesh")
-    );
-  });
+  // 4. Check for Cancellation (Allowed at ANY point: collecting or pending draft, provided it's not a topic shift)
+  const isCancelWord =
+    /^(cancel|stop|nevermind|never mind|don't send|dont send|abort|discard|exit|quit)\b/i.test(currentLower) ||
+    /^no[, ]+(?:cancel|stop|nevermind|never mind|don't send|dont send|discard|exit|quit|thanks|thank you)/i.test(currentLower) ||
+    currentLower === "cancel" ||
+    currentLower === "exit" ||
+    currentLower === "quit" ||
+    currentLower === "stop" ||
+    currentLower === "nevermind" ||
+    currentLower === "never mind" ||
+    currentLower === "abort" ||
+    currentLower === "no";
 
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
-
-  // Check if current message is email
-  const currentEmailMatch = currentMessage.match(emailRegex);
+  if (isCancelWord && (hasPendingDraftInHistory || historyHasContactFlow)) {
+    return {
+      isContactWorkflow: true,
+      isConfirmation: false,
+      isCancellation: true,
+      isEdit: false,
+      missingFields: [],
+      status: "cancelled",
+    };
+  }
 
   const isInContactWorkflow =
     isExplicitContactIntent ||
@@ -488,10 +511,13 @@ export function parseContactWorkflow(
     lastAgentMsg.match(/•\s*(?:\*\*)?Message:(?:\*\*)?\s*["“]?([^\n"”]+?)["”]?\s*(?:\n|$)/i) ||
     lastAgentMsg.match(/(?:^|\n)\s*Message:\s*["“]?([^\n"”]+?)["”]?\s*(?:\n|$)/i);
 
-  // 5. Extract Email (prefer current message for updates, fallback to history)
+  // 5. Extract Email (prefer explicit, then labeled format, then current message regex, then draft, then history)
   let email = explicitEmail;
   if (!email) {
-    if (currentEmailMatch) {
+    const labeledEmailMatch = currentMessage.match(/(?:^|[|\n;,])\s*(?:email|mail)[:\s]+([^\s|,\n;]+@[^\s|,\n;]+\.[^\s|,\n;]+)/i);
+    if (labeledEmailMatch) {
+      email = labeledEmailMatch[1].trim().toLowerCase();
+    } else if (currentEmailMatch) {
       email = currentEmailMatch[0].toLowerCase();
     } else if (draftFromMatch && draftFromMatch[2]) {
       email = draftFromMatch[2].trim().toLowerCase();
@@ -517,12 +543,21 @@ export function parseContactWorkflow(
   ];
   const casualNamePattern = /(?:i am|i'm)\s+([A-Za-z\s]{2,30})/i;
 
+  // Labeled name pattern in current message (e.g. Name: Alex | Email: ...)
+  const labeledNameMatch = currentMessage.match(/(?:^|[|\n;,])\s*(?:name|from|sender)[:\s]+([^|,\n;]+)/i);
+  if (!name && labeledNameMatch) {
+    const candidate = labeledNameMatch[1].trim().replace(/[^A-Za-z\s]/g, "").trim();
+    if (isValidPersonName(candidate)) {
+      name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+    }
+  }
+
   if (!name) {
-    // Check current message first with explicit name patterns
+    // Check current message with explicit name patterns
     for (const pat of explicitNamePatterns) {
       const m = currentMessage.match(pat);
       if (m && m[1]) {
-        let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
+        let candidate = m[1].trim().split(/[|,\n;\t]/)[0].replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
         candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
         if (isValidPersonName(candidate)) {
           name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
@@ -536,12 +571,26 @@ export function parseContactWorkflow(
     // Check casual "i am / i'm" in current message only if candidate is a strictly valid person name
     const m = currentMessage.match(casualNamePattern);
     if (m && m[1]) {
-      let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
+      let candidate = m[1].trim().split(/[|,\n;\t]/)[0].replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
       candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
       if (isValidPersonName(candidate)) {
         name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
       }
     }
+  }
+
+  // Check standalone person name in current message if not email, not confirm/cancel, and 1-3 words
+  if (
+    !name &&
+    !currentEmailMatch &&
+    !isConfirmWord &&
+    !isCancelWord &&
+    currentMessage.length >= 2 &&
+    currentMessage.length <= 35 &&
+    !isCollaborationPhrase &&
+    isValidPersonName(currentMessage.trim())
+  ) {
+    name = currentMessage.trim().charAt(0).toUpperCase() + currentMessage.trim().slice(1);
   }
 
   if (!name && draftFromMatch && draftFromMatch[1]) {
@@ -552,13 +601,22 @@ export function parseContactWorkflow(
   }
 
   if (!name) {
-    // Check user history in reverse ONLY for explicit name patterns
+    // Search user history in reverse for explicit name patterns or standalone names
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i].role !== "user") continue;
+      const c = history[i].content.trim();
+      const labeled = c.match(/(?:^|[|\n;,])\s*(?:name|from|sender)[:\s]+([^|,\n;]+)/i);
+      if (labeled) {
+        const candidate = labeled[1].trim().replace(/[^A-Za-z\s]/g, "").trim();
+        if (isValidPersonName(candidate)) {
+          name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+          break;
+        }
+      }
       for (const pat of explicitNamePatterns) {
-        const m = history[i].content.match(pat);
+        const m = c.match(pat);
         if (m && m[1]) {
-          let candidate = m[1].trim().replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
+          let candidate = m[1].trim().split(/[|,\n;\t]/)[0].replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
           candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
           if (isValidPersonName(candidate)) {
             name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
@@ -567,33 +625,22 @@ export function parseContactWorkflow(
         }
       }
       if (name) break;
-    }
-  }
-
-  // If last assistant turn specifically asked for name, and user provided a standalone name
-  if (!name && history.length > 0) {
-    const prevTurn = history[history.length - 1];
-    if (
-      isAssistantRole(prevTurn.role) &&
-      (prevTurn.content.toLowerCase().includes("may i have your name") ||
-        prevTurn.content.toLowerCase().includes("share your name") ||
-        prevTurn.content.toLowerCase().includes("who is contacting"))
-    ) {
-      if (
-        currentMessage.length >= 2 &&
-        currentMessage.length <= 40 &&
-        !currentEmailMatch &&
-        !isConfirmWord &&
-        !isCancelWord &&
-        isValidPersonName(currentMessage)
-      ) {
-        name = currentMessage.trim();
+      if (!c.includes("@") && c.length <= 35 && isValidPersonName(c)) {
+        name = c.charAt(0).toUpperCase() + c.slice(1);
+        break;
       }
     }
   }
 
   // 7. Extract Message
   let message = explicitMessage;
+
+  // Labeled message in current message (e.g. Message: Hello Umesh...)
+  const labeledMsgMatch = currentMessage.match(/(?:^|[|\n;,])\s*(?:message|msg|proposal|body|note)[:\s]+([^|]+)/i);
+  if (!message && labeledMsgMatch && labeledMsgMatch[1].trim().length >= 2) {
+    message = labeledMsgMatch[1].trim();
+  }
+
   const msgPatterns = [
     /(?:s[en]{2}d|sned|send|tell)(?:\s+my|\s+a)?\s+(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+)\s*(.+)/i,
     /(?:i\s+want\s+to\s+(?:send|sned|tell)\s+(?:a\s+|my\s+)?(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+))\s*(.+)/i,
@@ -630,12 +677,18 @@ export function parseContactWorkflow(
     message = draftMessageMatch[1].trim();
   }
 
-  // If not in current message or assistant draft, search user history
+  // Search user history in reverse for explicit messages or labeled messages
   if (!message) {
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i].role !== "user") continue;
+      const c = history[i].content.trim();
+      const lMatch = c.match(/(?:^|[|\n;,])\s*(?:message|msg|proposal|body|note)[:\s]+([^|]+)/i);
+      if (lMatch && lMatch[1].trim().length >= 2) {
+        message = lMatch[1].trim();
+        break;
+      }
       for (const pat of msgPatterns) {
-        const m = history[i].content.match(pat);
+        const m = c.match(pat);
         if (m && m[1]) {
           let candidate = m[1].trim().replace(/^(?:to\s+(?:umesh|him|you)\s*)/i, "").trim();
           if (candidate.length > 4 && !candidate.toLowerCase().startsWith("what") && candidate.toLowerCase() !== "umesh") {
@@ -648,18 +701,71 @@ export function parseContactWorkflow(
     }
   }
 
-  // If assistant asked for message and user typed it
+  // Check historical dialogue turns where assistant asked for message and user replied
+  if (!message) {
+    for (let i = 0; i < history.length - 1; i++) {
+      if (!isAssistantRole(history[i].role)) continue;
+      const p = history[i].content.toLowerCase();
+      if (
+        p.includes("what message") ||
+        p.includes("collaboration proposal") ||
+        p.includes("what would you like to say") ||
+        p.includes("message would you like to send")
+      ) {
+        const userTurn = history[i + 1];
+        if (userTurn && userTurn.role === "user") {
+          const uText = userTurn.content.trim();
+          if (
+            uText.length >= 3 &&
+            !uText.includes("@") &&
+            !isValidPersonName(uText) &&
+            !/^(cancel|stop|exit|quit|no)$/i.test(uText)
+          ) {
+            message = uText;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // If assistant just asked for message and current message is a reply (and not email, confirm/cancel, or standalone name)
   if (!message && history.length > 0) {
     const prevTurn = history[history.length - 1];
     if (
       isAssistantRole(prevTurn.role) &&
       (prevTurn.content.toLowerCase().includes("what message") ||
         prevTurn.content.toLowerCase().includes("what would you like to say") ||
-        prevTurn.content.toLowerCase().includes("collaboration proposal"))
+        prevTurn.content.toLowerCase().includes("collaboration proposal") ||
+        prevTurn.content.toLowerCase().includes("message would you like to send"))
     ) {
-      if (currentMessage.length > 3 && !currentEmailMatch && !isConfirmWord && !isCancelWord) {
+      if (
+        currentMessage.length > 3 &&
+        !currentEmailMatch &&
+        !isConfirmWord &&
+        !isCancelWord &&
+        !isValidPersonName(currentMessage.trim())
+      ) {
         message = currentMessage.trim();
       }
+    }
+  }
+
+  // Residual message extraction if single-turn contains name + email + extra text
+  if (!message && name && email && currentMessage.length > 15) {
+    let residual = currentMessage
+      .replace(new RegExp(email, "gi"), "")
+      .replace(new RegExp(`\\b${name}\\b`, "gi"), "")
+      .replace(/(?:my\s+)?email(?:\s+is)?[:\s]*/gi, "")
+      .replace(/(?:my\s+)?name(?:\s+is)?[:\s]*/gi, "")
+      .replace(/(?:my\s+)?message(?:\s+is)?[:\s]*/gi, "")
+      .replace(/(?:i\s+want\s+to\s+send\s+(?:a\s+|my\s+)?(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+)?)/gi, "")
+      .replace(/\b(and|nd|&|at|is|here|tell umesh that)\b/gi, " ")
+      .replace(/[|,:;\-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (residual.length >= 3) {
+      message = residual;
     }
   }
 
@@ -706,4 +812,209 @@ export function parseContactWorkflow(
     missingFields,
     status,
   };
+}
+
+export const parseContactWorkflowSync = parseContactWorkflow;
+
+/**
+ * Creates OpenRouter client configured with OpenRouter API base URL and metadata.
+ */
+export function createOpenRouterClient(apiKey?: string): OpenAI | null {
+  const key = (apiKey || process.env.OPENROUTER_API_KEY)?.trim();
+  if (!key) return null;
+  return new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: key,
+    defaultHeaders: {
+      "HTTP-Referer": process.env.SITE_URL || "https://portfolio-4r6o.onrender.com",
+      "X-Title": "UMU AI Decision Engine",
+    },
+  });
+}
+
+/**
+ * Queries OpenRouter Reasoning Model (e.g. thinkingmachines/inkling:free) for context-aware decision making.
+ */
+export async function queryOpenRouterDecision(
+  openRouter: OpenAI,
+  currentMessage: string,
+  history: { role: string; content: string }[],
+  model = process.env.OPENROUTER_MODEL || "thinkingmachines/inkling:free"
+): Promise<{
+  intent: "contact" | "confirm" | "cancel" | "outside_query";
+  name: string | null;
+  email: string | null;
+  message: string | null;
+  reasoning?: string;
+} | null> {
+  try {
+    const formattedHistory = history
+      .slice(-6)
+      .map((h) => `${h.role === "user" ? "User" : "UMU"}: ${h.content}`)
+      .join("\n");
+
+    const prompt = `You are the decision-making engine for UMU, an AI portfolio assistant for Umesh Kumar Sahoo.
+UMU allows visitors to explore Umesh's background, projects, or send him a direct message / collaboration proposal.
+
+Analyze the conversation history and the latest user message to determine intent and extract details.
+
+CONVERSATION HISTORY:
+${formattedHistory || "(Start of conversation)"}
+
+LATEST USER MESSAGE:
+"${currentMessage}"
+
+DECISION RULES:
+1. "outside_query": The user is asking a general question, asking a personal question about Umesh (e.g. "Why is...", "Who is...", "What does..."), asking about Umesh's projects (RAG, FreshGuard, BiGRU), asking for code, asking for tech news, or chatting casually.
+CRITICAL: If the assistant previously asked for contact info (like "What email address..."), but the user asks an unrelated question or says something outside of providing contact info, YOU MUST CLASSIFY THIS AS "outside_query"! Do NOT force them into the contact flow!
+2. "cancel": The user says "cancel", "stop", "never mind", "exit", "abort", "no", or wants to exit the contact flow.
+3. "confirm": The user explicitly confirms a prepared email draft (e.g. "yes", "confirm", "send", "send it", "looks good").
+4. "contact": The user wants to contact Umesh, send a message to Umesh, collaborate, or is providing contact information (name, email, message).
+
+EXTRACTION RULES (for "contact" and "confirm"):
+- name: The visitor's own name (NOT Umesh). Null if unknown.
+- email: The visitor's email address. Null if unknown.
+- message: The message or collaboration proposal they want to send to Umesh. Null if unknown.
+- Check BOTH the latest message AND previous conversation turns for these details. If an email, name, or message was provided in previous turns, KEEP IT!
+
+Respond with ONLY valid JSON:
+{
+  "intent": "contact" | "confirm" | "cancel" | "outside_query",
+  "name": string | null,
+  "email": string | null,
+  "message": string | null,
+  "reasoning": string
+}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const apiResponse = await openRouter.chat.completions.create(
+      {
+        model,
+        messages: [
+          { role: "system", content: "You are an accurate JSON-only intent classifier and entity extractor. Output strictly valid JSON." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.1,
+        // OpenRouter reasoning parameter
+        ...({ reasoning: { enabled: true } } as any),
+      },
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+
+    const rawContent = apiResponse?.choices?.[0]?.message?.content || "";
+    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.intent) {
+        return {
+          intent: parsed.intent,
+          name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : null,
+          email: typeof parsed.email === "string" && parsed.email.trim() ? parsed.email.trim() : null,
+          message: typeof parsed.message === "string" && parsed.message.trim() ? parsed.message.trim() : null,
+          reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : undefined,
+        };
+      }
+    }
+    return null;
+  } catch (err: any) {
+    console.warn("[OPENROUTER] Decision LLM notice:", err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Asynchronously resolves contact workflow with OpenRouter reasoning LLM, falling back to deterministic parser.
+ */
+export async function resolveContactWorkflow(
+  currentMessage: string,
+  rawHistory: { role: string; content?: string; text?: string }[] = [],
+  overrideDraft?: { name?: string; email?: string; message?: string },
+  openRouterClient?: OpenAI | null,
+  _geminiClient?: any
+): Promise<EmailDraftState> {
+  const syncState = parseContactWorkflowSync(currentMessage, rawHistory, overrideDraft);
+
+  // If explicit button confirmation or cancellation, respect it immediately
+  if (syncState.isConfirmation || syncState.isCancellation) {
+    return syncState;
+  }
+
+  // If OpenRouter client is configured, evaluate with reasoning LLM
+  if (openRouterClient) {
+    const rawItems = (rawHistory || []).map((h: any) => ({
+      role: String(h?.role || "").toLowerCase(),
+      content: (typeof h?.content === "string" ? h.content : (typeof h?.text === "string" ? h.text : "")) || "",
+    }));
+
+    const decision = await queryOpenRouterDecision(openRouterClient, currentMessage, rawItems);
+    if (decision) {
+      console.log(`[BACKEND] OpenRouter decision (${process.env.OPENROUTER_MODEL || "thinkingmachines/inkling:free"}): intent=${decision.intent}`);
+
+      if (decision.intent === "outside_query") {
+        return {
+          isContactWorkflow: false,
+          isConfirmation: false,
+          isCancellation: false,
+          isEdit: false,
+          missingFields: [],
+          status: "idle",
+        };
+      }
+
+      if (decision.intent === "cancel") {
+        return {
+          isContactWorkflow: true,
+          isConfirmation: false,
+          isCancellation: true,
+          isEdit: false,
+          missingFields: [],
+          status: "cancelled",
+        };
+      }
+
+      if (decision.intent === "confirm") {
+        const name = decision.name || syncState.draft?.name;
+        const email = decision.email || syncState.draft?.email;
+        const message = decision.message || syncState.draft?.message;
+        if (name && email && message) {
+          return {
+            isContactWorkflow: true,
+            isConfirmation: true,
+            isCancellation: false,
+            isEdit: false,
+            draft: { name, email, message },
+            missingFields: [],
+            status: "confirmed",
+          };
+        }
+      }
+
+      if (decision.intent === "contact") {
+        const name = decision.name || syncState.draft?.name;
+        const email = decision.email || syncState.draft?.email;
+        const message = decision.message || syncState.draft?.message;
+
+        const missingFields: ("name" | "email" | "message")[] = [];
+        if (!name) missingFields.push("name");
+        if (!email) missingFields.push("email");
+        if (!message) missingFields.push("message");
+
+        const status = missingFields.length === 0 ? "pending_confirmation" : "collecting";
+        return {
+          isContactWorkflow: true,
+          isConfirmation: false,
+          isCancellation: false,
+          isEdit: false,
+          draft: { name, email, message },
+          missingFields,
+          status,
+        };
+      }
+    }
+  }
+
+  return syncState;
 }

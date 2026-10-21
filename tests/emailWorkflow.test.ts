@@ -5,6 +5,7 @@ import {
   persistContactLocally,
   sendContactEmail,
   parseContactWorkflow,
+  resolveContactWorkflow,
 } from "../emailService";
 
 async function runEmailWorkflowTests() {
@@ -285,6 +286,99 @@ async function runEmailWorkflowTests() {
     assert(contactAfterNonNameSentence.draft?.name === undefined, "Does NOT parse 'Not asking about rag' as user name");
     assert(contactAfterNonNameSentence.missingFields.includes("name"), "Correctly marks name as missing");
     assert(contactAfterNonNameSentence.missingFields.includes("email"), "Correctly marks email as missing");
+  }
+
+  // ----------------------------------------------------
+  // Group 9: LLM Context-Aware Decision & Resilient UX
+  // ----------------------------------------------------
+  console.log("\n🔍 Group 9: LLM Context-Aware Decision & Resilient UX");
+  {
+    // 1. Cancellation during collecting phase (before draft is formed)
+    const collectingHistory = [
+      { role: "user", text: "I want to send a message to Umesh" },
+      { role: "assistant", text: "Thanks there! What email address should Umesh use to get back to you?" },
+    ];
+    const cancelDuringCollecting = parseContactWorkflow("cancel", collectingHistory);
+    assert(cancelDuringCollecting.isCancellation, "Cancels immediately when user says 'cancel' during collecting phase");
+    assert(cancelDuringCollecting.status === "cancelled", "Sets status to 'cancelled' during collecting phase");
+
+    const exitDuringCollecting = parseContactWorkflow("exit", collectingHistory);
+    assert(exitDuringCollecting.isCancellation, "Cancels immediately when user says 'exit'");
+
+    // 2. Automatic breakout on outside questions / statements (e.g. "Why is umesh lesbian")
+    const outsideQuestion = parseContactWorkflow("Why is umesh lesbian", collectingHistory);
+    assert(!outsideQuestion.isContactWorkflow, "Automatically breaks out of contact flow on outside questions");
+    assert(outsideQuestion.status === "idle", "Resets status to 'idle' on personal/outside questions");
+
+    const outsideWhatQuestion = parseContactWorkflow("What is his GPA?", collectingHistory);
+    assert(!outsideWhatQuestion.isContactWorkflow, "Automatically breaks out of contact flow on 'What is his GPA?'");
+    assert(outsideWhatQuestion.status === "idle", "Resets status to 'idle'");
+
+    // 3. Multi-turn preservation without ping-pong amnesia
+    // Turn 1: user gives email
+    const turn1History = [
+      { role: "user", text: "I want to send a message to Umesh" },
+      { role: "assistant", text: "Thanks there! What email address should Umesh use to get back to you?" },
+    ];
+    const turn1Result = parseContactWorkflow("ashishmahapatro17@gmail.com", turn1History);
+    assert(turn1Result.draft?.email === "ashishmahapatro17@gmail.com", "Extracts email on turn 1");
+
+    // Turn 2: user gives message
+    const turn2History = [
+      ...turn1History,
+      { role: "user", text: "ashishmahapatro17@gmail.com" },
+      { role: "assistant", text: "Got it! What message or collaboration proposal would you like me to send to Umesh?" },
+    ];
+    const turn2Result = parseContactWorkflow("let's build an awesome app together", turn2History);
+    assert(turn2Result.draft?.email === "ashishmahapatro17@gmail.com", "Preserves email across intervening turns");
+    assert(turn2Result.draft?.message === "let's build an awesome app together", "Captures message on turn 2");
+
+    // Turn 3: user gives name
+    const turn3History = [
+      ...turn2History,
+      { role: "user", text: "let's build an awesome app together" },
+      { role: "assistant", text: "Thanks for your message! May I have your name so Umesh knows who is contacting him?" },
+    ];
+    const turn3Result = parseContactWorkflow("Motu rangfar", turn3History);
+    assert(turn3Result.status === "pending_confirmation", "Transitions directly to pending_confirmation without re-asking");
+    assert(turn3Result.draft?.name === "Motu rangfar", "Extracts name 'Motu rangfar'");
+    assert(turn3Result.draft?.email === "ashishmahapatro17@gmail.com", "Retains email without amnesia");
+    assert(turn3Result.draft?.message === "let's build an awesome app together", "Retains message without amnesia");
+
+    // 4. Single-turn delimited format (Name: ... | Email: ... | Message: ...)
+    const delimitedQuery = "Name: Alex Morgan | Email: alex@example.com | Message: I'd like to collaborate on your AI models";
+    const delimitedResult = parseContactWorkflow(delimitedQuery, []);
+    assert(delimitedResult.status === "pending_confirmation", "Parses single-turn delimited format directly into draft");
+    assert(delimitedResult.draft?.name === "Alex Morgan", "Extracts delimited name: Alex Morgan");
+    assert(delimitedResult.draft?.email === "alex@example.com", "Extracts delimited email: alex@example.com");
+    assert(delimitedResult.draft?.message?.includes("collaborate on your AI models") === true, "Extracts delimited message");
+
+    // 5. Async resolveContactWorkflow with OpenRouter Decision Mock
+    const mockOpenRouter = {
+      chat: {
+        completions: {
+          create: async () => ({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    intent: "outside_query",
+                    name: null,
+                    email: null,
+                    message: null,
+                    reasoning: "User is asking an outside technical question about RAG architecture.",
+                  }),
+                },
+              },
+            ],
+          }),
+        },
+      },
+    } as any;
+
+    const asyncDecisionResult = await resolveContactWorkflow("tell me about vector search", collectingHistory, undefined, mockOpenRouter);
+    assert(!asyncDecisionResult.isContactWorkflow, "OpenRouter decision classifies outside query and exits contact workflow");
+    assert(asyncDecisionResult.status === "idle", "Resets status to idle via OpenRouter decision");
   }
 
   console.log("\n==================================================");
