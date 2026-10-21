@@ -49,10 +49,19 @@ function normalizeText(value: unknown, maxLength: number, allowNewlines = false)
 }
 
 /**
+ * Detects whether a string is a casual greeting like 'hi', 'hii', 'hello', 'hey'.
+ */
+export function isGreetingWord(str: string): boolean {
+  if (!str) return false;
+  const cleaned = str.trim().toLowerCase().replace(/[^a-z]/g, "");
+  return /^(hi+|hello+|hey+|yo+|howdy|sup|greetings)$/.test(cleaned);
+}
+
+/**
  * Validates whether a candidate string is an actual human name,
  * filtering out conversational phrases, negations, verbs, and keywords.
  */
-export function isValidPersonName(candidate: string): boolean {
+export function isValidPersonName(candidate: string, allowUmesh = false): boolean {
   if (!candidate || typeof candidate !== "string") return false;
   const cleaned = candidate.trim().replace(/[^A-Za-z\s]/g, "").trim();
   if (cleaned.length < 2 || cleaned.length > 35) return false;
@@ -66,18 +75,28 @@ export function isValidPersonName(candidate: string): boolean {
     "coder", "learning", "working", "explaining", "saying", "telling", "testing",
     "doing", "curious", "ready", "sure", "happy", "fine", "good", "ok", "okay",
     "willing", "planning", "hoping", "able", "back", "new", "online",
-    "rag", "project", "code", "repo", "repository", "github", "umesh", "terminal",
+    "rag", "project", "code", "repo", "repository", "github", "terminal",
     "assistant", "news", "headline", "email", "mail", "message", "msg", "draft", "feature",
     "model", "bigru", "freshguard", "timeseries", "devops", "docker", "python",
     "javascript", "react", "fastapi", "whisper", "speech", "audio", "video",
-    "hi", "hello", "hey", "yo", "thanks", "thank", "please", "can", "could", "would",
+    "hi", "hii", "hiii", "hello", "helloo", "hey", "heyy", "heyya", "yo", "yoo", "howdy", "sup",
+    "thanks", "thank", "please", "pls", "thx", "can", "could", "would",
     "want", "wanted", "wanting", "like", "liked", "send", "sent", "chat", "talk",
     "blah", "blahblah", "test", "testing", "who", "what", "where", "why", "how",
-    "know", "about", "neither", "either", "none"
+    "know", "about", "neither", "either", "none",
+    "plan", "cancel", "cancelling", "cancelled", "stop", "exit", "quit", "abort", "nevermind",
+    "yeah", "yep", "nope", "nah", "bye", "cya",
+    "something", "anything", "nothing", "someone", "anyone",
+    "let", "tell", "told", "talked", "earlier", "later", "building", "built"
   ]);
 
   for (const w of words) {
-    if (invalidNameWords.has(w.toLowerCase())) {
+    const lower = w.toLowerCase();
+    if (lower === "umesh") {
+      if (!allowUmesh) return false;
+      continue;
+    }
+    if (invalidNameWords.has(lower)) {
       return false;
     }
   }
@@ -463,7 +482,9 @@ export function parseContactWorkflow(
 
   // 4. Check for Cancellation (Allowed at ANY point: collecting or pending draft, provided it's not a topic shift)
   const isCancelWord =
-    /^(cancel|stop|nevermind|never mind|don't send|dont send|abort|discard|exit|quit)\b/i.test(currentLower) ||
+    /\b(cancel|cancelling|cancelled|abort|nevermind|never mind|discard)\b/i.test(currentLower) ||
+    /\b(don'?t\s+send|do\s+not\s+send)\b/i.test(currentLower) ||
+    /^(stop|exit|quit|no)\b/i.test(currentLower) ||
     /^no[, ]+(?:cancel|stop|nevermind|never mind|don't send|dont send|discard|exit|quit|thanks|thank you)/i.test(currentLower) ||
     currentLower === "cancel" ||
     currentLower === "exit" ||
@@ -547,7 +568,7 @@ export function parseContactWorkflow(
   const labeledNameMatch = currentMessage.match(/(?:^|[|\n;,])\s*(?:name|from|sender)[:\s]+([^|,\n;]+)/i);
   if (!name && labeledNameMatch) {
     const candidate = labeledNameMatch[1].trim().replace(/[^A-Za-z\s]/g, "").trim();
-    if (isValidPersonName(candidate)) {
+    if (isValidPersonName(candidate, true)) {
       name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
     }
   }
@@ -559,7 +580,7 @@ export function parseContactWorkflow(
       if (m && m[1]) {
         let candidate = m[1].trim().split(/[|,\n;\t]/)[0].replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
         candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
-        if (isValidPersonName(candidate)) {
+        if (isValidPersonName(candidate, true)) {
           name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
           break;
         }
@@ -573,29 +594,30 @@ export function parseContactWorkflow(
     if (m && m[1]) {
       let candidate = m[1].trim().split(/[|,\n;\t]/)[0].replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
       candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
-      if (isValidPersonName(candidate)) {
+      if (isValidPersonName(candidate, true)) {
         name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
       }
     }
   }
 
-  // Check standalone person name in current message if not email, not confirm/cancel, and 1-3 words
+  // Check standalone person name in current message if not email, not confirm/cancel, not greeting, and 1-3 words
   if (
     !name &&
     !currentEmailMatch &&
     !isConfirmWord &&
     !isCancelWord &&
+    !isGreetingWord(currentMessage.trim()) &&
     currentMessage.length >= 2 &&
     currentMessage.length <= 35 &&
     !isCollaborationPhrase &&
-    isValidPersonName(currentMessage.trim())
+    isValidPersonName(currentMessage.trim(), false)
   ) {
     name = currentMessage.trim().charAt(0).toUpperCase() + currentMessage.trim().slice(1);
   }
 
   if (!name && draftFromMatch && draftFromMatch[1]) {
     const candidate = draftFromMatch[1].trim();
-    if (isValidPersonName(candidate)) {
+    if (isValidPersonName(candidate, true)) {
       name = candidate;
     }
   }
@@ -608,7 +630,7 @@ export function parseContactWorkflow(
       const labeled = c.match(/(?:^|[|\n;,])\s*(?:name|from|sender)[:\s]+([^|,\n;]+)/i);
       if (labeled) {
         const candidate = labeled[1].trim().replace(/[^A-Za-z\s]/g, "").trim();
-        if (isValidPersonName(candidate)) {
+        if (isValidPersonName(candidate, true)) {
           name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
           break;
         }
@@ -618,14 +640,14 @@ export function parseContactWorkflow(
         if (m && m[1]) {
           let candidate = m[1].trim().split(/[|,\n;\t]/)[0].replace(/\b(and|nd|&|my|email|mail|msg|message|at|is|here)\b.*$/i, "").trim();
           candidate = candidate.replace(/[^A-Za-z\s]/g, "").trim();
-          if (isValidPersonName(candidate)) {
+          if (isValidPersonName(candidate, true)) {
             name = candidate.charAt(0).toUpperCase() + candidate.slice(1);
             break;
           }
         }
       }
       if (name) break;
-      if (!c.includes("@") && c.length <= 35 && isValidPersonName(c)) {
+      if (!c.includes("@") && c.length <= 35 && !isGreetingWord(c) && isValidPersonName(c, false)) {
         name = c.charAt(0).toUpperCase() + c.slice(1);
         break;
       }
@@ -642,6 +664,8 @@ export function parseContactWorkflow(
   }
 
   const msgPatterns = [
+    /(?:can you\s+)?(?:please\s+)?(?:let|tell)(?:\s+(?:him|umesh))?\s+(?:know|tell)?(?:\s+(?:that|about))\s*(.+)/i,
+    /(?:let umesh know|let him know|tell umesh|tell him)\s+(?:about|that)?\s*(.+)/i,
     /(?:s[en]{2}d|sned|send|tell)(?:\s+my|\s+a)?\s+(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+)\s*(.+)/i,
     /(?:i\s+want\s+to\s+(?:send|sned|tell)\s+(?:a\s+|my\s+)?(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+))\s*(.+)/i,
     /(?:tell umesh that|send a message to umesh that|send him a message that|tell him that)\s+(.+)/i,
@@ -718,6 +742,7 @@ export function parseContactWorkflow(
           if (
             uText.length >= 3 &&
             !uText.includes("@") &&
+            !isGreetingWord(uText) &&
             !isValidPersonName(uText) &&
             !/^(cancel|stop|exit|quit|no)$/i.test(uText)
           ) {
@@ -729,7 +754,7 @@ export function parseContactWorkflow(
     }
   }
 
-  // If assistant just asked for message and current message is a reply (and not email, confirm/cancel, or standalone name)
+  // If assistant just asked for message and current message is a reply (and not email, confirm/cancel, greeting, or standalone name)
   if (!message && history.length > 0) {
     const prevTurn = history[history.length - 1];
     if (
@@ -744,6 +769,7 @@ export function parseContactWorkflow(
         !currentEmailMatch &&
         !isConfirmWord &&
         !isCancelWord &&
+        !isGreetingWord(currentMessage.trim()) &&
         !isValidPersonName(currentMessage.trim())
       ) {
         message = currentMessage.trim();
@@ -759,8 +785,9 @@ export function parseContactWorkflow(
       .replace(/(?:my\s+)?email(?:\s+is)?[:\s]*/gi, "")
       .replace(/(?:my\s+)?name(?:\s+is)?[:\s]*/gi, "")
       .replace(/(?:my\s+)?message(?:\s+is)?[:\s]*/gi, "")
+      .replace(/(?:can you\s+)?(?:please\s+)?(?:let|tell)(?:\s+(?:him|umesh))?\s+(?:know|tell)?(?:\s+(?:that|about))?/gi, "")
       .replace(/(?:i\s+want\s+to\s+send\s+(?:a\s+|my\s+)?(?:message|msg|email)?(?:\s+to\s+umesh)?(?:\s+that|\s*:\s*|\s+saying\s+)?)/gi, "")
-      .replace(/\b(and|nd|&|at|is|here|tell umesh that)\b/gi, " ")
+      .replace(/\b(and|nd|&|at|is|here|tell umesh that|can you please)\b/gi, " ")
       .replace(/[|,:;\-]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -867,14 +894,14 @@ LATEST USER MESSAGE:
 DECISION RULES:
 1. "outside_query": The user is asking a general question, asking a personal question about Umesh (e.g. "Why is...", "Who is...", "What does..."), asking about Umesh's projects (RAG, FreshGuard, BiGRU), asking for code, asking for tech news, or chatting casually.
 CRITICAL: If the assistant previously asked for contact info (like "What email address..."), but the user asks an unrelated question or says something outside of providing contact info, YOU MUST CLASSIFY THIS AS "outside_query"! Do NOT force them into the contact flow!
-2. "cancel": The user says "cancel", "stop", "never mind", "exit", "abort", "no", or wants to exit the contact flow.
+2. "cancel": The user says "cancel", "stop", "never mind", "exit", "abort", "no", "plan cancel", "don't send", or wants to exit the contact flow.
 3. "confirm": The user explicitly confirms a prepared email draft (e.g. "yes", "confirm", "send", "send it", "looks good").
 4. "contact": The user wants to contact Umesh, send a message to Umesh, collaborate, or is providing contact information (name, email, message).
 
 EXTRACTION RULES (for "contact" and "confirm"):
-- name: The visitor's own name (NOT Umesh). Null if unknown.
+- name: The visitor's own name. If the visitor happens to also be named Umesh (e.g. "my name is umesh"), extract "Umesh". Do not confuse the recipient Umesh with the sender unless explicitly stated as their own name. Null if unknown.
 - email: The visitor's email address. Null if unknown.
-- message: The message or collaboration proposal they want to send to Umesh. Null if unknown.
+- message: The message, request, or collaboration proposal they want to send to Umesh (e.g. from "can you please let him know about X" or "tell him that Y", extract "X" or "Y"). Null if unknown.
 - Check BOTH the latest message AND previous conversation turns for these details. If an email, name, or message was provided in previous turns, KEEP IT!
 
 Respond with ONLY valid JSON:

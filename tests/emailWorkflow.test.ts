@@ -381,6 +381,42 @@ async function runEmailWorkflowTests() {
     assert(asyncDecisionResult.status === "idle", "Resets status to idle via OpenRouter decision");
   }
 
+  // ── GROUP 10: Live User Transcripts & Friction Edge Cases ──
+  console.log("\n🔍 Group 10: Live Edge Cases & Regression Protection");
+  {
+    // Case 1: Visitor named Umesh provides full details in a conversational query
+    const conversationalUmeshQuery =
+      "my name is umesh and email is pupuql123@gmail.com and can you please let him know about building project we talked about earlier";
+    const flow1 = parseContactWorkflow(conversationalUmeshQuery, []);
+    assert(flow1.isContactWorkflow, "Identifies full single-turn contact message from user named Umesh");
+    assert(flow1.draft?.name === "Umesh", "Correctly extracts sender name 'Umesh' when explicitly provided");
+    assert(flow1.draft?.email === "pupuql123@gmail.com", "Correctly extracts email 'pupuql123@gmail.com'");
+    assert(
+      flow1.draft?.message?.includes("building project") === true,
+      `Correctly extracts message from 'let him know about...' (got: '${flow1.draft?.message}')`
+    );
+    assert(flow1.status === "pending_confirmation", "Reaches 'pending_confirmation' in single turn");
+
+    // Case 2: Compound cancellation phrase 'plan cancel' and 'cancel it'
+    const collectingHist = [
+      { role: "user", content: "I want to send a message to Umesh" },
+      { role: "assistant", content: "I'd be glad to help you send a direct message to Umesh! Please share your name, email, and message." }
+    ];
+
+    const planCancelFlow = parseContactWorkflow("plan cancel", collectingHist);
+    assert(planCancelFlow.isCancellation, "Recognizes compound 'plan cancel' as cancellation");
+    assert(planCancelFlow.status === "cancelled", "Sets status to 'cancelled' for 'plan cancel'");
+
+    const cancelItFlow = parseContactWorkflow("cancel it", collectingHist);
+    assert(cancelItFlow.isCancellation, "Recognizes 'cancel it' as cancellation");
+    assert(cancelItFlow.status === "cancelled", "Sets status to 'cancelled' for 'cancel it'");
+
+    // Case 3: Greeting 'hii' during collecting state does not become a person name
+    const greetingCollectingFlow = parseContactWorkflow("hii", collectingHist);
+    assert(greetingCollectingFlow.draft?.name !== "Hii", "Does NOT treat greeting 'hii' as person name");
+    assert(greetingCollectingFlow.status === "collecting", "Remains in collecting state for greeting");
+  }
+
   console.log("\n==================================================");
   console.log(`📊 RESULTS: ${passed}/${total} TESTS PASSED`);
   console.log("==================================================");

@@ -26,6 +26,7 @@ import {
   parseContactWorkflow,
   resolveContactWorkflow,
   createOpenRouterClient,
+  isGreetingWord,
 } from "./emailService";
 
 dotenv.config({ path: ".env.local" });
@@ -1220,7 +1221,19 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
         };
       } else if (contactWorkflow.status === "collecting") {
         const { name, email, message } = contactWorkflow.draft || {};
-        if (!name && !email && !message) {
+        if (isGreetingWord(trimmedMessage)) {
+          if (!name && !email && !message) {
+            reply = "Hello! I'd be glad to help you send a direct message to Umesh!\n\nPlease share your **name**, **email**, and **message**. You can provide them in any format, for example:\n> `Name: Alex | Email: alex@example.com | Message: Hi Umesh, let's connect!`\n\n*(Type **cancel** at any time to exit)*";
+          } else if (!email && !message) {
+            reply = `Hello ${name || "there"}! What email address should Umesh reply to, and what message would you like to send?\n> Example: \`Email: alex@example.com | Message: Let's collaborate on AI\`\n\n*(Type **cancel** at any time to exit)*`;
+          } else if (!email) {
+            reply = `Hello ${name || "there"}! What email address should Umesh use to get back to you?\n> Example: \`alex@example.com\`\n\n*(Type **cancel** at any time to exit)*`;
+          } else if (!message) {
+            reply = `Hello ${name || "there"}! What message or collaboration proposal would you like me to send to Umesh?\n> Example: \`Message: I would like to discuss an engineering role / collaboration\`\n\n*(Type **cancel** at any time to exit)*`;
+          } else {
+            reply = `Hello! May I have your name so Umesh knows who is contacting him?\n> Example: \`Name: Alex\`\n\n*(Type **cancel** at any time to exit)*`;
+          }
+        } else if (!name && !email && !message) {
           reply = "I'd be glad to help you send a direct message to Umesh!\n\nPlease share your **name**, **email**, and **message**. You can provide them in any format, for example:\n> `Name: Alex | Email: alex@example.com | Message: Hi Umesh, let's connect!`\n\n*(Type **cancel** at any time to exit)*";
         } else if (!email && !message) {
           reply = `Hi ${name}! What email address should Umesh reply to, and what message would you like to send?\n> Example: \`Email: alex@example.com | Message: Let's collaborate on AI\`\n\n*(Type **cancel** at any time to exit)*`;

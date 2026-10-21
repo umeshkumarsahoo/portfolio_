@@ -583,47 +583,69 @@ def predict():
             {/* Architecture SVG Diagrams */}
             <div className="p-4 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] overflow-x-auto">
               {activeProject === "umu-ai" && (
-                <svg viewBox="0 0 680 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[540px] h-auto">
-                  <rect x="10" y="60" width="100" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.8" />
-                  <text x="60" y="88" fill="#181818" fontSize="11" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Visitor Query</text>
-                  <text x="60" y="104" fill="#666" fontSize="9" textAnchor="middle" fontFamily="monospace">Chat / Action</text>
+                <svg viewBox="0 0 710 185" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full min-w-[580px] h-auto">
+                  {/* Visitor Query */}
+                  <rect x="8" y="62" width="100" height="62" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.8" />
+                  <text x="58" y="88" fill="#181818" fontSize="11" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Visitor Query</text>
+                  <text x="58" y="103" fill="#64748B" fontSize="8.5" textAnchor="middle" fontFamily="monospace">Chat · Action · Q&amp;A</text>
 
-                  <path d="M110 90 L140 90" stroke="#2468B4" strokeWidth="1.8" />
+                  <path d="M108 93 L138 93" stroke="#7C3AED" strokeWidth="1.8" />
 
-                  <rect x="140" y="45" width="120" height="90" rx="8" fill="#FFFFFF" stroke="#E7E3D8" strokeWidth="1.8" />
-                  <text x="200" y="75" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Heuristic Router</text>
-                  <text x="200" y="93" fill="#444" fontSize="9" textAnchor="middle" fontFamily="monospace">Project Token Match</text>
-                  <text x="200" y="108" fill="#444" fontSize="9" textAnchor="middle" fontFamily="monospace">Action Detector</text>
+                  {/* Tier 1: OpenRouter Decision Engine (Reasoning LLM) */}
+                  <rect x="138" y="38" width="140" height="110" rx="8" fill="#FAF5FF" stroke="#7C3AED" strokeWidth="1.8" />
+                  <text x="208" y="58" fill="#7C3AED" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Tier 1: Decision LLM</text>
+                  <text x="208" y="73" fill="#6B21A8" fontSize="8.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">OpenRouter Inkling</text>
+                  <text x="208" y="89" fill="#4B5563" fontSize="8" textAnchor="middle" fontFamily="monospace">• Zero-Shot Intent</text>
+                  <text x="208" y="103" fill="#4B5563" fontSize="8" textAnchor="middle" fontFamily="monospace">• Dynamic Breakout</text>
+                  <text x="208" y="117" fill="#4B5563" fontSize="8" textAnchor="middle" fontFamily="monospace">• Entity Extraction</text>
+                  <text x="208" y="134" fill="#2563EB" fontSize="7.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">(&lt; 2ms Heuristic Fallback)</text>
 
-                  <path d="M260 70 L290 40" stroke="#999" strokeWidth="1.5" />
-                  <path d="M260 90 L290 90" stroke="#2468B4" strokeWidth="1.8" />
-                  <path d="M260 110 L290 140" stroke="#999" strokeWidth="1.5" />
+                  {/* Routing Connectors from Tier 1 */}
+                  <path d="M278 70 L308 38" stroke="#0284C7" strokeWidth="1.5" />
+                  <path d="M278 93 L308 93" stroke="#D97706" strokeWidth="1.5" />
+                  <path d="M278 120 L308 150" stroke="#C026D3" strokeWidth="1.5" />
 
-                  <rect x="290" y="15" width="130" height="45" rx="6" fill="#F4F8FA" stroke="#2468B4" strokeWidth="1.2" />
-                  <text x="355" y="35" fill="#181818" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Link RAG Scraper</text>
-                  <text x="355" y="48" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">SSRF Safe + Cache</text>
+                  {/* Specialized Intermediate Engines */}
+                  {/* Link RAG Scraper */}
+                  <rect x="308" y="16" width="136" height="44" rx="6" fill="#F0F9FF" stroke="#0284C7" strokeWidth="1.2" />
+                  <text x="376" y="34" fill="#0369A1" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Link RAG Scraper</text>
+                  <text x="376" y="47" fill="#64748B" fontSize="8" textAnchor="middle" fontFamily="monospace">SSRF Safe · CIDR Filter</text>
 
-                  <rect x="290" y="68" width="130" height="45" rx="6" fill="#FBF7EE" stroke="#E6A23C" strokeWidth="1.2" />
-                  <text x="355" y="88" fill="#181818" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">GitHub File Trees</text>
-                  <text x="355" y="101" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">31 Repos Catalogue</text>
+                  {/* GitHub Repo Trees */}
+                  <rect x="308" y="71" width="136" height="44" rx="6" fill="#FFFBEB" stroke="#D97706" strokeWidth="1.2" />
+                  <text x="376" y="89" fill="#B45309" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">GitHub Repo Trees</text>
+                  <text x="376" y="102" fill="#64748B" fontSize="8" textAnchor="middle" fontFamily="monospace">30 Repos Knowledge</text>
 
-                  <rect x="290" y="120" width="130" height="45" rx="6" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.2" />
-                  <text x="355" y="140" fill="#181818" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Action Engine</text>
-                  <text x="355" y="153" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Email Draft + Confirm</text>
+                  {/* Contact Action Engine */}
+                  <rect x="308" y="128" width="136" height="44" rx="6" fill="#FDF4FF" stroke="#C026D3" strokeWidth="1.2" />
+                  <text x="376" y="146" fill="#A21CAF" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Contact Action Engine</text>
+                  <text x="376" y="159" fill="#64748B" fontSize="8" textAnchor="middle" fontFamily="monospace">Multi-Turn Retention</text>
 
-                  <path d="M420 37 L460 75" stroke="#999" strokeWidth="1.5" />
-                  <path d="M420 90 L460 90" stroke="#2468B4" strokeWidth="1.8" />
-                  <path d="M420 142 L460 105" stroke="#999" strokeWidth="1.5" />
+                  {/* Convergence Connectors */}
+                  <path d="M444 38 L474 72" stroke="#0284C7" strokeWidth="1.4" />
+                  <path d="M444 93 L474 93" stroke="#D97706" strokeWidth="1.4" />
+                  <path d="M444 150 L474 150" stroke="#C026D3" strokeWidth="1.4" />
 
-                  <rect x="460" y="60" width="110" height="60" rx="8" fill="#FFFFFF" stroke="#2468B4" strokeWidth="1.8" />
-                  <text x="515" y="88" fill="#2468B4" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Gemini 2.5</text>
-                  <text x="515" y="104" fill="#666" fontSize="8" textAnchor="middle" fontFamily="monospace">Flash & Pro Fallback</text>
+                  {/* Tier 2: Gemini Synthesis & Guarded Barrier */}
+                  <rect x="474" y="62" width="114" height="62" rx="8" fill="#FFFFFF" stroke="#2563EB" strokeWidth="1.8" />
+                  <text x="531" y="84" fill="#1D4ED8" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Tier 2: Gemini 2.0</text>
+                  <text x="531" y="99" fill="#475569" fontSize="8" textAnchor="middle" fontFamily="monospace">Grounded Synthesis</text>
+                  <text x="531" y="112" fill="#15803D" fontSize="7.5" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Code-First &amp; RAG</text>
 
-                  <path d="M570 90 L600 90" stroke="#2468B4" strokeWidth="1.8" />
+                  <rect x="474" y="128" width="114" height="44" rx="6" fill="#FEF2F2" stroke="#DC2626" strokeWidth="1.2" />
+                  <text x="531" y="146" fill="#B91C1C" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Guarded Barrier</text>
+                  <text x="531" y="159" fill="#64748B" fontSize="8" textAnchor="middle" fontFamily="monospace">Draft Card · Explicit OK</text>
 
-                  <rect x="600" y="60" width="70" height="60" rx="8" fill="#F0F9EB" stroke="#67C23A" strokeWidth="1.5" />
-                  <text x="635" y="88" fill="#2E7D32" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Verified</text>
-                  <text x="635" y="102" fill="#2E7D32" fontSize="8" textAnchor="middle" fontFamily="monospace">Answer</text>
+                  {/* Final Output Deliverables */}
+                  <path d="M588 93 L616 93" stroke="#16A34A" strokeWidth="1.6" />
+                  <rect x="616" y="67" width="84" height="52" rx="6" fill="#F0FDF4" stroke="#16A34A" strokeWidth="1.5" />
+                  <text x="658" y="89" fill="#15803D" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Verified</text>
+                  <text x="658" y="103" fill="#15803D" fontSize="8" textAnchor="middle" fontFamily="monospace">Answer</text>
+
+                  <path d="M588 150 L616 150" stroke="#16A34A" strokeWidth="1.6" />
+                  <rect x="616" y="124" width="84" height="52" rx="6" fill="#F0FDF4" stroke="#16A34A" strokeWidth="1.5" />
+                  <text x="658" y="146" fill="#15803D" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">Delivered</text>
+                  <text x="658" y="160" fill="#15803D" fontSize="8" textAnchor="middle" fontFamily="monospace">To Inbox</text>
                 </svg>
               )}
 

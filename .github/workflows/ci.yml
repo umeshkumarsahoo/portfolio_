@@ -32,6 +32,9 @@ jobs:
       
     - name: Type check
       run: npm run lint
+
+    - name: Run All Automated Test Suites (211 Tests)
+      run: npm test
       
     - name: Build Application
       run: npm run build
