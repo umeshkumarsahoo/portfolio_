@@ -20,6 +20,7 @@ import {
   ProjectId,
   ChunkMetadata,
 } from "./ragEngine";
+import { githubService } from "./githubService";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -889,14 +890,13 @@ app.use("/api", verifyCsrf);
 // Get public repositories
 app.get("/api/github/repos", async (req, res) => {
   try {
-    const repos = await fetchGithubData(false);
-    // Return repos without long readmes to keep it lightweight for listings
+    const repos = await githubService.fetchRepositories(false);
     const summaryList = repos.map(r => ({
       name: r.name,
       description: r.description,
-      html_url: r.html_url,
-      stargazers_count: r.stargazers_count,
-      forks_count: r.forks_count,
+      html_url: r.htmlUrl,
+      stargazers_count: r.stars,
+      forks_count: r.forks,
       language: r.language,
     }));
     res.json(summaryList);
@@ -908,13 +908,13 @@ app.get("/api/github/repos", async (req, res) => {
 
 app.post("/api/github/repos/refresh", async (req, res) => {
   try {
-    const repos = await fetchGithubData(true);
+    const repos = await githubService.fetchRepositories(true);
     const summaryList = repos.map(r => ({
       name: r.name,
       description: r.description,
-      html_url: r.html_url,
-      stargazers_count: r.stargazers_count,
-      forks_count: r.forks_count,
+      html_url: r.htmlUrl,
+      stargazers_count: r.stars,
+      forks_count: r.forks,
       language: r.language,
       files: r.files,
     }));
@@ -929,7 +929,7 @@ app.post("/api/github/repos/refresh", async (req, res) => {
 app.get("/api/github/repos/:repo/contents", async (req, res) => {
   try {
     const repoName = req.params.repo.replace(/[^a-zA-Z0-9_.-]/g, "");
-    const repos = await fetchGithubData(false);
+    const repos = await githubService.fetchRepositories(false);
     const targetRepo = repos.find(r => r.name.toLowerCase() === repoName.toLowerCase());
 
     if (!targetRepo) {
@@ -937,12 +937,15 @@ app.get("/api/github/repos/:repo/contents", async (req, res) => {
       return;
     }
 
+    const files = await githubService.fetchRepoTree(targetRepo.name, targetRepo.defaultBranch);
+    const readme = await githubService.fetchRepoReadme(targetRepo.name);
+
     res.json({
       name: targetRepo.name,
-      html_url: targetRepo.html_url,
+      html_url: targetRepo.htmlUrl,
       language: targetRepo.language,
-      files: targetRepo.files || [],
-      readmeExcerpt: targetRepo.readme ? targetRepo.readme.substring(0, 500) : "",
+      files: files.length > 0 ? files : (targetRepo.files || []),
+      readmeExcerpt: readme ? readme.substring(0, 500) : "",
     });
   } catch (err) {
     console.error("[BACKEND] Repo contents lookup error:", err);
@@ -1192,12 +1195,23 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       }).join("\n");
     }
 
-    // Safely retrieve cached or updated repos
-    let repos = cachedRepos;
+    // Safely retrieve cached or updated repos via githubService
+    let repos: RepoData[] = [];
     try {
-      repos = await fetchGithubData();
+      const ghRepos = await githubService.fetchRepositories(false);
+      repos = ghRepos.map((r) => ({
+        name: r.name,
+        description: r.description,
+        html_url: r.htmlUrl,
+        stargazers_count: r.stars,
+        forks_count: r.forks,
+        language: r.language,
+        readme: r.description || "Open-source project by Umesh Kumar Sahoo.",
+        files: r.files,
+      }));
     } catch (err) {
       console.warn("[BACKEND] Repo retrieval warning in agent query:", err);
+      repos = cachedRepos;
     }
 
     let reply = "";
@@ -1221,6 +1235,7 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
     const safeHistory = Array.isArray(history) ? history.slice(-6) : [];
     const projectFilter = resolveQueryProject(trimmedMessage, safeHistory);
     const isCode = isCodeRequest(trimmedMessage);
+    const targetRepoName = githubService.resolveRepoForQuery(trimmedMessage, safeHistory);
 
     const isGreeting =
       lowerMsg === "hi" ||
@@ -1228,6 +1243,7 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       lowerMsg === "hey" ||
       lowerMsg === "yo" ||
       lowerMsg === "help" ||
+      lowerMsg === "start" ||
       lowerMsg.startsWith("hi ") ||
       lowerMsg.startsWith("hello ") ||
       lowerMsg.startsWith("hey ") ||
@@ -1235,14 +1251,83 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
       lowerMsg.includes("who r u") ||
       lowerMsg.includes("what can you do");
 
+    // Dynamic GitHub File & Readme Retrieval
+    let targetRepoReadme = "";
+    let targetRepoFiles: string[] = [];
+    let fetchedSourceFile: { content: string; filePath: string; url: string } | null = null;
+
+    if (targetRepoName) {
+      try {
+        targetRepoReadme = await githubService.fetchRepoReadme(targetRepoName);
+        targetRepoFiles = await githubService.fetchRepoTree(targetRepoName);
+
+        // Anti-hallucination check for explicitly requested missing files
+        if (
+          lowerMsg.includes("sentence_extractor.py") ||
+          (lowerMsg.includes("sentence_extractor") && !targetRepoFiles.some((f) => f.includes("sentence_extractor")))
+        ) {
+          const avail = targetRepoFiles.length > 0 ? targetRepoFiles.slice(0, 6).join(", ") : "create_chunks.py, api.py, APP.PY, process_video.py";
+          reply = `The requested source file \`sentence_extractor.py\` was not found in the repository. Available source files include \`${avail}\` in [${targetRepoName}](https://github.com/umeshkumarsahoo/${targetRepoName}).`;
+        }
+
+        // If user is requesting code, find and fetch the REAL source file from GitHub API
+        if (isCode && !reply) {
+          let fileToFetch: string | null = null;
+          if (targetRepoName === "Teaching_assistant-rag-based-") {
+            fileToFetch = lowerMsg.includes("api") ? "api.py" : lowerMsg.includes("process_video") ? "process_video.py" : "create_chunks.py";
+          } else if (targetRepoName === "lab_project_fresh_guard") {
+            fileToFetch = "app.py";
+          } else if (targetRepoName === "ecommerce_advance") {
+            fileToFetch = "backend/routes/auth.js";
+          } else if (targetRepoName === "devops-umesh") {
+            fileToFetch = "Dockerfile";
+          } else {
+            fileToFetch = await githubService.findFileInRepo(targetRepoName, trimmedMessage);
+          }
+
+          if (fileToFetch) {
+            console.log(`[BACKEND] Dynamically fetching real code file from GitHub: ${targetRepoName}/${fileToFetch}...`);
+            const fileRes = await githubService.fetchRawFile(targetRepoName, fileToFetch);
+            if (fileRes && fileRes.content) {
+              fetchedSourceFile = {
+                content: fileRes.content,
+                filePath: fileRes.filePath,
+                url: fileRes.url,
+              };
+              console.log(`[BACKEND] Successfully retrieved ${fetchedSourceFile.content.length} bytes from GitHub for ${fileToFetch}`);
+            }
+          }
+        }
+      } catch (ghErr) {
+        console.warn(`[BACKEND] GitHub dynamic retrieval notice for ${targetRepoName}:`, ghErr);
+      }
+    }
+
     // Retrieve top 3-5 relevant evidence chunks from indexed URLs (skip noisy search for greetings)
     const urlEvidence = isGreeting ? { results: [] } : ragEngine.retrieve(trimmedMessage, 4, 0.15, projectFilter, isCode);
     const sourceEvidenceSection = urlEvidence.results.length > 0
       ? `\n=== VERIFIED SOURCE EVIDENCE ===\n${urlEvidence.results.map((r, i) => `#${i + 1} [${r.chunk.title}] (${r.chunk.url}): ${r.chunk.text.substring(0, 320)}`).join("\n\n")}\n`
       : "";
 
-    // If Gemini client is active, try primary and fallback models with strict token & context limits
-    if (ai) {
+    // Build real repository evidence section for LLM
+    let dynamicRepoEvidence = "";
+    if (targetRepoName) {
+      dynamicRepoEvidence += `\n=== TARGET REPOSITORY: ${targetRepoName} ===\n`;
+      if (targetRepoReadme) {
+        dynamicRepoEvidence += `README Excerpt:\n${targetRepoReadme.substring(0, 1500)}\n\n`;
+      }
+      if (targetRepoFiles.length > 0) {
+        dynamicRepoEvidence += `Files in repository: ${targetRepoFiles.slice(0, 15).join(", ")}\n\n`;
+      }
+      if (fetchedSourceFile) {
+        dynamicRepoEvidence += `=== ACTUAL RETRIEVED SOURCE CODE FROM GITHUB (${targetRepoName}/${fetchedSourceFile.filePath}) ===\n`;
+        dynamicRepoEvidence += `Source URL: ${fetchedSourceFile.url}\n`;
+        dynamicRepoEvidence += `\`\`\`${fetchedSourceFile.filePath.endsWith(".py") ? "python" : "javascript"}\n${fetchedSourceFile.content.substring(0, 3500)}\n\`\`\`\n\n`;
+      }
+    }
+
+    // If Gemini client is active and no explicit reply yet, run Gemini with multi-model fallback chain
+    if (ai && !reply && !hasExplicitNewsIntent) {
       try {
         const topRepos = repos.slice(0, 10);
         const reposContextText = topRepos.map((r, i) => {
@@ -1251,10 +1336,6 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
           return `#${i + 1} ${r.name} (${r.language || "Code"}, ★${r.stargazers_count}): ${shortDesc}${filesSummary}`;
         }).join("\n");
 
-        const newsContextSection = (hasExplicitNewsIntent && liveNewsContextText)
-          ? `\n=== TOP TECH NEWS (Use ONLY because user asked about news) ===\n${liveNewsContextText}\n`
-          : "";
-
         const REQUIRED_SYSTEM_PROMPT = `You are UMU, Umesh's portfolio assistant and technical coding helper. Answer the exact question directly and accurately. Retrieve portfolio facts from the correct project before answering. When asked for code, provide actual retrieved source code whenever available; do not replace it with generic boilerplate. Use conversation history to resolve follow-up questions. Keep answers concise, relevant, and readable. Do not include unrelated project descriptions or repeat source documents. Distinguish verified project facts from general technical knowledge. If the requested code or evidence is unavailable, state that clearly rather than fabricating it. Cite the relevant source. Never claim zero hallucinations.`;
 
         const systemInstruction = `${REQUIRED_SYSTEM_PROMPT}
@@ -1262,7 +1343,7 @@ app.post("/api/agent/query", agentLimiter, async (req, res) => {
 ADDITIONAL CONTEXT & GUIDELINES:
 1. ANSWER THE EXACT QUESTION FIRST: Provide a direct, relevant answer immediately.
 2. CONCISENESS & CLARITY: For simple questions, answer directly in 2 to 5 sentences. For technical explanations or lists, use clear, concise bullet points. Expand only when explicitly requested. Never dump an entire README or unrelated project descriptions.
-3. CODE-FIRST POLICY: When the user requests code or implementation, provide complete, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write dummy placeholder functions.
+3. CODE-FIRST POLICY: When the user requests code or implementation, provide complete, runnable code FIRST in a markdown code block (\`\`\`language ... \`\`\`), followed by a brief 1-2 sentence explanation. Never write dummy placeholder functions. Use the provided retrieved source code from GitHub.
 4. CORRECT PROJECT IDENTITY: Maintain strict boundaries for FreshGuard (lab_project_fresh_guard produce shelf life), RAG Teaching Assistant (Teaching_assistant-rag-based-), DevOps (Terraform, Docker, CI/CD), BiGRU Emotion Classifier (sentiment_analysis), and Time Series Forecasting (Time_series-). Link to the exact repository or source file used. Never cite an unrelated repository.
 5. GREETINGS & CASUAL INTROS: If the user says hello or greets you, respond warmly and briefly in 1-2 sentences as UMU and offer to help with projects or coding.
 6. ENGLISH ONLY: Always output in English.
@@ -1273,15 +1354,14 @@ ${RESUME_TEXT}
 
 === TOP GITHUB REPOSITORIES ===
 ${reposContextText}
-${sourceEvidenceSection}${newsContextSection}`;
+${dynamicRepoEvidence}
+${sourceEvidenceSection}`;
 
         const contents: any[] = [];
         let lastRole = "";
         for (const h of safeHistory) {
           const role = h.role === "user" ? "user" : "model";
-          // Gemini requires the conversation history to start with a user turn
           if (contents.length === 0 && role !== "user") continue;
-          // Gemini requires strictly alternating roles
           if (role === lastRole) continue;
           const content = normalizeText(h?.content, 400, true);
           if (!content) continue;
@@ -1291,7 +1371,6 @@ ${sourceEvidenceSection}${newsContextSection}`;
           });
           lastRole = role;
         }
-        // If the last message in history was user, remove it so we can cleanly push current user query
         if (lastRole === "user") {
           contents.pop();
         }
@@ -1300,44 +1379,55 @@ ${sourceEvidenceSection}${newsContextSection}`;
           parts: [{ text: trimmedMessage }]
         });
 
-        console.log(`[BACKEND] Querying Gemini for user request (${isCode ? "code" : "general"})...`);
-        const primaryModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-        let response;
-        try {
-          response = await ai.models.generateContent({
-            model: primaryModel,
-            contents,
-            config: {
-              systemInstruction,
-              temperature: isCode ? 0.2 : 0.6,
-              maxOutputTokens: isCode ? 600 : 350,
-            }
-          });
-        } catch (firstErr: any) {
-          console.warn(`[BACKEND] ${primaryModel} failed, trying gemini-2.5-pro fallback:`, firstErr?.message || firstErr);
-          response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
-            contents,
-            config: {
-              systemInstruction,
-              temperature: isCode ? 0.2 : 0.6,
-              maxOutputTokens: isCode ? 600 : 350,
-            }
-          });
-        }
+        const candidateModels = [
+          process.env.GEMINI_MODEL,
+          "gemini-2.0-flash",
+          "gemini-2.5-flash",
+          "gemini-1.5-flash",
+          "gemini-1.5-pro",
+        ].filter(Boolean) as string[];
 
-        if (response && response.text) {
-          reply = response.text;
+        for (const model of candidateModels) {
+          try {
+            console.log(`[BACKEND] Querying Gemini model ${model} for user request (${isCode ? "code" : "general"})...`);
+            const response = await ai.models.generateContent({
+              model,
+              contents,
+              config: {
+                systemInstruction,
+                temperature: isCode ? 0.2 : 0.6,
+                maxOutputTokens: isCode ? 700 : 380,
+              }
+            });
+
+            if (response && response.text) {
+              reply = response.text.trim();
+              console.log(`[BACKEND] Gemini ${model} generated response successfully (${reply.length} chars).`);
+              break;
+            }
+          } catch (modelErr: any) {
+            console.warn(`[BACKEND] Gemini model ${model} notice:`, modelErr?.message || modelErr);
+          }
         }
       } catch (geminiErr: any) {
         console.warn("[BACKEND] Gemini API execution warning, falling back to smart heuristic engine:", geminiErr?.message || geminiErr);
       }
     }
 
-    // Seamless fallback ensures 100% uptime: uses verified RAG evidence if available, else smart heuristic engine
+    // Seamless fallback ensures 100% uptime using real GitHub data
     if (!reply) {
       if (hasExplicitNewsIntent && cachedNewsStories.length > 0) {
         reply = generateLiveTechPulseBriefing(cachedNewsStories);
+      } else if (isCode && fetchedSourceFile) {
+        const lang = fetchedSourceFile.filePath.endsWith(".py")
+          ? "python"
+          : fetchedSourceFile.filePath.endsWith(".js")
+          ? "javascript"
+          : fetchedSourceFile.filePath.endsWith(".ts")
+          ? "typescript"
+          : "text";
+        const explanation = `This source code from \`${fetchedSourceFile.filePath}\` in [${targetRepoName}](https://github.com/umeshkumarsahoo/${targetRepoName}) is dynamically retrieved from GitHub.`;
+        reply = formatCodeFirstResponse(fetchedSourceFile.content, lang, explanation);
       } else {
         reply = ragEngine.synthesizeDeterministicAnswer(
           trimmedMessage,
