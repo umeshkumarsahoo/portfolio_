@@ -1566,7 +1566,8 @@ ADDITIONAL CONSTRAINTS:
 1. Answer the exact question directly in the very first sentence.
 2. For simple questions, keep your answer between 2 and 5 sentences.
 3. If code is requested, provide the actual source code first in a markdown block, then a brief 1-2 sentence explanation.
-4. Output strictly in English.`;
+4. Output strictly in English.
+5. If the visitor wants to contact or send a message to Umesh, guide them to provide their name, email, and message so an email draft can be prepared and confirmed. Never claim that you cannot contact Umesh.`;
 
         const primaryModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
         let response;

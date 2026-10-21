@@ -926,6 +926,71 @@ app.post("/api/github/repos/refresh", async (req, res) => {
   }
 });
 
+// Get comprehensive live GitHub engineering activity (commits, repo stats, languages, sync timestamp)
+app.get("/api/github/activity", async (req, res) => {
+  try {
+    const repos = await githubService.fetchRepositories(false);
+    const commits = await githubService.fetchRecentCommits(false);
+    const lastSynced = new Date().toISOString();
+
+    const languagesMap: Record<string, number> = {};
+    repos.forEach(r => {
+      if (r.language) {
+        languagesMap[r.language] = (languagesMap[r.language] || 0) + 1;
+      }
+    });
+
+    const totalStars = repos.reduce((acc, r) => acc + (r.stars || 0), 0);
+    const totalForks = repos.reduce((acc, r) => acc + (r.forks || 0), 0);
+
+    res.json({
+      lastSynced,
+      commits,
+      stats: {
+        totalRepos: repos.length,
+        totalStars,
+        totalForks,
+        languages: languagesMap,
+      }
+    });
+  } catch (err: any) {
+    console.error("[BACKEND] GitHub activity error:", err);
+    res.status(500).json({ error: "Failed to load live GitHub activity." });
+  }
+});
+
+app.post("/api/github/activity/refresh", async (req, res) => {
+  try {
+    const repos = await githubService.fetchRepositories(true);
+    const commits = await githubService.fetchRecentCommits(true);
+    const lastSynced = new Date().toISOString();
+
+    const languagesMap: Record<string, number> = {};
+    repos.forEach(r => {
+      if (r.language) {
+        languagesMap[r.language] = (languagesMap[r.language] || 0) + 1;
+      }
+    });
+
+    const totalStars = repos.reduce((acc, r) => acc + (r.stars || 0), 0);
+    const totalForks = repos.reduce((acc, r) => acc + (r.forks || 0), 0);
+
+    res.json({
+      lastSynced,
+      commits,
+      stats: {
+        totalRepos: repos.length,
+        totalStars,
+        totalForks,
+        languages: languagesMap,
+      }
+    });
+  } catch (err: any) {
+    console.error("[BACKEND] GitHub activity refresh error:", err);
+    res.status(500).json({ error: "Failed to refresh live GitHub activity." });
+  }
+});
+
 // Inspect file tree / file contents from public repository
 app.get("/api/github/repos/:repo/contents", async (req, res) => {
   try {
@@ -1286,6 +1351,7 @@ ADDITIONAL CONTEXT & GUIDELINES:
 4. CORRECT PROJECT IDENTITY: Maintain strict boundaries for FreshGuard (lab_project_fresh_guard produce shelf life), RAG Teaching Assistant (Teaching_assistant-rag-based-), DevOps (Terraform, Docker, CI/CD), BiGRU Emotion Classifier (sentiment_analysis), and Time Series Forecasting (Time_series-). Link to the exact repository or source file used. Never cite an unrelated repository.
 5. GREETINGS & CASUAL INTROS: If the user says hello or greets you, respond warmly and briefly in 1-2 sentences as UMU and offer to help with projects or coding.
 6. ENGLISH ONLY: Always output in English.
+7. VISITOR CONTACT & MESSAGING: You CAN send messages or emails to Umesh for visitors. When a visitor says they want to contact Umesh, send him a message, or collaborate, warmly invite them to share their name, their email address, and the message they would like to send. Explain that you will prepare an email draft for them to review and confirm before sending. Never claim that you cannot contact Umesh.
 
 Authoritative Context:
 === AUTHORATIVE RESUME ===

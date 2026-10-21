@@ -4,7 +4,7 @@ import {
   Send, Terminal, Cpu, Bot, Star, ExternalLink, RefreshCw, Sparkles, BookOpen, 
   Calendar, User, MapPin, Mail, GraduationCap, TrendingUp, Cloud, Trophy, 
   Brain, Leaf, Plane, Award, Code, Globe, Play, Github, Linkedin, Eye, ArrowRight,
-  GitFork, Check, X, Edit2, AlertCircle, CheckCircle2
+  GitFork, Check, X, Edit2, AlertCircle, CheckCircle2, Activity
 } from "lucide-react";
 import { secureFetch } from "../lib/api";
 import UmuDoodle from "./UmuDoodle";
@@ -22,6 +22,8 @@ import {
 import portraitImg from "../assets/images/umesh_portrait_1784052523060.png";
 import MarkdownRenderer from "./MarkdownRenderer";
 import TechNewsFeed from "./TechNewsFeed";
+import ProjectCaseStudies from "./ProjectCaseStudies";
+import GitHubStats from "./GitHubStats";
 
 interface TabContentProps {
   activeTab: string;
@@ -86,6 +88,7 @@ export default function TabContent({
   const [isRefreshingRepos, setIsRefreshingRepos] = useState(false);
   const [editingDraftIndex, setEditingDraftIndex] = useState<number | null>(null);
   const [editDraftForm, setEditDraftForm] = useState({ name: "", email: "", message: "" });
+  const [projectSubTab, setProjectSubTab] = useState<"case-studies" | "github-activity" | "all-repos">("case-studies");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -777,123 +780,185 @@ export default function TabContent({
           </span>
         </div>
 
-        {/* Two-Page Spread Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-          {/* Left Page (6 cols): 3 Core Featured Projects */}
-          <div className="lg:col-span-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
-                Flagship Implementations
-              </span>
-              <TwilightSeaIllustration className="w-20 h-14 shrink-0 rounded-lg overflow-hidden border border-[#E7E3D8]" />
-            </div>
-
-            <div className="space-y-4">
-              {featuredProjects.map((p, idx) => (
-                <div key={idx} className="p-4 rounded-2xl border border-[#E7E3D8] bg-[#FAF9F5] hover:border-[var(--accent-blue)] transition-all flex flex-col justify-between group">
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-mono text-[10px] font-bold text-[var(--accent-blue)]">0{idx + 1} · {p.badge}</span>
-                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                    <h4 className="text-base font-bold text-[#181818] group-hover:text-[var(--accent-blue)] transition-colors">
-                      {p.title}
-                    </h4>
-                    <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
-                      {p.desc}
-                    </p>
-                  </div>
-                  <div className="pt-3 mt-3 border-t border-[#E7E3D8]/60 flex items-center justify-between text-[11px] font-mono text-[var(--text-faint)]">
-                    <span className="truncate pr-2">{p.tech}</span>
-                    <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-blue)] font-semibold shrink-0 flex items-center gap-1 hover:underline">
-                      Code <ArrowRight className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Chapter 04 Sub-Navigation */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-[#EFECE4]">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-[#FAF9F5] border border-[#E7E3D8]">
+            <button
+              onClick={() => setProjectSubTab("case-studies")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                projectSubTab === "case-studies"
+                  ? "bg-white text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 shadow-2xs font-bold"
+                  : "text-[var(--text-muted)] hover:text-[#181818]"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Interactive Case Studies</span>
+            </button>
+            <button
+              onClick={() => setProjectSubTab("github-activity")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                projectSubTab === "github-activity"
+                  ? "bg-white text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 shadow-2xs font-bold"
+                  : "text-[var(--text-muted)] hover:text-[#181818]"
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Live GitHub Activity & Heatmap</span>
+            </button>
+            <button
+              onClick={() => setProjectSubTab("all-repos")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                projectSubTab === "all-repos"
+                  ? "bg-white text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 shadow-2xs font-bold"
+                  : "text-[var(--text-muted)] hover:text-[#181818]"
+              }`}
+            >
+              <Github className="w-3.5 h-3.5" />
+              <span>Repositories Catalogue ({repos.length || 31})</span>
+            </button>
           </div>
 
-          {/* Right Page (6 cols): Live Synchronized GitHub Repositories */}
-          <div className="lg:col-span-6 space-y-4 lg:border-l lg:border-[#EFECE4] lg:pl-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
-                  Live GitHub Index
-                </span>
-                <h4 className="text-lg font-hand font-bold text-[#181818]">
-                  Real-time Public Repositories
-                </h4>
-              </div>
-              <button
-                onClick={handleRefreshRepos}
-                disabled={isRefreshingRepos}
-                className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 px-2.5 py-1 rounded-md hover:bg-[var(--accent-blue)] hover:text-white transition-all cursor-pointer"
-                title="Sync with GitHub API"
-              >
-                <RefreshCw className={`w-3 h-3 ${isRefreshingRepos ? "animate-spin" : ""}`} />
-                <span>Sync</span>
-              </button>
-            </div>
-
-            {/* Filter Input */}
-            <input
-              type="text"
-              placeholder="Search repositories by name or tech..."
-              value={repoSearch}
-              onChange={(e) => setRepoSearch(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-[#E7E3D8] bg-[#FAF9F5] focus:outline-none focus:border-[var(--accent-blue)]"
-            />
-
-            {/* Repos List */}
-            <div className="max-h-[380px] overflow-y-auto space-y-2.5 pr-1">
-              {isLoadingRepos ? (
-                <div className="py-12 text-center text-xs font-mono text-[var(--text-faint)]">
-                  Connecting to GitHub API...
-                </div>
-              ) : filteredRepos.length > 0 ? (
-                filteredRepos.slice(0, 10).map((r, i) => (
-                  <a
-                    key={i}
-                    href={r.html_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-3 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] hover:bg-white hover:border-[var(--accent-blue)] transition-all group"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono font-bold text-[#181818] group-hover:text-[var(--accent-blue)] transition-colors truncate pr-2">
-                        {r.name}
-                      </span>
-                      <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-faint)] shrink-0">
-                        <span className="flex items-center gap-0.5">
-                          <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
-                          {r.stargazers_count}
-                        </span>
-                        <span className="flex items-center gap-0.5">
-                          <GitFork className="w-2.5 h-2.5" />
-                          {r.forks_count}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 mt-1">
-                      {r.description || "Open source repository by Umesh Kumar Sahoo"}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-[var(--text-faint)]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)]" />
-                      <span>{r.language || "Code"}</span>
-                    </div>
-                  </a>
-                ))
-              ) : (
-                <div className="py-8 text-center text-xs text-[var(--text-faint)]">
-                  No repositories matched your filter.
-                </div>
-              )}
-            </div>
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-[11px] font-mono text-[var(--text-faint)]">
+              {projectSubTab === "case-studies" ? "UMU AI · FreshGuard · RAG" : "@umeshkumarsahoo"}
+            </span>
           </div>
         </div>
+
+        {/* View 1: Interactive Case Studies */}
+        {projectSubTab === "case-studies" && (
+          <ProjectCaseStudies />
+        )}
+
+        {/* View 2: Live Engineering Activity & GitHub Graph Card */}
+        {projectSubTab === "github-activity" && (
+          <GitHubStats 
+            repos={repos} 
+            isLoading={isLoadingRepos} 
+            onRefresh={handleRefreshRepos} 
+            isRefreshing={isRefreshingRepos} 
+          />
+        )}
+
+        {/* View 3: Two-Page Spread Layout (Featured Projects + All Repos Search) */}
+        {projectSubTab === "all-repos" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+            {/* Left Page (6 cols): 3 Core Featured Projects */}
+            <div className="lg:col-span-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                  Flagship Implementations
+                </span>
+                <TwilightSeaIllustration className="w-20 h-14 shrink-0 rounded-lg overflow-hidden border border-[#E7E3D8]" />
+              </div>
+
+              <div className="space-y-4">
+                {featuredProjects.map((p, idx) => (
+                  <div key={idx} className="p-4 rounded-2xl border border-[#E7E3D8] bg-[#FAF9F5] hover:border-[var(--accent-blue)] transition-all flex flex-col justify-between group">
+                    <div>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-mono text-[10px] font-bold text-[var(--accent-blue)]">0{idx + 1} · {p.badge}</span>
+                        <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[var(--text-faint)] group-hover:text-[var(--accent-blue)] transition-colors">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                      <h4 className="text-base font-bold text-[#181818] group-hover:text-[var(--accent-blue)] transition-colors">
+                        {p.title}
+                      </h4>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed">
+                        {p.desc}
+                      </p>
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-[#E7E3D8]/60 flex items-center justify-between text-[11px] font-mono text-[var(--text-faint)]">
+                      <span className="truncate pr-2">{p.tech}</span>
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-blue)] font-semibold shrink-0 flex items-center gap-1 hover:underline">
+                        Code <ArrowRight className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Page (6 cols): Live Synchronized GitHub Repositories */}
+            <div className="lg:col-span-6 space-y-4 lg:border-l lg:border-[#EFECE4] lg:pl-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-[var(--text-faint)] uppercase tracking-wider">
+                    Live GitHub Index
+                  </span>
+                  <h4 className="text-lg font-hand font-bold text-[#181818]">
+                    Real-time Public Repositories
+                  </h4>
+                </div>
+                <button
+                  onClick={handleRefreshRepos}
+                  disabled={isRefreshingRepos}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 px-2.5 py-1 rounded-md hover:bg-[var(--accent-blue)] hover:text-white transition-all cursor-pointer"
+                  title="Sync with GitHub API"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isRefreshingRepos ? "animate-spin" : ""}`} />
+                  <span>Sync</span>
+                </button>
+              </div>
+
+              {/* Filter Input */}
+              <input
+                type="text"
+                placeholder="Search repositories by name or tech..."
+                value={repoSearch}
+                onChange={(e) => setRepoSearch(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-[#E7E3D8] bg-[#FAF9F5] focus:outline-none focus:border-[var(--accent-blue)]"
+              />
+
+              {/* Repos List */}
+              <div className="max-h-[380px] overflow-y-auto space-y-2.5 pr-1">
+                {isLoadingRepos ? (
+                  <div className="py-12 text-center text-xs font-mono text-[var(--text-faint)]">
+                    Connecting to GitHub API...
+                  </div>
+                ) : filteredRepos.length > 0 ? (
+                  filteredRepos.slice(0, 10).map((r, i) => (
+                    <a
+                      key={i}
+                      href={r.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-3 rounded-xl border border-[#E7E3D8] bg-[#FAF9F5] hover:bg-white hover:border-[var(--accent-blue)] transition-all group"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-mono font-bold text-[#181818] group-hover:text-[var(--accent-blue)] transition-colors truncate pr-2">
+                          {r.name}
+                        </span>
+                        <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--text-faint)] shrink-0">
+                          <span className="flex items-center gap-0.5">
+                            <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                            {r.stargazers_count}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <GitFork className="w-2.5 h-2.5" />
+                            {r.forks_count}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 mt-1">
+                        {r.description || "Open source repository by Umesh Kumar Sahoo"}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2 text-[10px] font-mono text-[var(--text-faint)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-blue)]" />
+                        <span>{r.language || "Code"}</span>
+                      </div>
+                    </a>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-[var(--text-faint)]">
+                    No repositories matched your filter.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     );
   }

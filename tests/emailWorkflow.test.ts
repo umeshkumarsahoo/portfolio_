@@ -202,6 +202,50 @@ async function runEmailWorkflowTests() {
     assert(failResult.error !== undefined, "Provides detailed error reason");
   }
 
+  // ── GROUP 8: Conversational Typos & Multi-Turn Message Queries ──
+  console.log("\n🔍 Group 8: Conversational Typos & Multi-Turn Queries");
+  {
+    // Typo: 'contatc'
+    const typoFlow = parseContactWorkflow("hey can u contatc umesh for me", []);
+    assert(typoFlow.isContactWorkflow, "Handles typo 'contatc' as contact workflow");
+    assert(typoFlow.status === "collecting", "Sets status to 'collecting' for missing details");
+    assert(typoFlow.missingFields.includes("email"), "Identifies email is missing");
+
+    // Turn 1: Conversational 'send my message that i said hi'
+    const t1 = parseContactWorkflow("can u send my message to umesh that i said hi", []);
+    assert(t1.isContactWorkflow, "Detects 'can u send my message to umesh that i said hi'");
+    assert(t1.draft?.message === "i said hi", "Extracts 'i said hi' as draft message");
+    assert(t1.status === "collecting", "Asks for missing sender information");
+
+    // Turn 2: Providing credentials using .text history format
+    const historyTurn2 = [
+      { role: "user", text: "can u send my message to umesh that i said hi" },
+      { role: "assistant", text: "Thanks there! What email address should Umesh use to get back to you?" },
+    ];
+    const t2 = parseContactWorkflow("my email is alex@example.com and my name is Alex", historyTurn2);
+    assert(t2.isContactWorkflow, "Maintains contact workflow across turns");
+    assert(t2.draft?.name === "Alex", "Extracts name 'Alex'");
+    assert(t2.draft?.email === "alex@example.com", "Extracts email 'alex@example.com'");
+    assert(t2.draft?.message === "i said hi", "Preserves message 'i said hi' from turn 1");
+    assert(t2.status === "pending_confirmation", "Reaches 'pending_confirmation' state");
+
+    // Turn 3: Confirmation
+    const historyTurn3 = [
+      ...historyTurn2,
+      { role: "user", text: "my email is alex@example.com and my name is Alex" },
+      {
+        role: "assistant",
+        text: 'I have prepared an email draft to send to Umesh:\n\n• Recipient: Umesh Kumar Sahoo\n• From: Alex (alex@example.com)\n• Message: i said hi\n\nWould you like me to send this now? Please confirm.',
+      },
+    ];
+    const t3 = parseContactWorkflow("yes send it", historyTurn3);
+    assert(t3.isConfirmation, "Recognizes 'yes send it' as confirmation");
+    assert(t3.status === "confirmed", "Sets status to 'confirmed'");
+    assert(t3.draft?.name === "Alex", "Maintains sender name for delivery");
+    assert(t3.draft?.email === "alex@example.com", "Maintains sender email for delivery");
+    assert(t3.draft?.message === "i said hi", "Maintains sender message for delivery");
+  }
+
   console.log("\n==================================================");
   console.log(`📊 RESULTS: ${passed}/${total} TESTS PASSED`);
   console.log("==================================================");

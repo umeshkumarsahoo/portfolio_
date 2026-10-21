@@ -283,10 +283,18 @@ export async function sendContactEmail(contactInput: {
  */
 export function parseContactWorkflow(
   currentMessage: string,
-  history: { role: string; content: string }[] = [],
+  rawHistory: { role: string; content?: string; text?: string }[] = [],
   overrideDraft?: { name?: string; email?: string; message?: string }
 ): EmailDraftState {
   const currentLower = currentMessage.toLowerCase().trim();
+
+  // Normalize history entries so both .content and .text formats work, and normalize role
+  const history = (rawHistory || []).map((h: any) => ({
+    role: String(h?.role || "").toLowerCase(),
+    content: (typeof h?.content === "string" ? h.content : (typeof h?.text === "string" ? h.text : "")) || "",
+  }));
+
+  const isAssistantRole = (role: string) => role === "assistant" || role === "agent" || role === "model";
 
   // If client supplied explicit draft fields (e.g. from UI confirmation or inline edit)
   let explicitName = overrideDraft?.name ? normalizeText(overrideDraft.name, 120) : undefined;
@@ -294,7 +302,7 @@ export function parseContactWorkflow(
   let explicitMessage = overrideDraft?.message ? normalizeText(overrideDraft.message, 4000, true) : undefined;
 
   // 1. Check if previous assistant message presented a draft or asked for confirmation
-  const lastAgentMsg = [...history].reverse().find((h) => h.role === "agent" || h.role === "model")?.content || "";
+  const lastAgentMsg = [...history].reverse().find((h) => isAssistantRole(h.role))?.content || "";
   const lastAgentMsgLower = lastAgentMsg.toLowerCase();
   const hasPendingDraftInHistory =
     lastAgentMsgLower.includes("email draft") ||
@@ -333,9 +341,10 @@ export function parseContactWorkflow(
   const historyHasContactFlow = history.some((h) => {
     const c = h.content.toLowerCase();
     return (
-      c.includes("contact umesh") ||
+      /conta[a-z]*/i.test(c) ||
       c.includes("send a message") ||
       c.includes("send message") ||
+      c.includes("send my message") ||
       c.includes("direct message to umesh") ||
       c.includes("email draft") ||
       c.includes("what email address") ||
@@ -343,23 +352,24 @@ export function parseContactWorkflow(
       c.includes("who is contacting him") ||
       c.includes("what message") ||
       c.includes("collaborat") ||
-      c.includes("email umesh")
+      c.includes("email umesh") ||
+      c.includes("tell umesh")
     );
   });
 
   const isExplicitContactIntent =
-    currentLower === "contact me" ||
-    currentLower.includes("contact umesh") ||
-    currentLower.includes("i want to contact") ||
-    currentLower.includes("send a message") ||
-    currentLower.includes("send message") ||
-    currentLower.includes("email umesh") ||
+    /conta[a-z]*/i.test(currentLower) ||
+    /send.*(message|msg|email)/i.test(currentLower) ||
+    currentLower.includes("reach out") ||
     currentLower.includes("tell umesh") ||
-    currentLower.includes("reach out to umesh") ||
+    currentLower.includes("talk to umesh") ||
+    currentLower.includes("connect with umesh") ||
+    currentLower.includes("say hi to umesh") ||
+    currentLower.includes("say hello to umesh") ||
     currentLower.includes("collaborate") ||
     currentLower.includes("collaboration") ||
     (currentLower.includes("hire") && (currentLower.includes("umesh") || currentLower.includes("you"))) ||
-    currentLower.includes("internship opportunity");
+    currentLower.includes("internship");
 
   const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
 
@@ -383,13 +393,25 @@ export function parseContactWorkflow(
     };
   }
 
+  // Check if last assistant message had a prepared draft
+  const draftFromMatch =
+    lastAgentMsg.match(/•\s*(?:\*\*)?From:(?:\*\*)?\s*([^(]+?)\s*\(`?([^`)\s]+)`?\)/i) ||
+    lastAgentMsg.match(/(?:^|\n)\s*From:\s*([^(]+?)\s*\(`?([^`)\s]+)`?\)/i);
+
+  const draftMessageMatch =
+    lastAgentMsg.match(/•\s*(?:\*\*)?Message:(?:\*\*)?\s*["“]?([^\n"”]+?)["”]?\s*(?:\n|$)/i) ||
+    lastAgentMsg.match(/(?:^|\n)\s*Message:\s*["“]?([^\n"”]+?)["”]?\s*(?:\n|$)/i);
+
   // 5. Extract Email (prefer current message for updates, fallback to history)
   let email = explicitEmail;
   if (!email) {
     if (currentEmailMatch) {
       email = currentEmailMatch[0].toLowerCase();
+    } else if (draftFromMatch && draftFromMatch[2]) {
+      email = draftFromMatch[2].trim().toLowerCase();
     } else {
       for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role !== "user") continue;
         const m = history[i].content.match(emailRegex);
         if (m) {
           email = m[0].toLowerCase();
@@ -421,9 +443,17 @@ export function parseContactWorkflow(
     }
   }
 
+  if (!name && draftFromMatch && draftFromMatch[1]) {
+    const candidate = draftFromMatch[1].trim();
+    if (candidate.length >= 2) {
+      name = candidate;
+    }
+  }
+
   if (!name) {
-    // Check history in reverse
+    // Check user history in reverse
     for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role !== "user") continue;
       for (const pat of namePatterns) {
         const m = history[i].content.match(pat);
         if (m && m[1]) {
@@ -442,7 +472,7 @@ export function parseContactWorkflow(
   if (!name && history.length > 0) {
     const prevTurn = history[history.length - 1];
     if (
-      (prevTurn.role === "agent" || prevTurn.role === "model") &&
+      isAssistantRole(prevTurn.role) &&
       (prevTurn.content.toLowerCase().includes("may i have your name") ||
         prevTurn.content.toLowerCase().includes("share your name") ||
         prevTurn.content.toLowerCase().includes("who is contacting"))
@@ -462,7 +492,8 @@ export function parseContactWorkflow(
   // 7. Extract Message
   let message = explicitMessage;
   const msgPatterns = [
-    /(?:tell umesh|send a message to umesh that|send him a message that|tell him)\s+(.+)/i,
+    /(?:send(?:\s+my)?\s+message(?:\s+to\s+umesh)?\s+that)\s+(.+)/i,
+    /(?:tell umesh that|send a message to umesh that|send him a message that|tell him that|tell umesh|tell him)\s+(.+)/i,
     /(?:change message to|edit message to|update message to|message is|my message is|message:\s*)(.+)/i,
     /(?:interested in|want to discuss|collaborate on|hiring for)\s+(.+)/i,
   ];
@@ -472,7 +503,7 @@ export function parseContactWorkflow(
       const m = currentMessage.match(pat);
       if (m && m[1]) {
         const candidate = m[1].trim();
-        if (candidate.length > 4 && !candidate.toLowerCase().startsWith("what")) {
+        if (candidate.length >= 2 && !candidate.toLowerCase().startsWith("what")) {
           message = candidate;
           break;
         }
@@ -480,15 +511,23 @@ export function parseContactWorkflow(
     }
   }
 
-  if (!message && currentLower.includes("collaborat")) {
+  if (!message && (currentLower.includes("said hi") || currentLower.includes("say hi") || currentLower.includes("say hello"))) {
+    message = "Hello Umesh, I wanted to say hi!";
+  } else if (!message && currentLower.includes("collaborat")) {
     message = currentMessage.replace(/^.*?(collaborat\w*)/i, "I'm interested in collaborating").trim();
   } else if (!message && (currentLower.includes("hire") || currentLower.includes("internship"))) {
     message = currentMessage;
   }
 
-  // If not in current message, search history
+  // If not in current message, check if draft was in previous assistant message
+  if (!message && draftMessageMatch && draftMessageMatch[1]) {
+    message = draftMessageMatch[1].trim();
+  }
+
+  // If not in current message or assistant draft, search user history
   if (!message) {
     for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role !== "user") continue;
       for (const pat of msgPatterns) {
         const m = history[i].content.match(pat);
         if (m && m[1]) {
@@ -507,7 +546,7 @@ export function parseContactWorkflow(
   if (!message && history.length > 0) {
     const prevTurn = history[history.length - 1];
     if (
-      (prevTurn.role === "agent" || prevTurn.role === "model") &&
+      isAssistantRole(prevTurn.role) &&
       (prevTurn.content.toLowerCase().includes("what message") ||
         prevTurn.content.toLowerCase().includes("what would you like to say") ||
         prevTurn.content.toLowerCase().includes("collaboration proposal"))
